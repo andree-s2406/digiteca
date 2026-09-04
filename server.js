@@ -47,6 +47,7 @@ function apiAuthGuard(req, res, next) {
     '/contacto',
     '/stats/visita',
     '/stats/lectura',
+    '/stats/libro-abierto',
     '/health'
   ];
   if (publicPaths.some(p => req.path === p || req.path.startsWith(p))) {
