@@ -5,12 +5,11 @@ const { query } = require('../db/connection');
 // GET /api/ranking - Obtener Top 5 libros más abiertos / más buscados
 router.get('/', async (req, res) => {
   try {
-    // Consulta dinámica: los libros ordenados por cantidad de aperturas en estadisticas_eventos
     const result = await query(
       `SELECT l.id AS libro_id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios,
               COUNT(e.id) AS veces_abierto
        FROM libros l
-       LEFT JOIN estadisticas_eventos e ON e.referencia_id = l.id AND e.tipo = 'libro_abierto'
+       LEFT JOIN estadisticas_eventos e ON e.referencia_id = l.id AND (e.tipo = 'libro_abierto' OR e.tipo = 'lectura')
        GROUP BY l.id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios
        ORDER BY veces_abierto DESC, l.id ASC
        LIMIT 5;`
@@ -49,7 +48,6 @@ router.put('/', async (req, res) => {
       return res.status(400).json({ error: 'Se esperaba un array de IDs de libros' });
     }
 
-    // Limpiar tabla y reinsertar en orden
     await query(`DELETE FROM ranking_buscados;`);
 
     for (let i = 0; i < ids.length; i++) {

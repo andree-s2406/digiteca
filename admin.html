@@ -796,6 +796,8 @@ function cambiarPanel(el){
   document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("active"); });
   document.getElementById(id).classList.add("active");
   document.getElementById("topbarTitle").textContent = PANEL_TITLES[id]||"";
+  if(id === "panelMasBuscados") cargarRankingAutomatico();
+  if(id === "panelResumen") actualizarStats();
   if(window.innerWidth <= 768) toggleSidebar();
 }
 

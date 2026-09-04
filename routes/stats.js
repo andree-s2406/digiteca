@@ -95,7 +95,7 @@ router.get('/', async (req, res) => {
 
     // 4. Conteo de libros abiertos en el período
     const { rows: rAbiertos } = await query(
-      `SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'libro_abierto' ${filterSql};`,
+      `SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE (tipo = 'libro_abierto' OR tipo = 'lectura') ${filterSql};`,
       params
     );
 
@@ -142,7 +142,7 @@ router.get('/', async (req, res) => {
       `SELECT e.referencia_id AS id, l.titulo, l.autor, l.materia, COUNT(*) AS veces
        FROM estadisticas_eventos e
        JOIN libros l ON e.referencia_id = l.id
-       WHERE e.tipo = 'libro_abierto' ${filterSql}
+       WHERE (e.tipo = 'libro_abierto' OR e.tipo = 'lectura') ${filterSql}
        GROUP BY e.referencia_id, l.titulo, l.autor, l.materia
        ORDER BY veces DESC
        LIMIT 10;`,
@@ -203,7 +203,7 @@ router.get('/reporte-texto', async (req, res) => {
     const { rows: rLibros } = await query(`SELECT COUNT(*) AS total FROM libros;`);
     const { rows: rUsuarios } = await query(`SELECT * FROM usuarios ORDER BY id ASC;`);
     const { rows: rVisitas } = await query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'visita' ${filterSql};`, params);
-    const { rows: rAbiertos } = await query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'libro_abierto' ${filterSql};`, params);
+    const { rows: rAbiertos } = await query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE (tipo = 'libro_abierto' OR tipo = 'lectura') ${filterSql};`, params);
     const { rows: rHoy } = await query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'ingreso' AND fecha::date = CURRENT_DATE;`);
     const { rows: rDesc } = await query(`SELECT COUNT(*) AS total FROM descargas;`);
 
@@ -225,7 +225,7 @@ router.get('/reporte-texto', async (req, res) => {
       `SELECT l.titulo, l.autor, COUNT(*) AS veces
        FROM estadisticas_eventos e
        JOIN libros l ON e.referencia_id = l.id
-       WHERE e.tipo = 'libro_abierto' ${filterSql}
+       WHERE (e.tipo = 'libro_abierto' OR e.tipo = 'lectura') ${filterSql}
        GROUP BY l.titulo, l.autor
        ORDER BY veces DESC
        LIMIT 10;`,
