@@ -1084,25 +1084,27 @@ function confirmarEliminarLibro(id){
 // ════════════════════════════════════════════════
 function renderRanking(){
   var ranking = getRanking();
-  var libros  = getLibros();
   var h = "";
-  for(var i=0;i<ranking.length;i++){
+  for(var i=0; i<ranking.length && i<5; i++){
     var id = ranking[i];
-    var l = null;
-    for(var j=0;j<libros.length;j++){ if(String(libros[j].id)===String(id)){ l=libros[j]; break; } }
+    var l = getLibroPorId(id);
+    var pos = i + 1;
     if(!l) continue;
-    h += '<div class="rank-row">';
-    h += '<div class="rank-pos">'+(i+1)+'</div>';
-    h += '<div class="rank-emoji">'+l.e+'</div>';
-    h += '<div class="rank-info"><div class="rank-title">'+l.t+'</div><div class="rank-sub">'+l.a+'</div></div>';
-    h += '<div class="rank-actions">';
-    if(i>0) h += '<button class="btn btn-ghost btn-sm" onclick="moverRanking('+i+',-1)" title="Subir">'+DigiIcons.get("arrow-up",{size:12})+'</button>';
-    if(i<ranking.length-1) h += '<button class="btn btn-ghost btn-sm" onclick="moverRanking('+i+',1)" title="Bajar">'+DigiIcons.get("arrow-down",{size:12})+'</button>';
-    h += '<button class="btn btn-danger btn-sm" onclick="quitarRanking(\''+id+'\')" title="Quitar">'+DigiIcons.get("x",{size:12})+'</button>';
+    h += '<div class="rank-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;border:1px solid var(--borde);margin-bottom:8px;background:var(--bg-card)">';
+    h += '<div style="display:flex;align-items:center;gap:10px">';
+    h += '<span style="font-weight:900;color:var(--am-o);font-size:1.1rem;min-width:24px">#' + pos + '</span>';
+    h += '<div><p style="font-weight:700;font-size:.92rem;color:var(--txt)">' + l.t + '</p>';
+    h += '<p style="font-size:.78rem;color:var(--txt-m)">' + (l.a||"") + ' • <span style="color:var(--cel-o)">' + (l.mat||l.l||"") + '</span></p></div>';
+    h += '</div>';
+    h += '<div style="display:flex;gap:4px">';
+    if(i > 0) h += '<button class="btn btn-ghost btn-sm" onclick="moverRanking(' + i + ',-1)" title="Subir">' + DigiIcons.get("arrow-up", {size:12}) + '</button>';
+    if(i < Math.min(ranking.length, 5) - 1) h += '<button class="btn btn-ghost btn-sm" onclick="moverRanking(' + i + ',1)" title="Bajar">' + DigiIcons.get("arrow-down", {size:12}) + '</button>';
+    h += '<button class="btn btn-danger btn-sm" onclick="quitarRanking(\'' + id + '\')" title="Quitar">' + DigiIcons.get("x", {size:12}) + '</button>';
     h += '</div></div>';
   }
-  if(!h) h = '<p style="color:var(--txt-m);font-size:.9rem">El ranking está vacío. Agregá libros desde la lista.</p>';
-  document.getElementById("rankingActual").innerHTML = h;
+  if(!h) h = '<p style="color:var(--txt-m);font-size:.9rem">El ranking está sincronizándose automáticamente con las lecturas reales.</p>';
+  var rkActual = document.getElementById("rankingActual");
+  if(rkActual) rkActual.innerHTML = h;
 }
 
 function renderListaRanking(){

@@ -2,29 +2,46 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
 
-// GET /api/ranking - Obtener ranking de IDs
+// GET /api/ranking - Obtener Top 5 libros más abiertos / más buscados
 router.get('/', async (req, res) => {
   try {
+    // Consulta dinámica: los libros ordenados por cantidad de aperturas en estadisticas_eventos
     const result = await query(
-      `SELECT r.posicion, r.libro_id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia
-       FROM ranking_buscados r
-       JOIN libros l ON r.libro_id = l.id
-       ORDER BY r.posicion ASC;`
+      `SELECT l.id AS libro_id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios,
+              COUNT(e.id) AS veces_abierto
+       FROM libros l
+       LEFT JOIN estadisticas_eventos e ON e.referencia_id = l.id AND e.tipo = 'libro_abierto'
+       GROUP BY l.id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios
+       ORDER BY veces_abierto DESC, l.id ASC
+       LIMIT 5;`
     );
 
-    // Retornar array de IDs para compatibilidad directa y array enriquecido
-    const ids = result.rows.map(r => r.libro_id);
+    const ranking = result.rows.map((row, index) => ({
+      posicion: index + 1,
+      libro_id: row.libro_id,
+      titulo: row.titulo,
+      autor: row.autor,
+      emoji: row.emoji,
+      portada_url: row.portada_url,
+      materia: row.materia,
+      tipo: row.tipo,
+      anios: row.anios,
+      veces_abierto: parseInt(row.veces_abierto, 10) || 0
+    }));
+
+    const ids = ranking.map(r => r.libro_id);
+
     res.json({
       ids: ids,
-      ranking: result.rows
+      ranking: ranking
     });
   } catch (err) {
     console.error('Error en GET /api/ranking:', err);
-    res.status(500).json({ error: 'Error al consultar ranking' });
+    res.status(500).json({ error: 'Error al consultar ranking dinámico' });
   }
 });
 
-// PUT /api/ranking - Actualizar ranking de IDs
+// PUT /api/ranking - Actualizar ranking manual si se desea
 router.put('/', async (req, res) => {
   try {
     const { ids } = req.body;

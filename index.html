@@ -235,6 +235,8 @@ function norm(s){
 var LIBROS = [];
 
 // Carga dinámica desde API y registro de visitas
+var RANKING_DINAMICO = [];
+
 async function initInicioAPI(){
   try {
     if (window.API) {
@@ -243,11 +245,19 @@ async function initInicioAPI(){
         const libs = await API.libros.getAll();
         if (Array.isArray(libs)) {
           LIBROS = libs;
-          renderCatalogo();
         }
       }
+      if (window.API.ranking) {
+        const rk = await API.ranking.get();
+        if (rk && Array.isArray(rk.ranking)) {
+          RANKING_DINAMICO = rk.ranking;
+        }
+      }
+      renderCatalogo();
     }
-  } catch(e){}
+  } catch(e){
+    renderCatalogo();
+  }
 }
 initInicioAPI();
 
@@ -309,42 +319,60 @@ function getRankingIds(){
 function renderCatalogo(){
   var grid = document.getElementById("catalogoGrid");
   if(!grid) return;
-  var rankIds = getRankingIds();
 
-  // Build ordered list based on ranking
   var ranked = [];
-  for(var ri=0; ri<rankIds.length && ranked.length<10; ri++){
-    for(var li=0; li<LIBROS.length; li++){
-      if(LIBROS[li].id === rankIds[ri]){
-        ranked.push({libro: LIBROS[li], pos: ri+1});
-        break;
-      }
+
+  // 1. Usar el Top 5 más abiertos / más buscados desde la API
+  if(RANKING_DINAMICO && RANKING_DINAMICO.length > 0){
+    for(var ri=0; ri<RANKING_DINAMICO.length && ranked.length<5; ri++){
+      var item = RANKING_DINAMICO[ri];
+      // Buscar objeto completo del libro en LIBROS o usar el del ranking
+      var fullBook = LIBROS.find(function(b){ return String(b.id) === String(item.libro_id); }) || {
+        id: item.libro_id,
+        t: item.titulo,
+        a: item.autor,
+        img: item.portada_url,
+        mat: item.materia,
+        c: item.materia,
+        e: item.emoji || "📚",
+        x: item.tipo || "Libro"
+      };
+      ranked.push({ libro: fullBook, pos: ri + 1, veces: item.veces_abierto });
     }
-  }
-  // Fill to 10 if needed
-  if(ranked.length < 10){
-    for(var li=0; li<LIBROS.length && ranked.length<10; li++){
-      var already = ranked.some(function(item){ return item.libro.id === LIBROS[li].id; });
-      if(!already){
-        ranked.push({libro: LIBROS[li], pos: ranked.length+1});
-      }
+  } else {
+    // Fallback: usar primeros libros disponibles
+    for(var li=0; li<LIBROS.length && ranked.length<5; li++){
+      ranked.push({ libro: LIBROS[li], pos: li + 1, veces: 0 });
     }
   }
 
-  var h="";
-  for(var i=0; i<ranked.length && i<10; i++){
+  if(ranked.length === 0){
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px 20px;color:var(--txt-m)">' +
+      '<div style="font-size:3rem;margin-bottom:12px">📚</div>' +
+      '<h3>No hay libros en el catálogo actualmente</h3>' +
+      '<p>Los libros agregados desde el panel aparecerán aquí automáticamente.</p>' +
+      '</div>';
+    return;
+  }
+
+  var h = "";
+  for(var i=0; i<ranked.length && i<5; i++){
     var l   = ranked[i].libro;
     var pos = ranked[i].pos;
-    h+='<div class="libro-card" onclick="abrirModal('+l.id+')">';
-    h+='<img class="libro-img" src="'+getImg(l)+'" alt="'+l.t+'" loading="lazy"/>';
-    if(pos>0) h+='<span class="libro-rank">'+DigiIcons.get("flame",{size:14,color:"#e85d04"})+' #'+pos+' más buscado</span>';
-    h+='<div class="libro-body">';
-    h+='<span class="libro-cat-tag">'+l.l+'</span>';
-    h+='<h3 class="libro-title">'+l.t+'</h3>';
-    h+='<p class="libro-autor">'+l.a+'</p>';
-    h+='</div></div>';
+    var badgeTexto = "#" + pos + " más buscado";
+
+    h += '<div class="libro-card" onclick="abrirModal(\'' + l.id + '\')">';
+    h += '<img class="libro-img" src="' + getImg(l) + '" alt="' + (l.t||"") + '" loading="lazy"/>';
+    if(pos > 0) {
+      h += '<span class="libro-rank">' + DigiIcons.get("flame", {size:14, color:"#e85d04"}) + ' ' + badgeTexto + '</span>';
+    }
+    h += '<div class="libro-body">';
+    h += '<span class="libro-cat-tag">' + (l.mat || l.l || "General") + '</span>';
+    h += '<h3 class="libro-title">' + (l.t || "Sin título") + '</h3>';
+    h += '<p class="libro-autor">' + (l.a || "No especificado") + '</p>';
+    h += '</div></div>';
   }
-  grid.innerHTML=h;
+  grid.innerHTML = h;
 }
 renderCatalogo();
 
