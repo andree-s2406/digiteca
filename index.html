@@ -48,7 +48,7 @@
   </a>
   <div class="nav-links" id="navLinks">
     <a href="index.html" class="active">Inicio</a>
-    <a href="catalogo.html">Catálogo</a><a href="#novedades">Novedades</a>
+    <a href="#catalogo">Más buscados</a><a href="catalogo.html">Catálogo</a><a href="#novedades">Novedades</a>
     <a href="#servicios">Servicios</a><a href="#acerca">Nosotros</a>
     <a href="#contacto" class="btn-nav">Contacto</a>
     
@@ -112,6 +112,19 @@
     </div>
   </div>
 </section>
+
+<section id="catalogo">
+  <div class="sec-hdr">
+    <span class="sec-tag"><i data-lucide="flame" style="width:14px;height:14px;color:#e85d04"></i> Tendencias</span>
+    <h2 class="sec-title">Libros <span class="hl">Más Buscados</span></h2>
+    <p class="sec-desc">Los títulos más leídos y consultados en tiempo real por la comunidad de la escuela.</p>
+  </div>
+  <div class="cat-grid" id="catalogoGrid"></div>
+  <div class="cat-footer">
+    <a href="catalogo.html" class="btn-p"><i data-lucide="book-open"></i> Explorar todo el catálogo &rarr;</a>
+  </div>
+</section>
+
 <section id="novedades">
   <div class="sec-hdr">
     <span class="sec-tag">Novedades</span>
@@ -187,7 +200,7 @@
     <div class="foot-col">
       <h5>Navegación</h5>
       <a href="index.html">Inicio</a>
-      <a href="catalogo.html">Catálogo</a>
+      <a href="#catalogo">Más buscados</a><a href="catalogo.html">Catálogo</a>
       <a href="descargas.html">Descargas</a>
       
     </div>
@@ -326,7 +339,6 @@ function renderCatalogo(){
   if(RANKING_DINAMICO && RANKING_DINAMICO.length > 0){
     for(var ri=0; ri<RANKING_DINAMICO.length && ranked.length<5; ri++){
       var item = RANKING_DINAMICO[ri];
-      // Buscar objeto completo del libro en LIBROS o usar el del ranking
       var fullBook = LIBROS.find(function(b){ return String(b.id) === String(item.libro_id); }) || {
         id: item.libro_id,
         t: item.titulo,
@@ -340,7 +352,6 @@ function renderCatalogo(){
       ranked.push({ libro: fullBook, pos: ri + 1, veces: item.veces_abierto });
     }
   } else {
-    // Fallback: usar primeros libros disponibles
     for(var li=0; li<LIBROS.length && ranked.length<5; li++){
       ranked.push({ libro: LIBROS[li], pos: li + 1, veces: 0 });
     }
@@ -361,7 +372,7 @@ function renderCatalogo(){
     var pos = ranked[i].pos;
     var badgeTexto = "#" + pos + " más buscado";
 
-    h += '<div class="libro-card" onclick="abrirModal(\'' + l.id + '\')">';
+    h += '<div class="libro-card" onclick="window.location.href=\'libro.html?id=' + encodeURIComponent(l.id) + '\'" style="cursor:pointer">';
     h += '<img class="libro-img" src="' + getImg(l) + '" alt="' + (l.t||"") + '" loading="lazy"/>';
     if(pos > 0) {
       h += '<span class="libro-rank">' + DigiIcons.get("flame", {size:14, color:"#e85d04"}) + ' ' + badgeTexto + '</span>';
