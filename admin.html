@@ -1098,23 +1098,38 @@ function renderRanking(){
   var rkEl = document.getElementById("rankingActual");
   if(!rkEl) return;
 
-  var ranking = RANKING_TOP5_DATA;
+  var stats = getStats();
+  var librosAb = stats.librosAbiertos || {};
+  var libros = getLibros();
 
-  // Fallback si la API no devolvió ranking aún: usar libros disponibles
-  if(!ranking || ranking.length === 0){
-    var libros = getLibros();
-    ranking = libros.slice(0, 5).map(function(l, idx){
-      return {
-        posicion: idx + 1,
-        libro_id: l.id,
-        titulo: l.t,
-        autor: l.a,
-        materia: l.mat || l.l || "General",
-        portada_url: l.img || "",
-        veces_abierto: 0
-      };
+  var lista = [];
+
+  for(var li=0; li<libros.length; li++){
+    var l = libros[li];
+    var vecesApi = 0;
+    if(RANKING_TOP5_DATA && RANKING_TOP5_DATA.length){
+      var rkItem = RANKING_TOP5_DATA.find(function(x){ return String(x.libro_id) === String(l.id); });
+      if(rkItem && rkItem.veces_abierto) vecesApi = parseInt(rkItem.veces_abierto, 10) || 0;
+    }
+    var vecesLocal = parseInt(librosAb[l.id] || librosAb[String(l.id)] || 0, 10);
+    var totalVeces = Math.max(vecesApi, vecesLocal);
+
+    lista.push({
+      libro_id: l.id,
+      titulo: l.t,
+      autor: l.a,
+      materia: l.mat || l.l || "General",
+      portada_url: l.img || "",
+      veces_abierto: totalVeces
     });
   }
+
+  lista.sort(function(a, b){
+    if(b.veces_abierto !== a.veces_abierto) return b.veces_abierto - a.veces_abierto;
+    return a.libro_id - b.libro_id;
+  });
+
+  var ranking = lista.slice(0, 5);
 
   if(ranking.length === 0){
     rkEl.innerHTML = '<div class="empty-state">' +
@@ -1131,7 +1146,7 @@ function renderRanking(){
     var item = ranking[i];
     var pos = i + 1;
     var veces = item.veces_abierto || 0;
-    var vecesTexto = veces === 1 ? "1 apertura" : (veces + " aperturas");
+    var vecesTexto = veces + " aperturas";
 
     h += '<div class="rank-row" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-radius:12px;border:1px solid var(--borde);margin-bottom:12px;background:var(--bg-card);box-shadow:0 2px 8px rgba(0,0,0,.03)">';
     h += '  <div style="display:flex;align-items:center;gap:14px">';
