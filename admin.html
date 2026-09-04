@@ -278,26 +278,17 @@
         </div>
       </div>
 
-      <!-- ═══ PANEL MÁS BUSCADOS ═══ -->
+            <!-- ═══ PANEL MÁS BUSCADOS (AUTOMÁTICO POR LECTURAS REALES) ═══ -->
       <div class="panel" id="panelMasBuscados">
         <div class="panel-header">
-          <h2 class="panel-title"><i data-lucide="flame" style="width:14px;height:14px;color:#e85d04"></i> Más buscados en Inicio</h2>
+          <h2 class="panel-title"><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;color:#e85d04"></i> Top 5 Libros Más Abiertos / Más Buscados</h2>
+          <button class="btn btn-ghost" onclick="cargarRankingAutomatico()"><i data-lucide="refresh-cw" style="width:15px;height:15px;margin-right:6px"></i>Actualizar métricas</button>
         </div>
-        <p style="color:var(--txt-m);font-size:.9rem;margin-bottom:20px;line-height:1.6">Definí cuáles libros aparecen destacados con el badge <strong><i data-lucide="flame" style="width:14px;height:14px;color:#e85d04"></i> #N más buscado</strong> en la sección Catálogo de la página de inicio. Podés asignar hasta 12 posiciones.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-          <div>
-            <h4 style="font-weight:700;color:var(--txt);margin-bottom:12px;font-size:.95rem">Ranking actual</h4>
-            <div id="rankingActual"></div>
-            <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="guardarRanking()"><i data-lucide="check" style="width:15px;height:15px;margin-right:6px"></i>Guardar ranking</button>
-          </div>
-          <div>
-            <h4 style="font-weight:700;color:var(--txt);margin-bottom:12px;font-size:.95rem">Agregar al ranking</h4>
-            <div class="filter-bar" style="margin-bottom:12px">
-              <input type="text" id="buscarRanking" placeholder="Buscar libro..." oninput="renderListaRanking()"/>
-            </div>
-            <div id="listaRanking" style="max-height:400px;overflow-y:auto"></div>
-          </div>
-        </div>
+        <p style="color:var(--txt-m);font-size:.9rem;margin-bottom:20px;line-height:1.6">
+          Este ranking se calcula <strong>100% de forma automática</strong> en tiempo real con las aperturas y lecturas de los estudiantes y docentes.
+          Los 5 libros con mayor cantidad de aperturas se destacan automáticamente en la página de inicio con la insignia <strong><i data-lucide="flame" style="width:14px;height:14px;color:#e85d04"></i> #N más buscado</strong>.
+        </p>
+        <div id="rankingActual" style="max-width:850px;margin-top:16px"></div>
       </div>
 
       <!-- ═══ PANEL USUARIOS ═══ -->
@@ -622,8 +613,7 @@ async function initPanel(){
   actualizarStats();
   renderTablaLibros();
   renderTablaUsuarios();
-  renderRanking();
-  renderListaRanking();
+  cargarRankingAutomatico();
 }
 
 // ── ESTADÍSTICAS ──
@@ -1080,72 +1070,86 @@ function confirmarEliminarLibro(id){
 }
 
 // ════════════════════════════════════════════════
-// MÁS BUSCADOS
+// TOP 5 MÁS BUSCADOS (AUTOMÁTICO POR LECTURAS)
 // ════════════════════════════════════════════════
+var RANKING_TOP5_DATA = [];
+
+async function cargarRankingAutomatico(){
+  var rkEl = document.getElementById("rankingActual");
+  if(rkEl) rkEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--txt-m)"><div class="spin" style="display:inline-block;margin-bottom:8px">' + DigiIcons.get("loader-2",{size:24}) + '</div><p>Cargando ranking de lecturas...</p></div>';
+
+  try {
+    if(window.API && window.API.ranking){
+      const res = await API.ranking.get();
+      if(res && Array.isArray(res.ranking)){
+        RANKING_TOP5_DATA = res.ranking;
+      }
+    }
+  } catch(err){
+    console.warn("Error cargando ranking:", err);
+  }
+
+  renderRanking();
+}
+
 function renderRanking(){
-  var ranking = getRanking();
+  var rkEl = document.getElementById("rankingActual");
+  if(!rkEl) return;
+
+  var ranking = RANKING_TOP5_DATA;
+
+  // Fallback si la API no devolvió ranking aún: usar libros disponibles
+  if(!ranking || ranking.length === 0){
+    var libros = getLibros();
+    ranking = libros.slice(0, 5).map(function(l, idx){
+      return {
+        posicion: idx + 1,
+        libro_id: l.id,
+        titulo: l.t,
+        autor: l.a,
+        materia: l.mat || l.l || "General",
+        emoji: l.e || "📚",
+        portada_url: l.img || "",
+        veces_abierto: 0
+      };
+    });
+  }
+
+  if(ranking.length === 0){
+    rkEl.innerHTML = '<div class="empty-state">' +
+      '<div class="empty-icon"><i data-lucide="book-open" style="width:48px;height:48px"></i></div>' +
+      '<h3>No hay libros registrados</h3>' +
+      '<p>Cuando agregues libros y los usuarios comiencen a leerlos, el Top 5 aparecerá automáticamente aquí.</p>' +
+      '</div>';
+    return;
+  }
+
+  var medallas = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
   var h = "";
+
   for(var i=0; i<ranking.length && i<5; i++){
-    var id = ranking[i];
-    var l = getLibroPorId(id);
+    var item = ranking[i];
     var pos = i + 1;
-    if(!l) continue;
-    h += '<div class="rank-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;border:1px solid var(--borde);margin-bottom:8px;background:var(--bg-card)">';
-    h += '<div style="display:flex;align-items:center;gap:10px">';
-    h += '<span style="font-weight:900;color:var(--am-o);font-size:1.1rem;min-width:24px">#' + pos + '</span>';
-    h += '<div><p style="font-weight:700;font-size:.92rem;color:var(--txt)">' + l.t + '</p>';
-    h += '<p style="font-size:.78rem;color:var(--txt-m)">' + (l.a||"") + ' • <span style="color:var(--cel-o)">' + (l.mat||l.l||"") + '</span></p></div>';
-    h += '</div>';
-    h += '<div style="display:flex;gap:4px">';
-    if(i > 0) h += '<button class="btn btn-ghost btn-sm" onclick="moverRanking(' + i + ',-1)" title="Subir">' + DigiIcons.get("arrow-up", {size:12}) + '</button>';
-    if(i < Math.min(ranking.length, 5) - 1) h += '<button class="btn btn-ghost btn-sm" onclick="moverRanking(' + i + ',1)" title="Bajar">' + DigiIcons.get("arrow-down", {size:12}) + '</button>';
-    h += '<button class="btn btn-danger btn-sm" onclick="quitarRanking(\'' + id + '\')" title="Quitar">' + DigiIcons.get("x", {size:12}) + '</button>';
-    h += '</div></div>';
-  }
-  if(!h) h = '<p style="color:var(--txt-m);font-size:.9rem">El ranking está sincronizándose automáticamente con las lecturas reales.</p>';
-  var rkActual = document.getElementById("rankingActual");
-  if(rkActual) rkActual.innerHTML = h;
-}
+    var medalla = medallas[i] || ("#" + pos);
+    var veces = item.veces_abierto || 0;
+    var vecesTexto = veces === 1 ? "1 apertura" : (veces + " aperturas");
 
-function renderListaRanking(){
-  var q = norm(document.getElementById("buscarRanking").value);
-  var ranking = getRanking();
-  var libros  = getLibros().filter(function(l){
-    var enRank = ranking.some(function(rkId){ return String(rkId)===String(l.id); });
-    var mq = !q || norm(l.t).indexOf(q)>=0 || norm(l.a).indexOf(q)>=0;
-    return !enRank && mq;
-  });
-  var h = "";
-  for(var i=0;i<libros.length;i++){
-    var l = libros[i];
-    h += '<div class="rank-row" style="cursor:pointer" onclick="agregarRanking(\''+l.id+'\')">';
-    h += '<div class="rank-emoji">'+l.e+'</div>';
-    h += '<div class="rank-info"><div class="rank-title">'+l.t+'</div><div class="rank-sub">'+l.a+'</div></div>';
-    h += '<button class="btn btn-primary btn-sm">'+DigiIcons.get("plus",{size:12,style:"margin-right:4px"})+'Agregar</button>';
+    h += '<div class="rank-row" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-radius:12px;border:1px solid var(--borde);margin-bottom:12px;background:var(--bg-card);box-shadow:0 2px 8px rgba(0,0,0,.03)">';
+    h += '  <div style="display:flex;align-items:center;gap:14px">';
+    h += '    <span style="font-size:1.5rem;min-width:32px;text-align:center">' + medalla + '</span>';
+    h += '    <div>';
+    h += '      <p style="font-weight:700;font-size:1rem;color:var(--txt);margin-bottom:2px">' + (item.titulo || "Sin título") + '</p>';
+    h += '      <p style="font-size:.82rem;color:var(--txt-m)">' + (item.autor || "Autor no especificado") + ' • <span style="color:var(--cel-o);font-weight:600">' + (item.materia || "General") + '</span></p>';
+    h += '    </div>';
+    h += '  </div>';
+    h += '  <div style="display:flex;align-items:center;gap:12px">';
+    h += '    <span class="badge badge-warning" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:6px 12px;border-radius:20px;background:rgba(232,93,4,.1);color:#e85d04;border:1px solid rgba(232,93,4,.2)">' + DigiIcons.get("flame", {size:14, color:"#e85d04"}) + ' ' + vecesTexto + '</span>';
+    h += '    <a href="libro.html?id=' + item.libro_id + '" target="_blank" class="btn btn-ghost btn-sm" title="Ver en visor"><i data-lucide="external-link" style="width:14px;height:14px"></i></a>';
+    h += '  </div>';
     h += '</div>';
   }
-  if(!h) h = '<p style="color:var(--txt-m);font-size:.88rem;padding:12px 0">Todos los libros están en el ranking.</p>';
-  document.getElementById("listaRanking").innerHTML = h;
-}
 
-function agregarRanking(id){
-  var r = getRanking();
-  if(r.indexOf(id)<0){ r.push(id); setRanking(r); }
-  renderRanking(); renderListaRanking();
-}
-function quitarRanking(id){
-  var r = getRanking().filter(function(x){ return x!==id; });
-  setRanking(r); renderRanking(); renderListaRanking();
-}
-function moverRanking(idx, dir){
-  var r = getRanking();
-  var ni = idx+dir;
-  if(ni<0||ni>=r.length) return;
-  var tmp=r[idx]; r[idx]=r[ni]; r[ni]=tmp;
-  setRanking(r); renderRanking();
-}
-function guardarRanking(){
-  toast("Ranking guardado correctamente","ok");
+  rkEl.innerHTML = h;
 }
 
 // ════════════════════════════════════════════════
