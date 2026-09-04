@@ -1,0 +1,504 @@
+/**
+ * DigiTeca - Catalogo Page Styles (catalogo.html)
+ * Hero del catálogo, búsqueda avanzada, sidebar de filtros acordeón, toolbar de ordenamiento y paginación
+ */
+
+/* ── HERO DEL CATÁLOGO ── */
+.cat-hero {
+  padding: 120px 40px 60px;
+  background: linear-gradient(135deg, var(--cel-o), #1A5F8A);
+  text-align: center;
+  transition: background 0.35s ease;
+}
+
+html.dark .cat-hero {
+  background: linear-gradient(135deg, #0A1E30, #0D2540);
+}
+
+.cat-hero h1 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 900;
+  color: #FFFFFF;
+  margin-bottom: 12px;
+}
+
+.cat-hero h1 span {
+  color: #F5D96A;
+}
+
+.cat-hero p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1.1rem;
+  max-width: 560px;
+  margin: 0 auto 36px;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.h-stat-num {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #F5D96A;
+  display: block;
+}
+
+.h-stat-lbl {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* ── BARRA DE BÚSQUEDA DEL CATÁLOGO ── */
+.cat-search {
+  background: var(--bg-alt);
+  padding: 28px 40px;
+  transition: background 0.35s ease;
+  border-bottom: 1px solid var(--borde);
+}
+
+.cat-search .search-wrap {
+  display: flex;
+  max-width: 860px;
+  margin: 0 auto;
+  background: var(--bg-card);
+  border-radius: 50px;
+  box-shadow: var(--sh);
+  overflow: hidden;
+  border: 3px solid rgba(232, 184, 20, 0.40);
+  transition: background 0.35s ease;
+}
+
+.cat-search .search-wrap input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 14px 28px;
+  font-size: 1rem;
+  color: var(--txt);
+  font-family: inherit;
+  background: transparent;
+  transition: color 0.35s ease;
+}
+
+.cat-search .search-wrap input::placeholder {
+  color: #A0B4C4;
+}
+
+.cat-search .btn-buscar {
+  border-radius: 0 50px 50px 0;
+  white-space: nowrap;
+}
+
+/* ── LAYOUT PRINCIPAL DEL CATÁLOGO ── */
+.cat-layout {
+  display: flex;
+  align-items: flex-start;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 40px 40px 80px;
+}
+
+/* ── SIDEBAR DE FILTROS ── */
+.sidebar {
+  width: 236px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 88px;
+  margin-right: 32px;
+  background: var(--sidebar);
+  border-radius: 20px;
+  border: 1px solid var(--sidebar-bdr);
+  overflow: hidden;
+  transition: background 0.35s ease, border-color 0.35s ease;
+}
+
+.sb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--sidebar-bdr);
+}
+
+.sb-title {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--txt);
+}
+
+.sb-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--cel-o);
+  font-weight: 700;
+  font-family: inherit;
+  padding: 3px 8px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+.sb-clear:hover {
+  background: var(--cel-c);
+}
+
+/* Acordeón de filtros */
+.sb-acc {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--sidebar-bdr);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease;
+  gap: 8px;
+}
+
+.sb-acc:hover,
+.sb-acc.open {
+  background: var(--cel-c);
+}
+
+html.dark .sb-acc:hover,
+html.dark .sb-acc.open {
+  background: #1E3E5A;
+}
+
+.sb-acc-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sb-acc-icon {
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sb-acc-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--txt);
+}
+
+.sb-acc-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sb-acc-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--cel-o);
+  background: var(--cel-c);
+  padding: 2px 7px;
+  border-radius: 10px;
+  transition: background 0.35s ease;
+}
+
+html.dark .sb-acc-count {
+  background: #1E3E5A;
+}
+
+.sb-acc.open .sb-acc-count {
+  background: rgba(46, 127, 179, 0.2);
+}
+
+.sb-chevron {
+  font-size: 0.75rem;
+  color: var(--txt-m);
+  transition: transform 0.25s ease;
+}
+
+.sb-acc.open .sb-chevron {
+  transform: rotate(180deg);
+}
+
+.sb-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.sb-body.open {
+  max-height: 600px;
+}
+
+.sb-body-inner {
+  padding: 8px 12px 12px;
+}
+
+.sb-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 7px 8px;
+  border-radius: 10px;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.2s ease;
+  gap: 6px;
+}
+
+.sb-option:hover {
+  background: var(--borde);
+}
+
+.sb-option.active {
+  background: var(--cel-o);
+}
+
+.sb-option.active .sb-opt-label {
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.sb-option.active .sb-opt-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+.sb-opt-label {
+  font-size: 0.85rem;
+  color: var(--txt);
+  flex: 1;
+}
+
+.sb-opt-count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--cel-o);
+  background: var(--borde);
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: var(--cel-o);
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  padding: 10px 18px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  font-family: inherit;
+  margin-bottom: 20px;
+}
+
+/* ── CONTENIDO DERECHO (TOOLBAR & GRID) ── */
+.cat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.cat-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cat-count {
+  font-size: 0.95rem;
+  color: var(--txt-m);
+  font-weight: 600;
+}
+
+.sort-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--txt-m);
+}
+
+.sort-wrap select {
+  border: 2px solid var(--borde);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 0.88rem;
+  color: var(--txt);
+  background: var(--bg-card);
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.35s ease, color 0.35s ease;
+}
+
+/* Chips de filtros activos */
+.active-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.af-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--cel-c);
+  color: var(--cel-o);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border: none;
+  font-family: inherit;
+}
+
+.af-chip:hover {
+  background: var(--cel-o);
+  color: #FFFFFF;
+}
+
+/* Badges de libro en catálogo */
+.libro-emoji {
+  display: block;
+  width: 100%;
+  aspect-ratio: 720/920;
+  object-fit: cover;
+  border-radius: 10px;
+  margin: 0 0 10px;
+  background: var(--borde);
+}
+
+.libro-badges {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.libro-anio-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--am-o);
+  background: var(--am-c);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+html.dark .libro-anio-tag {
+  background: #3A2E00;
+}
+
+/* Estado sin resultados */
+.no-results {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--txt-m);
+}
+
+.no-results .nr-icon {
+  font-size: 3.5rem;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.no-results h3 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.5rem;
+  color: var(--txt);
+  margin-bottom: 8px;
+}
+
+/* ── PAGINACIÓN ── */
+.paginacion {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+
+.pag-btn {
+  min-width: 38px;
+  height: 38px;
+  border-radius: 20px;
+  padding: 0 12px;
+  border: 2px solid var(--borde);
+  background: transparent;
+  color: var(--txt-m);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 0.88rem;
+}
+
+.pag-btn:hover,
+.pag-btn.activa {
+  background: var(--cel-o);
+  color: #FFFFFF;
+  border-color: var(--cel-o);
+}
+
+/* ── RESPONSIVE CATÁLOGO ── */
+@media (max-width: 900px) {
+  .cat-layout {
+    flex-direction: column;
+    padding: 24px 20px 60px;
+  }
+  .sidebar {
+    width: 100%;
+    position: static;
+    margin-right: 0;
+    margin-bottom: 0;
+    display: none;
+  }
+  .sidebar.open {
+    display: block;
+  }
+  .sidebar-toggle {
+    display: flex;
+  }
+}
+
+@media (max-width: 600px) {
+  .cat-hero {
+    padding: 100px 20px 40px;
+  }
+  .cat-search {
+    padding: 20px;
+  }
+  .cat-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+  }
+  .hero-stats {
+    gap: 24px;
+  }
+}

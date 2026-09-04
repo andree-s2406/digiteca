@@ -1,0 +1,476 @@
+/**
+ * DigiTeca - Login & Auth Page Styles (login.html)
+ * Diseño institucional premium: inputs estilizados, tarjeta centrada, botón con gradiente y modo oscuro
+ */
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ── FONDO DECORATIVO ── */
+.bg-deco {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bg-deco::before {
+  content: "";
+  position: absolute;
+  top: -120px;
+  right: -120px;
+  width: min(550px, 90vw);
+  height: min(550px, 90vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 127, 179, 0.15), transparent 70%);
+}
+
+.bg-deco::after {
+  content: "";
+  position: absolute;
+  bottom: -100px;
+  left: -100px;
+  width: min(500px, 85vw);
+  height: min(500px, 85vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 184, 20, 0.12), transparent 70%);
+}
+
+/* ── BARRA SUPERIOR ── */
+.top-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 24px;
+}
+
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+
+.brand-link:hover {
+  transform: translateY(-1px);
+}
+
+.brand-link .logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #FFFFFF;
+  border: 2px solid var(--cel-c);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* ── COLORES MARCA DIGITECA (Azul y Dorado) ── */
+.ac1,
+.login-title .ac1,
+.brand-name .ac1 {
+  color: var(--cel-o) !important;
+}
+
+.ac2,
+.login-title .ac2,
+.brand-name .ac2 {
+  color: var(--am-o) !important;
+}
+
+/* ── CONTENEDOR PRINCIPAL Y TARJETA ── */
+.login-wrap {
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+.login-card {
+  background: var(--bg-card);
+  border: 1px solid var(--borde);
+  border-radius: 24px;
+  padding: 42px 40px 36px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--borde);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+html.dark .login-card {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+
+/* ── LOGO INSTITUCIONAL EN TARJETA ── */
+.login-logo-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 10px 0 16px;
+}
+
+.login-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #FFFFFF;
+  border: 3px solid var(--cel-c);
+  box-shadow: 0 8px 24px rgba(46, 127, 179, 0.22);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-logo:hover {
+  transform: scale(1.06);
+  box-shadow: 0 12px 30px rgba(46, 127, 179, 0.35);
+}
+
+/* ── HEADER DE LA TARJETA ── */
+.login-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.school-badge {
+  display: inline-block;
+  background: var(--cel-c);
+  color: var(--cel-o);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 5px 14px;
+  border-radius: 20px;
+  margin-bottom: 14px;
+}
+
+html.dark .school-badge {
+  background: #1E4A6E;
+  color: #A8D8EE;
+}
+
+.login-title {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.65rem, 4.5vw, 2.1rem);
+  font-weight: 900;
+  color: var(--txt);
+  line-height: 1.25;
+  margin-bottom: 10px;
+}
+
+.login-sub {
+  font-size: clamp(0.88rem, 2.8vw, 0.95rem);
+  color: var(--txt-m);
+  line-height: 1.6;
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+/* ── FORMULARIO Y CAMPOS ── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: left;
+}
+
+.field-wrap label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--txt);
+}
+
+.field-wrap input {
+  width: 100%;
+  padding: 13px 16px;
+  background: var(--bg);
+  border: 1.5px solid var(--borde);
+  border-radius: 12px;
+  color: var(--txt);
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-sizing: border-box;
+}
+
+.field-wrap input:focus {
+  border-color: var(--cel-o);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 4px var(--cel-c);
+}
+
+.field-wrap input::placeholder {
+  color: var(--txt-m);
+  opacity: 0.7;
+}
+
+.field-wrap input.error {
+  border-color: var(--rojo) !important;
+  background: rgba(192, 57, 43, 0.04);
+}
+
+/* Mostrar / Ocultar contraseña */
+.pwd-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.pwd-wrap input {
+  padding-right: 48px;
+}
+
+.pwd-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--txt-m);
+  padding: 8px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.pwd-toggle:hover {
+  color: var(--cel-o);
+  background: var(--bg);
+}
+
+/* ── BOTÓN DE LOGIN ── */
+.btn-login {
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, var(--cel-o), #1A5276);
+  color: #FFFFFF !important;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(46, 127, 179, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  margin-top: 4px;
+}
+
+.btn-login:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(46, 127, 179, 0.5);
+  filter: brightness(1.08);
+}
+
+.btn-login:active {
+  transform: translateY(0);
+}
+
+.btn-login:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* ── MENSAJES DE FEEDBACK ── */
+.login-msg {
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 12px 16px;
+  border-radius: 12px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.45;
+}
+
+.login-msg.err {
+  background: var(--rojo-c);
+  color: var(--rojo);
+  display: flex;
+  border: 1px solid rgba(192, 57, 43, 0.2);
+}
+
+.login-msg.ok {
+  background: var(--verde-c);
+  color: var(--verde);
+  display: flex;
+  border: 1px solid rgba(46, 125, 82, 0.2);
+}
+
+/* ── SEPARADOR ── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 6px 0;
+  color: var(--txt-m);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--borde);
+}
+
+/* ── BOTÓN RESTABLECER ── */
+.btn-reset {
+  width: 100%;
+  background: transparent;
+  color: var(--txt-m);
+  border: 1.5px solid var(--borde);
+  border-radius: 12px;
+  padding: 12px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-reset:hover {
+  background: var(--bg);
+  border-color: var(--cel-o);
+  color: var(--cel-o);
+  transform: translateY(-1px);
+}
+
+/* ── PANEL RESTABLECER CONTRASEÑA ── */
+.reset-panel {
+  display: none;
+}
+
+.reset-panel.open {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeIn 0.3s ease;
+}
+
+.reset-back {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--cel-o);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: gap 0.2s ease;
+  width: fit-content;
+}
+
+.reset-back:hover {
+  gap: 10px;
+}
+
+/* ── NOTA INFERIOR ── */
+.login-nota {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--borde);
+  text-align: center;
+}
+
+.login-nota p {
+  font-size: 0.85rem;
+  color: var(--txt-m);
+  line-height: 1.55;
+}
+
+.login-nota strong {
+  color: var(--cel-o);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .top-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 24px;
+}
+  .brand-name {
+    font-size: 1.25rem;
+  }
+  .login-wrap {
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+  .login-card {
+    padding: 28px 20px 24px;
+    border-radius: 20px;
+  }
+  .login-title {
+    font-size: 1.6rem;
+  }
+  .login-sub {
+    font-size: 0.88rem;
+  }
+}

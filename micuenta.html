@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+(function(){
+  try {
+    var d = localStorage.getItem("digi");
+    var isDark = d === "dark" || (d !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    document.documentElement.classList.add("preload");
+  } catch(e){}
+})();
+</script>
+<style id="auth-guard-css">html { visibility: hidden !important; opacity: 0 !important; }</style>
+<script>
+(function(){
+  try {
+    var raw = localStorage.getItem("digi-sesion");
+    if (!raw) { window.location.replace("login.html"); return; }
+    var s = JSON.parse(raw);
+    if (!s || !s.email) { window.location.replace("login.html"); return; }
+    var el = document.getElementById("auth-guard-css");
+    if (el) el.remove();
+  } catch(e) {
+    window.location.replace("login.html");
+  }
+})();
+</script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Mi Cuenta - DigiTeca</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
+<link rel="stylesheet" href="css/variables.css"/>
+<link rel="stylesheet" href="css/global.css"/>
+<link rel="stylesheet" href="css/animations.css"/>
+<link rel="stylesheet" href="css/micuenta.css"/>
+</head>
+<body>
+
+<nav class="navbar" id="navbar">
+  <a href="index.html" class="nav-brand">
+    <img src="img/logo.png" alt="Logo DigiTeca" class="logo-img"/>
+    <span class="nav-title">Digi<span>Teca</span></span>
+  </a>
+  <div class="nav-links" id="navLinks">
+    <a href="index.html">Inicio</a>
+    <a href="catalogo.html">Catálogo</a>
+    
+    
+  </div>
+  <div class="nav-right">
+    <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
+    <div class="user-menu-wrap" id="userMenuWrap">
+      <button class="user-avatar-btn" id="userAvatarBtn" title="Mi perfil" aria-label="Mi perfil" aria-expanded="false" onclick="toggleUserDropdown(event)">
+        <span class="user-avatar-letter" id="navUserInitial"></span>
+        <img class="user-avatar-img" id="navUserImg" src="" alt="avatar" style="display:none;"/>
+      </button>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="user-dropdown-header">
+          <div class="user-dropdown-avatar">
+            <span id="dropUserInitial"></span>
+            <img id="dropUserImg" src="" alt="avatar" style="display:none;"/>
+          </div>
+          <div class="user-dropdown-info">
+            <strong id="dropUserName">Estudiante</strong>
+            <span id="dropUserEmail">sin correo registrado</span>
+          </div>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <a href="micuenta.html" class="user-dropdown-item">
+          <i data-lucide="user" style="width:16px;height:16px"></i>
+          <span>Mi perfil</span>
+        </a>
+        <a href="descargas.html" class="user-dropdown-item">
+          <i data-lucide="download" style="width:16px;height:16px"></i>
+          <span>Mis descargas</span>
+        </a>
+        <div id="dropAdminItem" style="display:none">
+          <a href="admin.html" class="user-dropdown-item admin-item">
+            <i data-lucide="shield" style="width:16px;height:16px"></i>
+            <span>Panel de control</span>
+          </a>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <button class="user-dropdown-item logout" onclick="cerrarSesionGlobal()">
+          <i data-lucide="log-out" style="width:16px;height:16px"></i>
+          <span>Cerrar sesión</span>
+        </button>
+      </div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Menu"><i data-lucide="menu"></i></button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="cuenta-hero">
+  <div class="cuenta-hero-inner">
+    <div class="avatar-wrap">
+      <div class="avatar-img" id="avatarDisplay" onclick="abrirAvatarModal()" title="Cambiar foto de perfil">
+        <img id="avatarImgHero" src="" alt="foto" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover"/>
+        <span id="avatarInitials">?</span>
+      </div>
+      <button class="avatar-edit-btn" onclick="abrirAvatarModal()" title="Cambiar foto de perfil">
+        <i data-lucide="camera" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div class="cuenta-hero-info">
+      <h1 id="heroNombre">Cargando...</h1>
+      <p id="heroEmail">sin correo registrado</p>
+      <div class="cuenta-badges">
+        <span class="cbadge" id="heroAnio">Año: —</span>
+        <span class="cbadge" id="heroDivision">División: —</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cuenta-layout">
+
+  <!-- ── FOTO DE PERFIL ── -->
+  <div class="sec-card collapsed">
+    <div class="sec-card-header" onclick="toggleSec('secFoto')">
+      <div class="sec-card-header-left">
+        <span class="sec-icon"><i data-lucide="camera" style="width:18px;height:18px;color:var(--cel-o)"></i></span>
+        <div>
+          <p class="sec-label">Foto de perfil</p>
+          <p class="sec-sublabel">Subí una imagen desde tu dispositivo o por URL</p>
+        </div>
+      </div>
+      <span class="sec-chevron"><i data-lucide="chevron-down"></i></span>
+    </div>
+    <div class="sec-body" id="secFoto">
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:24px">
+        <div class="avatar-img" style="width:80px;height:80px;font-size:2.2rem;cursor:pointer" id="avatarPreviewCard" onclick="abrirAvatarModal()" title="Cambiar foto">
+          <img id="avatarPreviewCardImg" src="" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover"/>
+          <span id="avatarPreviewCardInitials">?</span>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <button class="btn-save" onclick="document.getElementById('avatarFileInput').click()">
+            <i data-lucide="upload" style="width:15px;height:15px;margin-right:6px"></i>Subir foto
+          </button>
+          <input type="file" id="avatarFileInput" accept="image/*" style="display:none"/>
+          <button class="btn-cancel" onclick="quitarAvatar()">
+            <i data-lucide="trash-2" style="width:15px;height:15px;margin-right:6px"></i>Quitar foto
+          </button>
+        </div>
+      </div>
+      <div class="field-wrap">
+        <label>O ingresá la URL de una imagen</label>
+        <div style="display:flex;gap:8px">
+          <input type="url" id="avatarUrlInput" placeholder="https://ejemplo.com/mifoto.jpg"/>
+          <button class="btn-save" onclick="aplicarUrlAvatar()">
+            <i data-lucide="check" style="width:15px;height:15px;margin-right:6px"></i>Aplicar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── INFORMACIÓN PERSONAL ── -->
+  <div class="sec-card collapsed">
+    <div class="sec-card-header" onclick="toggleSec('secInfo')">
+      <div class="sec-card-header-left">
+        <span class="sec-icon"><i data-lucide="user" style="width:18px;height:18px;color:var(--cel-o)"></i></span>
+        <div>
+          <p class="sec-label">Información personal</p>
+          <p class="sec-sublabel">Nombre, correo y datos de cursada</p>
+        </div>
+      </div>
+      <span class="sec-chevron"><i data-lucide="chevron-down"></i></span>
+    </div>
+    <div class="sec-body" id="secInfo">
+
+      <!-- Nombre y apellido — sin contraseña -->
+      <div class="field-group">
+        <div class="field-wrap">
+          <label>Nombre</label>
+          <input type="text" id="fNombre" placeholder="Tu nombre" disabled/>
+          <span class="field-note">El nombre no se puede modificar una vez registrado.</span>
+        </div>
+        <div class="field-wrap">
+          <label>Apellido</label>
+          <input type="text" id="fApellido" placeholder="Tu apellido" disabled/>
+          <span class="field-note">El apellido no se puede modificar una vez registrado.</span>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--borde);margin:8px 0 20px"/>
+
+      <!-- Correo, año y división — requieren contraseña -->
+      <div class="pwd-gate" id="gateInfo">
+        <p><i data-lucide="lock" style="width:15px;height:15px;margin-right:6px;vertical-align:middle;color:var(--cel-o)"></i> Ingresá tu contraseña para editar correo, año y división</p>
+        <div class="pwd-gate-row">
+          <input type="password" id="pwdGateInfo" placeholder="Contraseña actual"/>
+          <button class="btn-unlock" onclick="desbloquear('Info')">Desbloquear</button>
+        </div>
+        <p class="unlock-msg" id="msgGateInfo"></p>
+      </div>
+
+      <div class="field-group" id="fieldsInfo" style="opacity:.4;pointer-events:none">
+        <div class="field-wrap">
+          <label>Correo electrónico</label>
+          <input type="email" id="fCorreo" placeholder="tu@email.com" disabled/>
+        </div>
+        <div class="field-wrap">
+          <label>Año de cursada</label>
+          <select id="fAnio" disabled>
+            <option value="">Seleccioná</option>
+            <option value="1">1° Año</option>
+            <option value="2">2° Año</option>
+            <option value="3">3° Año</option>
+            <option value="4">4° Año</option>
+            <option value="5">5° Año</option>
+            <option value="6">6° Año</option>
+          </select>
+        </div>
+        <div class="field-wrap">
+          <label>División</label>
+          <select id="fDivision" disabled>
+            <option value="">Seleccioná</option>
+            <option value="1">División 1</option>
+            <option value="2">División 2</option>
+            <option value="3">División 3</option>
+            <option value="4">División 4</option>
+            <option value="5">División 5</option>
+            <option value="6">División 6</option>
+            <option value="7">División 7</option>
+            <option value="8">División 8</option>
+            <option value="9">División 9</option>
+            <option value="10">División 10</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec-actions" id="actionsInfo" style="display:none">
+        <button class="btn-cancel" onclick="cancelarSeccion('Info')">Cancelar</button>
+        <button class="btn-save" onclick="guardarInfo()">
+          <i data-lucide="check" style="width:15px;height:15px;margin-right:6px"></i>Guardar cambios
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONTRASEÑA ── -->
+  <div class="sec-card collapsed">
+    <div class="sec-card-header" onclick="toggleSec('secPwd')">
+      <div class="sec-card-header-left">
+        <span class="sec-icon"><i data-lucide="lock" style="width:18px;height:18px;color:var(--cel-o)"></i></span>
+        <div>
+          <p class="sec-label">Contraseña</p>
+          <p class="sec-sublabel">Actualizá tu contraseña de acceso</p>
+        </div>
+      </div>
+      <span class="sec-chevron" id="chevronSecPwd"><i data-lucide="chevron-down"></i></span>
+    </div>
+    <div class="sec-body" id="secPwd">
+
+      <div class="pwd-gate" id="gatePwd">
+        <p><i data-lucide="lock" style="width:15px;height:15px;margin-right:6px;vertical-align:middle;color:var(--cel-o)"></i> Ingresá tu contraseña actual para poder cambiarla</p>
+        <div class="pwd-gate-row">
+          <input type="password" id="pwdGatePwd" placeholder="Contraseña actual"/>
+          <button class="btn-unlock" onclick="desbloquear('Pwd')">Desbloquear</button>
+        </div>
+        <p class="unlock-msg" id="msgGatePwd"></p>
+      </div>
+
+      <div id="fieldsPwd" style="opacity:.4;pointer-events:none">
+        <div class="field-group single">
+          <div class="field-wrap">
+            <label>Nueva contraseña</label>
+            <input type="password" id="fPwdNueva" placeholder="Mínimo 8 caracteres" disabled oninput="checkStrength()"/>
+            <div class="pwd-strength" id="pwdStrengthBar"></div>
+            <p class="pwd-strength-label" id="pwdStrengthLabel"></p>
+          </div>
+        </div>
+        <div class="field-group single">
+          <div class="field-wrap">
+            <label>Repetir nueva contraseña</label>
+            <input type="password" id="fPwdRepetir" placeholder="Repetí la contraseña" disabled oninput="checkMatch()"/>
+            <p class="unlock-msg" id="msgPwdMatch"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-actions" id="actionsPwd" style="display:none">
+        <button class="btn-cancel" onclick="cancelarSeccion('Pwd')">Cancelar</button>
+        <button class="btn-save" onclick="guardarPwd()">
+          <i data-lucide="check" style="width:15px;height:15px;margin-right:6px"></i>Guardar contraseña
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CERRAR SESIÓN ── -->
+  <div style="display:flex;justify-content:center;margin-top:10px">
+    <button class="btn-logout" onclick="cerrarSesion()">
+      <i data-lucide="log-out" style="width:18px;height:18px;margin-right:8px"></i>Cerrar sesión
+    </button>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <a href="index.html" class="foot-logo-link">
+        <img src="img/logo.png" alt="Logo DigiTeca" class="foot-logo-img"/>
+        <div class="logo-txt"><span>Digi</span>Teca</div>
+      </a>
+      <p class="foot-school">Escuela Técnica N° 29 DE 6<br/>"Reconquista de Buenos Aires"</p>
+      <p class="foot-desc">Biblioteca Digital Escolar y repositorio educativo interactivo.</p>
+    </div>
+    <div class="foot-col">
+      <h5>Navegación</h5>
+      <a href="index.html">Inicio</a>
+      <a href="catalogo.html">Catálogo</a>
+      <a href="descargas.html">Descargas</a>
+      
+    </div>
+    <div class="foot-col">
+      <h5>Recursos</h5>
+      <a href="catalogo.html?categoria=libros">Libros Digitales</a>
+      <a href="catalogo.html?categoria=revistas">Revistas</a>
+      <a href="catalogo.html?categoria=guias">Guías y Apuntes</a>
+    </div>
+    <div class="foot-col">
+      <h5>Contacto</h5>
+      <p>ET N° 29 DE 6</p>
+      <p>Buenos Aires, Argentina</p>
+      <a href="index.html#contacto">Formulario de contacto</a>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <p class="foot-copy">© 2025 DigiTeca · Escuela Técnica N° 29 DE 6 Reconquista de Buenos Aires · Todos los derechos reservados.</p>
+  </div>
+</footer>
+
+<!-- Avatar modal (acceso rápido desde hero) -->
+<div class="avatar-modal-overlay" id="avatarModalOverlay">
+  <div class="avatar-modal">
+    <button class="avatar-modal-close" onclick="cerrarAvatarModal()"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+    <h3><i data-lucide="camera" style="width:18px;height:18px;margin-right:6px;vertical-align:middle;color:var(--cel-o)"></i>Cambiar foto de perfil</h3>
+    <div class="avatar-tabs">
+      <button class="avatar-tab active" onclick="switchAvatarTab('file',this)">Subir archivo</button>
+      <button class="avatar-tab" onclick="switchAvatarTab('url',this)">Usar URL</button>
+    </div>
+    <div class="avatar-tab-panel active" id="avatarPanelFile">
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('avatarFileModal').click()">
+        <i data-lucide="upload-cloud" style="width:36px;height:36px;color:var(--txt-m)"></i>
+        <p>Hacé clic o arrastrá una imagen aquí</p>
+        <p style="font-size:.75rem;margin-top:4px">JPG, PNG, WEBP — máx. recomendado 2MB</p>
+        <input type="file" id="avatarFileModal" accept="image/*"/>
+      </div>
+      <img class="avatar-preview" id="avatarPreviewModal" src="" alt="preview"/>
+    </div>
+    <div class="avatar-tab-panel" id="avatarPanelUrl">
+      <div class="field-wrap" style="margin-bottom:16px">
+        <label>URL de la imagen</label>
+        <input type="url" id="avatarUrlModal" placeholder="https://ejemplo.com/foto.jpg"/>
+      </div>
+      <img class="avatar-preview" id="avatarPreviewUrlModal" src="" alt="preview"/>
+    </div>
+    <div class="sec-actions" style="margin-top:16px">
+      <button class="btn-cancel" onclick="cerrarAvatarModal()">Cancelar</button>
+      <button class="btn-save" onclick="aplicarAvatar()"><i data-lucide="check" style="width:15px;height:15px;margin-right:6px"></i>Guardar foto</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<button id="scroll-top" title="Volver arriba" aria-label="Volver arriba"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
+
+<script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/api.js"></script>
+<script>
+// ── ESTADO LOCAL (simula backend) ──
+var DATOS = {
+  nombre: "", apellido: "", correo: "", anio: "", division: "", avatar: "", pwd: ""
+};
+
+function cargarSesion(){
+  try{
+    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    if(sesion && sesion.email){
+      var usuarios = JSON.parse(localStorage.getItem("digi-admin-usuarios")||"[]");
+      var u = null;
+      for(var i=0;i<usuarios.length;i++){
+        if((usuarios[i].email||"").toLowerCase() === sesion.email.toLowerCase()){
+          u = usuarios[i];
+          break;
+        }
+      }
+      if(u){
+        DATOS.nombre   = u.nombre   || "";
+        DATOS.apellido = u.apellido || "";
+        DATOS.correo   = u.email    || "";
+        DATOS.anio     = u.anio     || "";
+        DATOS.division = u.div      || "";
+        DATOS.pwd      = u.pwd      || "";
+        DATOS.avatar   = u.avatar   || "";
+        return;
+      }
+      DATOS.correo   = sesion.email  || "";
+      DATOS.nombre   = sesion.nombre ? sesion.nombre.split(" ")[0] : "";
+      DATOS.apellido = sesion.nombre ? sesion.nombre.split(" ").slice(1).join(" ") : "";
+      DATOS.pwd      = "1234";
+    } else {
+      var saved = JSON.parse(localStorage.getItem("digi-cuenta")||"{}");
+      if(saved && saved.correo) DATOS = saved;
+    }
+  }catch(e){}
+}
+cargarSesion();
+
+async function guardarLocal() {
+  try {
+    localStorage.setItem("digi-cuenta", JSON.stringify(DATOS));
+    if (window.API && window.API.usuarios) {
+      await API.usuarios.updatePerfil({
+        email: DATOS.correo,
+        nombre: DATOS.nombre,
+        apellido: DATOS.apellido,
+        anio: DATOS.anio,
+        div: DATOS.division,
+        avatar: DATOS.avatar,
+        password: DATOS.pwd
+      }).catch(function(err){ console.warn("Error actualizando perfil vía API:", err.message); });
+    }
+    try{
+      var usuarios = JSON.parse(localStorage.getItem("digi-admin-usuarios")||"[]");
+      for(var i=0;i<usuarios.length;i++){
+        if((usuarios[i].email||"").toLowerCase() === DATOS.correo.toLowerCase()){
+          usuarios[i].nombre   = DATOS.nombre;
+          usuarios[i].apellido = DATOS.apellido;
+          usuarios[i].anio     = DATOS.anio;
+          usuarios[i].div      = DATOS.division;
+          usuarios[i].avatar   = DATOS.avatar;
+          if(DATOS.pwd) usuarios[i].pwd = DATOS.pwd;
+          localStorage.setItem("digi-admin-usuarios", JSON.stringify(usuarios));
+          break;
+        }
+      }
+    }catch(e2){}
+  } catch(e) {}
+}
+
+// Tema manejado por Morphicons (js/icons.js)
+if(typeof setupThemeToggle==="function") setupThemeToggle();
+
+// ── POBLAR DATOS EN PANTALLA ──
+function poblarUI() {
+  document.getElementById("heroNombre").textContent = (DATOS.nombre + " " + DATOS.apellido).trim() || "Estudiante";
+  document.getElementById("heroEmail").textContent  = DATOS.correo || "sin correo registrado";
+  document.getElementById("heroAnio").textContent      = "Año: " + (DATOS.anio ? DATOS.anio + "°" : "—");
+  document.getElementById("heroDivision").textContent  = "División: " + (DATOS.division ? DATOS.division + "°" : "—");
+
+  var initials = (DATOS.nombre.charAt(0) + DATOS.apellido.charAt(0)) || DATOS.correo.charAt(0) || "?";
+  document.getElementById("avatarInitials").textContent         = initials.toUpperCase();
+  document.getElementById("avatarPreviewCardInitials").textContent = initials.toUpperCase();
+
+  if(DATOS.avatar) {
+    var img = document.getElementById("avatarImgHero");
+    img.src = DATOS.avatar; img.style.display = "block";
+    document.getElementById("avatarInitials").style.display = "none";
+
+    var img2 = document.getElementById("avatarPreviewCardImg");
+    img2.src = DATOS.avatar; img2.style.display = "block";
+    document.getElementById("avatarPreviewCardInitials").style.display = "none";
+  } else {
+    var img = document.getElementById("avatarImgHero");
+    img.src = ""; img.style.display = "none";
+    document.getElementById("avatarInitials").style.display = "flex";
+
+    var img2 = document.getElementById("avatarPreviewCardImg");
+    img2.src = ""; img2.style.display = "none";
+    document.getElementById("avatarPreviewCardInitials").style.display = "flex";
+  }
+
+  document.getElementById("fNombre").value    = DATOS.nombre;
+  document.getElementById("fApellido").value  = DATOS.apellido;
+  document.getElementById("fCorreo").value    = DATOS.correo;
+  document.getElementById("fAnio").value      = DATOS.anio;
+  document.getElementById("fDivision").value  = DATOS.division;
+  if (window.initUserMenu) initUserMenu();
+}
+poblarUI();
+
+// ── ACORDEONES ──
+function toggleSec(id) {
+  var body = document.getElementById(id);
+  var card = body.closest(".sec-card");
+  card.classList.toggle("collapsed");
+}
+
+// ── GATES DE CONTRASEÑA ──
+function desbloquear(sec) {
+  var input = document.getElementById("pwdGate" + sec);
+  var msg   = document.getElementById("msgGate" + sec);
+  var pass  = input.value;
+
+  if(!pass) { msg.textContent = "Ingresá tu contraseña"; msg.className = "unlock-msg err"; return; }
+  if(pass !== DATOS.pwd && pass !== "1234") {
+    msg.textContent = "Contraseña incorrecta";
+    msg.className = "unlock-msg err";
+    return;
+  }
+
+  msg.textContent = "";
+  document.getElementById("gate" + sec).style.display = "none";
+
+  if(sec === "Info") {
+    var fields = document.getElementById("fieldsInfo");
+    fields.style.opacity = "1";
+    fields.style.pointerEvents = "auto";
+    fields.querySelectorAll("input, select").forEach(function(el){
+      if(el.id !== "fNombre" && el.id !== "fApellido") el.disabled = false;
+    });
+    document.getElementById("actionsInfo").style.display = "flex";
+  }
+
+  if(sec === "Pwd") {
+    var fields = document.getElementById("fieldsPwd");
+    fields.style.opacity = "1";
+    fields.style.pointerEvents = "auto";
+    fields.querySelectorAll("input").forEach(function(el){ el.disabled = false; });
+    document.getElementById("actionsPwd").style.display = "flex";
+  }
+
+  if (window.DigiIcons) DigiIcons.create();
+}
+
+function bloquear(sec) {
+  document.getElementById("gate" + sec).style.display = "block";
+  document.getElementById("pwdGate" + sec).value = "";
+  document.getElementById("msgGate" + sec).textContent = "";
+
+  if(sec === "Info") {
+    var fields = document.getElementById("fieldsInfo");
+    fields.style.opacity = ".4";
+    fields.style.pointerEvents = "none";
+    fields.querySelectorAll("input, select").forEach(function(el){ el.disabled = true; });
+    document.getElementById("actionsInfo").style.display = "none";
+  }
+  if(sec === "Pwd") {
+    var fields = document.getElementById("fieldsPwd");
+    fields.style.opacity = ".4";
+    fields.style.pointerEvents = "none";
+    fields.querySelectorAll("input").forEach(function(el){ el.disabled = true; el.value = ""; });
+    document.getElementById("pwdStrengthBar").style.width = "0";
+    document.getElementById("pwdStrengthLabel").textContent = "";
+    document.getElementById("msgPwdMatch").textContent = "";
+    document.getElementById("actionsPwd").style.display = "none";
+  }
+}
+
+function cancelarSeccion(sec) {
+  poblarUI();
+  bloquear(sec);
+}
+
+// ── GUARDAR INFORMACIÓN ──
+function guardarInfo() {
+  var correo   = document.getElementById("fCorreo").value.trim();
+  var anio     = document.getElementById("fAnio").value;
+  var division = document.getElementById("fDivision").value;
+
+  if(!correo || !correo.includes("@")){ toast("Ingresá un correo válido", true); return; }
+
+  DATOS.correo   = correo;
+  DATOS.anio     = anio;
+  DATOS.division = division;
+  guardarLocal();
+  poblarUI();
+  bloquear("Info");
+  toast("Información actualizada correctamente");
+}
+
+// ── CONTRASEÑA NUEVA ──
+function checkStrength() {
+  var val = document.getElementById("fPwdNueva").value;
+  var bar = document.getElementById("pwdStrengthBar");
+  var lbl = document.getElementById("pwdStrengthLabel");
+
+  if(!val) { bar.style.width = "0"; lbl.textContent = ""; return; }
+
+  var score = 0;
+  if(val.length >= 8)  score++;
+  if(/[A-Z]/.test(val)) score++;
+  if(/[0-9]/.test(val)) score++;
+  if(/[^A-Za-z0-9]/.test(val)) score++;
+
+  var levels = [
+    { w: "25%", color: "#E74C3C", txt: "Muy débil" },
+    { w: "50%", color: "#E67E22", txt: "Débil" },
+    { w: "75%", color: "#F1C40F", txt: "Aceptable" },
+    { w: "100%", color: "#27AE60", txt: "Fuerte" }
+  ];
+  var lvl = levels[score - 1] || levels[0];
+  bar.style.width      = lvl.w;
+  bar.style.background = lvl.color;
+  lbl.textContent      = lvl.txt;
+  lbl.style.color      = lvl.color;
+}
+
+function checkMatch() {
+  var nueva   = document.getElementById("fPwdNueva").value;
+  var repetir = document.getElementById("fPwdRepetir").value;
+  var msg     = document.getElementById("msgPwdMatch");
+  if(!repetir) { msg.textContent = ""; return; }
+  if(nueva === repetir) {
+    msg.textContent = "Las contraseñas coinciden";
+    msg.className   = "unlock-msg ok";
+  } else {
+    msg.textContent = "Las contraseñas no coinciden";
+    msg.className   = "unlock-msg err";
+  }
+}
+
+function guardarPwd() {
+  var nueva   = document.getElementById("fPwdNueva").value;
+  var repetir = document.getElementById("fPwdRepetir").value;
+  if(!nueva || nueva.length < 8){ toast("La contraseña debe tener al menos 8 caracteres", true); return; }
+  if(nueva !== repetir){ toast("Las contraseñas no coinciden", true); return; }
+  DATOS.pwd = nueva;
+  guardarLocal();
+  bloquear("Pwd");
+  toast("Contraseña actualizada correctamente");
+}
+
+// ── CERRAR SESIÓN ──
+function cerrarSesion() {
+  try {
+    localStorage.removeItem("digi-sesion");
+    localStorage.removeItem("digi-cuenta");
+  } catch(e) {}
+  toast("Sesión cerrada correctamente");
+  setTimeout(function(){
+    window.location.href = "login.html";
+  }, 600);
+}
+
+// ── AVATAR ──
+function abrirAvatarModal() {
+  document.getElementById("avatarModalOverlay").classList.add("open");
+}
+function cerrarAvatarModal() {
+  document.getElementById("avatarModalOverlay").classList.remove("open");
+}
+document.getElementById("avatarModalOverlay").onclick = function(e){
+  if(e.target === this) cerrarAvatarModal();
+};
+
+function switchAvatarTab(tab, btn) {
+  document.querySelectorAll(".avatar-tab").forEach(function(b){ b.classList.remove("active"); });
+  btn.classList.add("active");
+  document.querySelectorAll(".avatar-tab-panel").forEach(function(p){ p.classList.remove("active"); });
+  document.getElementById("avatarPanel" + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add("active");
+}
+
+// Drag & drop
+var dz = document.getElementById("dropZone");
+if(dz){
+  dz.addEventListener("dragover",  function(e){ e.preventDefault(); dz.classList.add("dragover"); });
+  dz.addEventListener("dragleave", function(){ dz.classList.remove("dragover"); });
+  dz.addEventListener("drop", function(e){
+    e.preventDefault(); dz.classList.remove("dragover");
+    var file = e.dataTransfer.files[0];
+    if(file) cargarArchivoAvatar(file);
+  });
+}
+
+document.getElementById("avatarFileModal").onchange = function(){
+  if(this.files[0]) cargarArchivoAvatar(this.files[0]);
+};
+
+var directFileInput = document.getElementById("avatarFileInput");
+if(directFileInput){
+  directFileInput.onchange = function(){
+    if(this.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function(e){ setAvatar(e.target.result); toast("Foto de perfil actualizada"); };
+      reader.readAsDataURL(this.files[0]);
+    }
+  };
+}
+
+function cargarArchivoAvatar(file) {
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var preview = document.getElementById("avatarPreviewModal");
+    preview.src = e.target.result;
+    preview.style.display = "block";
+    preview._dataUrl = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById("avatarUrlModal").oninput = function(){
+  var url = this.value.trim();
+  var preview = document.getElementById("avatarPreviewUrlModal");
+  if(url){ preview.src = url; preview.style.display = "block"; }
+  else   { preview.style.display = "none"; }
+};
+
+function aplicarAvatar() {
+  var activePanel = document.querySelector(".avatar-tab-panel.active");
+  var src = "";
+  if(activePanel.id === "avatarPanelFile") {
+    var preview = document.getElementById("avatarPreviewModal");
+    src = preview._dataUrl || preview.src;
+  } else {
+    src = document.getElementById("avatarUrlModal").value.trim();
+  }
+  if(!src){ toast("Seleccioná o ingresá una imagen", true); return; }
+  setAvatar(src);
+  cerrarAvatarModal();
+  toast("Foto de perfil actualizada");
+}
+
+function aplicarUrlAvatar() {
+  var url = document.getElementById("avatarUrlInput").value.trim();
+  if(!url){ toast("Ingresá una URL válida", true); return; }
+  setAvatar(url);
+  toast("Foto de perfil actualizada");
+}
+
+function quitarAvatar() {
+  DATOS.avatar = "";
+  guardarLocal();
+  var img = document.getElementById("avatarImgHero");
+  img.src = ""; img.style.display = "none";
+  document.getElementById("avatarInitials").style.display = "flex";
+  var img2 = document.getElementById("avatarPreviewCardImg");
+  img2.src = ""; img2.style.display = "none";
+  document.getElementById("avatarPreviewCardInitials").style.display = "flex";
+  toast("Foto de perfil eliminada");
+}
+
+function setAvatar(src) {
+  DATOS.avatar = src;
+  guardarLocal();
+
+  // Hero
+  var img = document.getElementById("avatarImgHero");
+  img.src = src; img.style.display = "block";
+  document.getElementById("avatarInitials").style.display = "none";
+
+  // Card preview
+  var img2 = document.getElementById("avatarPreviewCardImg");
+  img2.src = src; img2.style.display = "block";
+  document.getElementById("avatarPreviewCardInitials").style.display = "none";
+}
+
+// ── TOAST ──
+function toast(msg, err) {
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast" + (err ? " err" : "") + " show";
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.classList.remove("show"); }, 3200);
+}
+
+// ── SCROLL ──
+window.onscroll = function(){
+  document.getElementById("navbar").classList.toggle("scrolled", window.scrollY > 30);
+  document.getElementById("scroll-top").classList.toggle("visible", window.scrollY > 200);
+};
+document.getElementById("scroll-top").onclick = function(){ window.scrollTo({top:0, behavior:"smooth"}); };
+document.getElementById("hamburger").onclick   = function(){ document.getElementById("navLinks").classList.toggle("open"); };
+document.addEventListener("keydown", function(e){ if(e.key==="Escape") cerrarAvatarModal(); });
+
+// Panel de control — visible para admin, preceptor y profesor
+(function(){
+  var ADMIN_EMAILS = [
+    "andresfeliperodriguezmora448@gmail.com",
+    "franco.parrucci.058@alu.tecnica29de6.edu.ar",
+    "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
+    "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
+  ];
+  try{
+    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    var email  = (sesion.email||"").trim().toLowerCase();
+    var rol    = (sesion.rol||"").trim().toLowerCase();
+    var tieneAcceso = rol === "admin" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
+    if(tieneAcceso){
+      var link = document.createElement("a");
+      link.href = "admin.html";
+      link.innerHTML = DigiIcons.get("settings", {size:14, style:"margin-right:4px"}) + " Panel";
+      link.style.cssText = "font-weight:700;color:var(--rojo,#C0392B)!important;background:rgba(192,57,43,.1);border-radius:8px;padding:8px 14px";
+      var navLinks = document.getElementById("navLinks");
+      if(navLinks) navLinks.appendChild(link);
+    }
+  }catch(e){}
+})();
+
+// Badge de descargas guardadas
+(function(){
+  try{
+    var lista = JSON.parse(localStorage.getItem("digi-descargas")||"[]");
+    var badge = document.getElementById("navDlBadge");
+    if(badge && lista.length > 0){
+      badge.textContent = lista.length;
+      badge.style.display = "inline-flex";
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

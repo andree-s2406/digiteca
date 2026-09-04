@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+(function(){
+  try {
+    var d = localStorage.getItem("digi");
+    var isDark = d === "dark" || (d !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    document.documentElement.classList.add("preload");
+  } catch(e){}
+})();
+</script>
+<style id="auth-guard-css">html { visibility: hidden !important; opacity: 0 !important; }</style>
+<script>
+(function(){
+  try {
+    var raw = localStorage.getItem("digi-sesion");
+    if (!raw) { window.location.replace("login.html"); return; }
+    var s = JSON.parse(raw);
+    if (!s || !s.email) { window.location.replace("login.html"); return; }
+    var el = document.getElementById("auth-guard-css");
+    if (el) el.remove();
+  } catch(e) {
+    window.location.replace("login.html");
+  }
+})();
+</script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Mis Descargas – DigiTeca</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
+<link rel="stylesheet" href="css/variables.css"/>
+<link rel="stylesheet" href="css/global.css"/>
+<link rel="stylesheet" href="css/animations.css"/>
+<link rel="stylesheet" href="css/descargas.css"/>
+</head>
+<body>
+
+<nav id="navbar">
+  <a class="nav-brand" href="index.html">
+    <img src="img/logo.png" alt="Logo DigiTeca" class="logo-img"/>
+    <span class="nav-title">Digi<span>Teca</span></span>
+  </a>
+  <div class="nav-links" id="navLinks">
+    <a href="index.html">Inicio</a>
+    <a href="catalogo.html">Catálogo</a>
+    <a href="index.html#novedades">Novedades</a>
+    <a href="index.html#servicios">Servicios</a>
+    <a href="index.html#contacto" class="btn-nav">Contacto</a>
+    
+    
+  </div>
+  <div class="nav-right">
+    <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
+    <div class="user-menu-wrap" id="userMenuWrap">
+      <button class="user-avatar-btn" id="userAvatarBtn" title="Mi perfil" aria-label="Mi perfil" aria-expanded="false" onclick="toggleUserDropdown(event)">
+        <span class="user-avatar-letter" id="navUserInitial"></span>
+        <img class="user-avatar-img" id="navUserImg" src="" alt="avatar" style="display:none;"/>
+      </button>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="user-dropdown-header">
+          <div class="user-dropdown-avatar">
+            <span id="dropUserInitial"></span>
+            <img id="dropUserImg" src="" alt="avatar" style="display:none;"/>
+          </div>
+          <div class="user-dropdown-info">
+            <strong id="dropUserName">Estudiante</strong>
+            <span id="dropUserEmail">sin correo registrado</span>
+          </div>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <a href="micuenta.html" class="user-dropdown-item">
+          <i data-lucide="user" style="width:16px;height:16px"></i>
+          <span>Mi perfil</span>
+        </a>
+        <a href="descargas.html" class="user-dropdown-item">
+          <i data-lucide="download" style="width:16px;height:16px"></i>
+          <span>Mis descargas</span>
+        </a>
+        <div id="dropAdminItem" style="display:none">
+          <a href="admin.html" class="user-dropdown-item admin-item">
+            <i data-lucide="shield" style="width:16px;height:16px"></i>
+            <span>Panel de control</span>
+          </a>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <button class="user-dropdown-item logout" onclick="cerrarSesionGlobal()">
+          <i data-lucide="log-out" style="width:16px;height:16px"></i>
+          <span>Cerrar sesión</span>
+        </button>
+      </div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Menu"><i data-lucide="menu"></i></button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="desc-hero">
+  <div class="desc-hero-inner">
+    <span class="desc-hero-icon"><i data-lucide="download" style="width:14px;height:14px"></i></span>
+    <div>
+      <h1>Mis Descargas</h1>
+      <p>Libros y recursos que guardaste en tu cuenta para leer sin conexión.</p>
+      <span class="desc-badge" id="heroBadge">0 recursos guardados</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="desc-main">
+  <div class="desc-toolbar" id="toolbar" style="display:none">
+    <p class="desc-count" id="descCount"></p>
+    <button class="btn-limpiar" id="btnLimpiar"><i data-lucide="trash-2" style="width:15px;height:15px;margin-right:6px"></i>Vaciar descargas</button>
+  </div>
+  <div id="descGrid"></div>
+</div>
+
+<footer>
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <a href="index.html" class="foot-logo-link">
+        <img src="img/logo.png" alt="Logo DigiTeca" class="foot-logo-img"/>
+        <div class="logo-txt"><span>Digi</span>Teca</div>
+      </a>
+      <p class="foot-school">Escuela Técnica N° 29 DE 6<br/>"Reconquista de Buenos Aires"</p>
+      <p class="foot-desc">Biblioteca Digital Escolar y repositorio educativo interactivo.</p>
+    </div>
+    <div class="foot-col">
+      <h5>Navegación</h5>
+      <a href="index.html">Inicio</a>
+      <a href="catalogo.html">Catálogo</a>
+      <a href="descargas.html">Descargas</a>
+      
+    </div>
+    <div class="foot-col">
+      <h5>Recursos</h5>
+      <a href="catalogo.html?categoria=libros">Libros Digitales</a>
+      <a href="catalogo.html?categoria=revistas">Revistas</a>
+      <a href="catalogo.html?categoria=guias">Guías y Apuntes</a>
+    </div>
+    <div class="foot-col">
+      <h5>Contacto</h5>
+      <p>ET N° 29 DE 6</p>
+      <p>Buenos Aires, Argentina</p>
+      <a href="index.html#contacto">Formulario de contacto</a>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <p class="foot-copy">© 2025 DigiTeca · Escuela Técnica N° 29 DE 6 Reconquista de Buenos Aires · Todos los derechos reservados.</p>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+<button id="scroll-top" title="Volver arriba" aria-label="Volver arriba"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
+
+<script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/api.js"></script>
+<script>
+/* ── TEMA ── */
+(function(){
+  var h = document.documentElement, b = document.getElementById("themeBtn");
+  if (!b) return;
+  function set(d){
+    if (d) {
+      h.classList.add("dark");
+      if (window.DigiIcons) b.innerHTML = DigiIcons.get("sun", {size: 18});
+      b.setAttribute("title", "Cambiar a modo claro");
+    } else {
+      h.classList.remove("dark");
+      if (window.DigiIcons) b.innerHTML = DigiIcons.get("moon", {size: 18});
+      b.setAttribute("title", "Cambiar a modo oscuro");
+    }
+    try { localStorage.setItem("digi", d ? "dark" : "light"); } catch(e){}
+  }
+  var s = ""; try { s = localStorage.getItem("digi") || ""; } catch(e){}
+  if (s === "dark") set(true);
+  else if (s !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme:dark)").matches) set(true);
+  else set(false);
+  b.onclick = function(){ set(!h.classList.contains("dark")); };
+})();
+
+/* ── CARGAR DESCARGAS ── */
+async function cargarDescargas(){
+  var _sesD=JSON.parse(localStorage.getItem("digi-sesion")||"{}"); var _keyDesc="digi-descargas-"+((_sesD.email)||"guest"); var lista = [];
+  try{ lista = JSON.parse(localStorage.getItem(_keyDesc)||"[]"); }catch(e){}
+
+  try {
+    if (window.API && window.API.descargas && _sesD.email) {
+      const items = await API.descargas.getByEmail(_sesD.email);
+      if (Array.isArray(items)) {
+        lista = items.map(function(d){
+          return {
+            id: d.libro_id || d.id,
+            t: d.titulo || d.t,
+            a: d.autor || d.a,
+            img: d.portada_url || d.img || "",
+            mat: d.materia || d.mat || "Libro",
+            tipo: d.tipo || "Libro",
+            fecha: d.fecha_descarga ? new Date(d.fecha_descarga).toLocaleDateString("es-AR") : (d.fecha || "")
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Error cargando descargas desde API:", err.message);
+  }
+
+  var badge = document.getElementById("heroBadge");
+  var count = document.getElementById("descCount");
+  var toolbar = document.getElementById("toolbar");
+  var grid = document.getElementById("descGrid");
+
+  badge.textContent = lista.length + (lista.length===1?" recurso guardado":" recursos guardados");
+
+  if(lista.length === 0){
+    toolbar.style.display = "none";
+    grid.innerHTML =
+      '<div class="empty-state">' +
+        '<span class="empty-icon" style="color:var(--cel-o);">'+DigiIcons.get("download-cloud",{size:64})+'</span>' +
+        '<h2 class="empty-title">Tu biblioteca está vacía</h2>' +
+        '<p class="empty-desc">Todavía no guardaste ningún libro. Explorá el catálogo y hacé clic en "Guardar en mi cuenta" para agregarlo aquí.</p>' +
+        '<a href="catalogo.html" class="btn-p">' + DigiIcons.get("book-open", {size:18, style:"margin-right:6px"}) + 'Explorar el catálogo</a>' +
+      '</div>';
+    return;
+  }
+
+  toolbar.style.display = "flex";
+  count.textContent = "Tenés " + lista.length + (lista.length===1?" libro guardado":" libros guardados");
+
+  var h = '<div class="desc-grid">';
+  for(var i=0; i<lista.length; i++){
+    var l = lista[i];
+    var imgSrc = l.img && l.img!=="" ? l.img : "";
+    h += '<div class="desc-card" data-id="'+l.id+'">';
+    if(imgSrc){
+      h += '<img class="desc-card-img" src="'+imgSrc+'" alt="'+l.t+'" loading="lazy"/>';
+    } else {
+      h += '<div class="desc-card-img placeholder" style="aspect-ratio:720/920;display:flex;align-items:center;justify-content:center;color:var(--txt-m)">'+DigiIcons.get("book",{size:48})+'</div>';
+    }
+    h += '<button class="desc-card-del" data-id="'+l.id+'" title="Quitar de mis descargas">'+DigiIcons.get("x",{size:14})+'</button>';
+    h += '<div class="desc-card-body">';
+    h += '<span class="desc-card-mat">'+(l.mat||"Libro")+'</span>';
+    h += '<h3 class="desc-card-title">'+l.t+'</h3>';
+    h += '<p class="desc-card-autor">'+l.a+'</p>';
+    h += '<p class="desc-card-fecha">' + DigiIcons.get("calendar", {size:13, style:"margin-right:4px;vertical-align:middle"}) + 'Guardado el '+l.fecha+'</p>';
+    h += '</div></div>';
+  }
+  h += '</div>';
+  grid.innerHTML = h;
+
+  /* Click en card → ir al libro */
+  grid.querySelectorAll(".desc-card").forEach(function(card){
+    card.onclick = function(e){
+      if(e.target.classList.contains("desc-card-del")) return;
+      window.location.href = "libro.html?id="+this.getAttribute("data-id");
+    };
+  });
+
+  /* Botón eliminar individual */
+  grid.querySelectorAll(".desc-card-del").forEach(function(btn){
+    btn.onclick = function(e){
+      e.stopPropagation();
+      var id = parseInt(this.getAttribute("data-id"));
+      eliminarLibro(id);
+    };
+  });
+}
+
+/* ── ELIMINAR UN LIBRO ── */
+function eliminarLibro(id){
+  var _sesD=JSON.parse(localStorage.getItem("digi-sesion")||"{}"); var _keyDesc="digi-descargas-"+((_sesD.email)||"guest"); var lista = [];
+  try{ lista = JSON.parse(localStorage.getItem(_keyDesc)||"[]"); }catch(e){}
+  lista = lista.filter(function(l){ return l.id !== id; });
+  try{
+    var _sesDel=JSON.parse(localStorage.getItem("digi-sesion")||"{}"); var _keyDel="digi-descargas-"+((_sesDel.email)||"guest"); localStorage.setItem(_keyDel, JSON.stringify(lista));
+    localStorage.removeItem("libro-"+id+"-guardado");
+  }catch(e){}
+  toast("Libro eliminado de tus descargas");
+  cargarDescargas();
+}
+
+/* ── ELIMINAR TODOS ── */
+document.getElementById("btnLimpiar").onclick = function(){
+  if(!confirm("¿Eliminar todos los libros guardados? Esta acción no se puede deshacer.")) return;
+  var _sesD=JSON.parse(localStorage.getItem("digi-sesion")||"{}"); var _keyDesc="digi-descargas-"+((_sesD.email)||"guest"); var lista = [];
+  try{ lista = JSON.parse(localStorage.getItem(_keyDesc)||"[]"); }catch(e){}
+  var _sesCA=JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+  var _email=(_sesCA.email)||"guest";
+  lista.forEach(function(l){
+    try{ localStorage.removeItem("libro-"+l.id+"-guardado-"+_email); }catch(e){}
+  });
+  try{ localStorage.removeItem("digi-descargas-"+_email); }catch(e){}
+  toast("Se eliminaron todos los libros guardados");
+  cargarDescargas();
+};
+
+/* ── TOAST ── */
+function toast(msg){
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t);
+  t._t = setTimeout(function(){ t.classList.remove("show"); }, 3000);
+}
+
+/* ── SCROLL / NAV ── */
+window.onscroll = function(){
+  document.getElementById("navbar").classList.toggle("scrolled", window.scrollY>30);
+  document.getElementById("scroll-top").classList.toggle("visible", window.scrollY > 200);
+};
+document.getElementById("scroll-top").onclick = function(){ window.scrollTo({top:0,behavior:"smooth"}); };
+document.getElementById("hamburger").onclick = function(){ document.getElementById("navLinks").classList.toggle("open"); };
+
+/* ── INIT ── */
+cargarDescargas();
+
+// Panel de control — visible para admin, preceptor y profesor
+(function(){
+  var ADMIN_EMAILS = [
+    "andresfeliperodriguezmora448@gmail.com",
+    "franco.parrucci.058@alu.tecnica29de6.edu.ar",
+    "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
+    "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
+  ];
+  try{
+    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    var email  = (sesion.email||"").trim().toLowerCase();
+    var rol    = (sesion.rol||"").trim().toLowerCase();
+    var tieneAcceso = rol === "admin" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
+    if(tieneAcceso){
+      var link = document.createElement("a");
+      link.href = "admin.html";
+      link.innerHTML = DigiIcons.get("settings", {size:14, style:"margin-right:4px"}) + " Panel";
+      link.style.cssText = "font-weight:700;color:var(--rojo,#C0392B)!important;background:rgba(192,57,43,.1);border-radius:8px;padding:8px 14px";
+      var navLinks = document.getElementById("navLinks");
+      if(navLinks) navLinks.appendChild(link);
+    }
+  }catch(e){}
+})();
+
+</script>
+</body>
+</html>

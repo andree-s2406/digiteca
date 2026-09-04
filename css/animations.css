@@ -1,0 +1,123 @@
+/**
+ * DigiTeca Modern Animations & Design Enhancements
+ * Micro-interacciones suaves, efectos de elevación y diseño visual premium
+ */
+
+/* ── ANIMACIONES DE ENTRADA (FADE IN UP) ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(46, 127, 179, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(46, 127, 179, 0.45);
+  }
+}
+
+@keyframes floatSubtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── TARJETAS Y COMPONENTES ELEVADOS ── */
+.libro-card, .res-card, .desc-card, .sec-card, .stat-card, .catalogo-card, .serv-card {
+  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, border-color 0.28s ease !important;
+  will-change: transform, box-shadow;
+}
+
+.libro-card:hover, .catalogo-card:hover, .desc-card:hover, .serv-card:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 14px 30px -6px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--cel-o, #2E7FB3) !important;
+}
+
+/* ── BOTONES CON FEEDBACK HÁPTICO VISUAL ── */
+.btn-p, .btn-primary, .btn-save, .btn-unlock, .btn-login, .btn-buscar, .chip, .nav-item {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-p:hover, .btn-primary:hover, .btn-save:hover, .btn-login:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(46, 127, 179, 0.35) !important;
+}
+
+.btn-p:active, .btn-primary:active, .btn-save:active, .btn-login:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* ── ICONOS SVG INTEGRADOS ── */
+.digi-svg-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  transition: transform 0.25s ease, stroke 0.25s ease;
+  line-height: 1;
+}
+
+.digi-svg-icon svg {
+  display: block;
+}
+
+.libro-card:hover .digi-svg-icon, .catalogo-card:hover .digi-svg-icon, .serv-card:hover .digi-svg-icon {
+  transform: scale(1.1) rotate(-3deg);
+}
+
+/* ── BADGES Y TAGS CON ESTILO ── */
+.libro-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── SCROLLBAR ELEGANTE ── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg, #f4f6f9);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--borde, #cbd5e1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cel-o, #2E7FB3);
+}
+
+/* ── MODALES FLUIDOS ── */
+.modal-overlay.open .modal-box,
+.modal-overlay.open .modal {
+  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── GLASSOVERLAY NAVBAR ── */
+nav, .navbar {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}

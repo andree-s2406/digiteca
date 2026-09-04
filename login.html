@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+(function(){
+  try {
+    var d = localStorage.getItem("digi");
+    var isDark = d === "dark" || (d !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    document.documentElement.classList.add("preload");
+  } catch(e){}
+})();
+</script>
+<script>
+(function(){
+  try {
+    var raw = localStorage.getItem("digi-sesion");
+    if (raw && !window.location.search.includes("logout")) {
+      var s = JSON.parse(raw);
+      if (s && s.email) {
+        window.location.replace("index.html");
+      }
+    }
+  } catch(e){}
+})();
+</script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Iniciar sesión – DigiTeca</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
+<link rel="stylesheet" href="css/variables.css"/>
+<link rel="stylesheet" href="css/global.css"/>
+<link rel="stylesheet" href="css/animations.css"/>
+<link rel="stylesheet" href="css/login.css"/>
+</head>
+<body>
+
+<div class="bg-deco"></div>
+
+<!-- Barra superior -->
+<header class="top-bar">
+  <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
+</header>
+
+<!-- Contenido central de Login -->
+<main class="login-wrap">
+  <div class="login-card">
+
+        <!-- Header con Escudo Oficial -->
+    <div class="login-header">
+      <span class="school-badge">Escuela Técnica N° 29 DE 6</span>
+      <div class="login-logo-wrap">
+        <img src="img/logo.png" alt="Escuela Técnica N° 29 DE 6 - DigiTeca" class="login-logo"/>
+      </div>
+      <h1 class="login-title">
+        Bienvenido a<br/>
+        <span class="ac1">Digi</span><span class="ac2">Teca</span>
+      </h1>
+      <p class="login-sub">
+        Ingresá tus credenciales para acceder a la biblioteca digital.
+      </p>
+    </div>
+
+    <!-- Formulario de login -->
+    <div id="loginPanel">
+      <div class="login-form">
+
+        <div class="field-wrap">
+          <label for="loginEmail">Correo electrónico</label>
+          <input type="email" id="loginEmail" placeholder="tu@email.com" autocomplete="email" required/>
+        </div>
+
+        <div class="field-wrap">
+          <label for="loginPwd">Contraseña</label>
+          <div class="pwd-wrap">
+            <input type="password" id="loginPwd" placeholder="Tu contraseña" autocomplete="current-password" required/>
+            <button class="pwd-toggle" id="pwdToggle" type="button" title="Mostrar/ocultar contraseña"><i data-lucide="eye" style="width:18px;height:18px"></i></button>
+          </div>
+        </div>
+
+        <div class="login-msg" id="loginMsg"></div>
+
+        <button class="btn-login" id="btnLogin" type="button"><i data-lucide="unlock" style="width:18px;height:18px;margin-right:6px"></i> Ingresar</button>
+
+        <div class="divider">o</div>
+
+        <button class="btn-reset" id="btnAbrirReset" type="button"><i data-lucide="key" style="width:16px;height:16px;margin-right:6px"></i> Restablecer contraseña</button>
+
+      </div>
+    </div>
+
+    <!-- Panel restablecer contraseña -->
+    <div class="reset-panel" id="resetPanel">
+      <button class="reset-back" onclick="volverLogin()" type="button"><i data-lucide="arrow-left" style="width:14px;height:14px;margin-right:4px"></i>Volver al inicio de sesión</button>
+      <p style="font-size:0.88rem;color:var(--txt-m);line-height:1.55">
+        Ingresá tu correo institucional y te enviaremos las instrucciones para restablecer tu contraseña.
+      </p>
+      <div class="field-wrap">
+        <label for="resetEmail">Correo electrónico</label>
+        <input type="email" id="resetEmail" placeholder="tu@email.com"/>
+      </div>
+      <div class="login-msg" id="resetMsg"></div>
+      <button class="btn-login" id="btnEnviarReset" type="button"><i data-lucide="mail" style="width:18px;height:18px;margin-right:6px"></i> Enviar instrucciones</button>
+    </div>
+
+    <!-- Nota inferior -->
+    <div class="login-nota">
+      <p>¿No tenés credenciales? <strong>Solicitáselas a tu preceptor/a</strong> antes de tu próxima clase.</p>
+    </div>
+
+  </div>
+</main>
+
+
+
+<script src="js/morphicons.global.js"></script>
+<script src="js/lucide.min.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/api.js"></script>
+<script>
+if(typeof setupThemeToggle === "function") setupThemeToggle();
+
+/* ── MOSTRAR / OCULTAR CONTRASEÑA ── */
+document.getElementById("pwdToggle").onclick = function(){
+  var inp = document.getElementById("loginPwd");
+  var show = inp.type === "password";
+  inp.type = show ? "text" : "password";
+  
+  this.innerHTML = show ? DigiIcons.get("eye-off", {size:18}) : DigiIcons.get("eye", {size:18});
+};
+
+/* ── LOGIN ── */
+document.getElementById("btnLogin").onclick = function(){ intentarLogin(); };
+document.getElementById("loginPwd").onkeydown = function(e){
+  if(e.key === "Enter") intentarLogin();
+};
+document.getElementById("loginEmail").onkeydown = function(e){
+  if(e.key === "Enter") document.getElementById("loginPwd").focus();
+};
+
+async function intentarLogin(){
+  var email = document.getElementById("loginEmail").value.trim();
+  var pwd   = document.getElementById("loginPwd").value;
+  var msg   = document.getElementById("loginMsg");
+  var btn   = document.getElementById("btnLogin");
+
+  /* Limpiar errores previos */
+  msg.className = "login-msg";
+  msg.style.display = "none";
+  document.getElementById("loginEmail").classList.remove("error");
+  document.getElementById("loginPwd").classList.remove("error");
+
+  if(!email){
+    mostrarMsgLogin("Ingresá tu correo electrónico.", "err");
+    document.getElementById("loginEmail").classList.add("error");
+    document.getElementById("loginEmail").focus();
+    return;
+  }
+  if(!pwd){
+    mostrarMsgLogin("Ingresá tu contraseña.", "err");
+    document.getElementById("loginPwd").classList.add("error");
+    document.getElementById("loginPwd").focus();
+    return;
+  }
+
+  /* Verificación */
+  btn.disabled = true;
+  btn.innerHTML = DigiIcons.get("loader-2",{size:16,class:"spin",style:"margin-right:6px"})+" Verificando...";
+
+  try {
+    if (window.API && window.API.auth) {
+      const res = await API.auth.login(email, pwd);
+      if (res && res.user) {
+        mostrarMsgLogin("Credenciales correctas. Ingresando...", "ok");
+        btn.innerHTML = DigiIcons.get("check",{size:16,style:"margin-right:6px"})+" Ingresando...";
+        try{
+          localStorage.setItem("digi-sesion", JSON.stringify(res.user));
+          registrarIngreso(res.user);
+        }catch(e){}
+        setTimeout(function(){
+          window.location.href = "index.html";
+        }, 500);
+        return;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("API login:", apiErr.message);
+  }
+
+  // Fallback si la API offline o para verificación local
+  var usuarios = [];
+  try{ usuarios = JSON.parse(localStorage.getItem("digi-admin-usuarios")||"[]"); }catch(e){}
+  var uEncontrado = null;
+
+  for(var ui=0; ui<usuarios.length; ui++){
+    if((usuarios[ui].email||"").toLowerCase()===email.toLowerCase() && (usuarios[ui].pwd===pwd || usuarios[ui].password===pwd)){
+      if(usuarios[ui].estado === "restringido"){
+        mostrarMsgLogin("Tu cuenta está restringida. Consultá con tu preceptor/a.", "err");
+        btn.disabled = false;
+        btn.innerHTML = DigiIcons.get("unlock",{size:18,style:"margin-right:6px"})+" Ingresar";
+        return;
+      }
+      uEncontrado = usuarios[ui]; break;
+    }
+  }
+
+  if(uEncontrado){
+    mostrarMsgLogin("Credenciales correctas. Ingresando...", "ok");
+    btn.innerHTML = DigiIcons.get("check",{size:16,style:"margin-right:6px"})+" Ingresando...";
+    try{
+      localStorage.setItem("digi-sesion", JSON.stringify(uEncontrado));
+      registrarIngreso(uEncontrado);
+    }catch(e){}
+    setTimeout(function(){
+      window.location.href = "index.html";
+    }, 500);
+  } else {
+    mostrarMsgLogin("Correo o contraseña incorrectos. Verificá tus datos o pedí acceso a tu preceptor/a.", "err");
+    document.getElementById("loginPwd").classList.add("error");
+    document.getElementById("loginPwd").value = "";
+    document.getElementById("loginPwd").focus();
+    btn.disabled = false;
+    btn.innerHTML = DigiIcons.get("unlock",{size:18,style:"margin-right:6px"})+" Ingresar";
+  }
+}
+
+function mostrarMsgLogin(texto, tipo){
+  var msg = document.getElementById("loginMsg");
+  msg.textContent = texto;
+  msg.className = "login-msg " + tipo;
+  msg.style.display = "flex";
+}
+
+/* ── RESTABLECER CONTRASEÑA ── */
+document.getElementById("btnAbrirReset").onclick = function(){
+  document.getElementById("loginPanel").style.display = "none";
+  document.getElementById("resetPanel").classList.add("open");
+  document.getElementById("resetEmail").value =
+    document.getElementById("loginEmail").value;
+  document.getElementById("resetEmail").focus();
+};
+
+function volverLogin(){
+  document.getElementById("resetPanel").classList.remove("open");
+  document.getElementById("loginPanel").style.display = "block";
+  document.getElementById("resetMsg").className = "login-msg";
+  document.getElementById("resetMsg").style.display = "none";
+}
+
+document.getElementById("btnEnviarReset").onclick = function(){
+  var email = document.getElementById("resetEmail").value.trim();
+  var msg   = document.getElementById("resetMsg");
+  var btn   = this;
+
+  msg.className = "login-msg";
+  msg.style.display = "none";
+
+  if(!email || !email.includes("@")){
+    msg.textContent = "Ingresá un correo válido.";
+    msg.className   = "login-msg err";
+    msg.style.display = "flex";
+    document.getElementById("resetEmail").focus();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = DigiIcons.get("loader-2",{size:16,class:"spin",style:"margin-right:6px"})+" Enviando...";
+
+  setTimeout(function(){
+    msg.textContent = "Si el correo está registrado, recibirás las instrucciones en los próximos minutos. Revisá también la carpeta de spam.";
+    msg.className   = "login-msg ok";
+    msg.style.display = "flex";
+    btn.disabled = false;
+    btn.innerHTML = DigiIcons.get("mail",{size:18,style:"margin-right:6px"})+" Enviar instrucciones";
+  }, 1000);
+};
+
+document.getElementById("resetEmail").onkeydown = function(e){
+  if(e.key === "Enter") document.getElementById("btnEnviarReset").click();
+};
+
+// Registrar ingreso en estadísticas
+function registrarIngreso(usuario){
+  try{
+    var stats = JSON.parse(localStorage.getItem("digi-stats")||"{}");
+    var hoy = new Date().toDateString();
+    if(stats.ultimaFecha !== hoy){ stats.sesionesHoy = 0; stats.ultimaFecha = hoy; }
+    stats.sesionesHoy = (stats.sesionesHoy||0) + 1;
+    var dia = new Date().getDay();
+    if(!stats.ingresosPorDia) stats.ingresosPorDia=[0,0,0,0,0,0,0];
+    stats.ingresosPorDia[dia] = (stats.ingresosPorDia[dia]||0) + 1;
+    if(!stats.ingresosPorAnio) stats.ingresosPorAnio={"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"Otro":0};
+    var anio = usuario.anio||"Otro";
+    if(!stats.ingresosPorAnio[anio]) stats.ingresosPorAnio[anio] = 0;
+    stats.ingresosPorAnio[anio]++;
+    if(!stats.ultimosIngresos) stats.ultimosIngresos = [];
+    var now = new Date();
+    var fecha = now.toLocaleDateString("es-AR") + " " + now.toLocaleTimeString("es-AR", {hour:"2-digit",minute:"2-digit"});
+    stats.ultimosIngresos.push({
+      nombre: (usuario.nombre||"") + " " + (usuario.apellido||""),
+      email:  usuario.email||"",
+      rol:    usuario.rol||"alumno",
+      fecha:  fecha
+    });
+    if(stats.ultimosIngresos.length > 50) stats.ultimosIngresos = stats.ultimosIngresos.slice(-50);
+    localStorage.setItem("digi-stats", JSON.stringify(stats));
+  }catch(e){}
+}
+
+// Scroll-top button
+window.addEventListener("scroll", function(){
+  var st = document.getElementById("scroll-top");
+  if(st) st.classList.toggle("visible", window.scrollY > 200);
+});
+var stBtn = document.getElementById("scroll-top");
+if(stBtn) stBtn.onclick = function(){ window.scrollTo({top:0, behavior:"smooth"}); };
+
+</script>
+</body>
+</html>

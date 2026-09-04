@@ -1,0 +1,104 @@
+/**
+ * DigiTeca Design System - Variables & Base
+ * Centralized theme tokens for light and dark modes
+ */
+
+:root {
+  /* Paleta Celeste (Primario) */
+  --cel: #5BAFD6;
+  --cel-c: #A8D8EE;
+  --cel-o: #2E7FB3;
+
+  /* Paleta Amarillo / Dorado (Acento) */
+  --am: #E8B814;
+  --am-c: #F5D96A;
+  --am-o: #C49A0A;
+  --am2: #F39C12;
+  --am2-c: #FEF9E7;
+
+  /* Superficies y Fondos */
+  --bg: #FFFFFF;
+  --bg-alt: #F4F8FB;
+  --bg-card: #FFFFFF;
+  --inp: #FFFFFF;
+  --nav-bg: rgba(255, 255, 255, 0.96);
+  --nav-bdr: #A8D8EE;
+  --sidebar: #F4F8FB;
+  --sidebar-bdr: #E1EDF5;
+  --sidebar-w: 240px;
+
+  /* Tipografía y Bordes */
+  --txt: #1A2A3A;
+  --txt-m: #3A5068;
+  --borde: #E1EDF5;
+  --foot: #1A2A3A;
+
+  /* Estados y Feedback */
+  --verde: #2E7D52;
+  --verde-c: #E8F5EE;
+  --rojo: #C0392B;
+  --rojo-c: #FDECEA;
+
+  /* Sombras y Elevación */
+  --sh: 0 4px 24px rgba(46, 127, 179, 0.13);
+  --shf: 0 8px 40px rgba(46, 127, 179, 0.22);
+}
+
+html.dark {
+  /* Paleta Celeste (Modo Oscuro) */
+  --cel: #5BAFD6;
+  --cel-c: #1E4A6E;
+  --cel-o: #58B4E8;
+
+  /* Paleta Amarillo / Dorado (Modo Oscuro) */
+  --am: #E8B814;
+  --am-c: #3A2E00;
+  --am-o: #F5D96A;
+  --am2: #F5C842;
+  --am2-c: #2A1E00;
+
+  /* Superficies y Fondos */
+  --bg: #0A1628;
+  --bg-alt: #0F2030;
+  --bg-card: #132338;
+  --inp: #0F2030;
+  --nav-bg: rgba(10, 22, 40, 0.97);
+  --nav-bdr: #1E3E5A;
+  --sidebar: #0F2030;
+  --sidebar-bdr: #1E3E5A;
+
+  /* Tipografía y Bordes */
+  --txt: #E8F4FD;
+  --txt-m: #8FBDD8;
+  --borde: #1E3E5A;
+  --foot: #060E1A;
+
+  /* Estados y Feedback */
+  --verde: #5BD48A;
+  --verde-c: #0D2E1C;
+  --rojo: #E57373;
+  --rojo-c: #3A0A0A;
+
+  /* Sombras y Elevación */
+  --sh: 0 4px 24px rgba(0, 0, 0, 0.40);
+  --shf: 0 8px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* ── RESET Y BASE ── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--txt);
+  overflow-x: hidden;
+  transition: background 0.35s ease, color 0.35s ease;
+}

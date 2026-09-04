@@ -1,0 +1,249 @@
+/**
+ * DigiTeca - Descargas Page Styles (descargas.html)
+ * Hero de biblioteca personal, toolbar de acciones, tarjetas con eliminación y estado vacío
+ */
+
+/* ── HERO DE DESCARGAS ── */
+.desc-hero {
+  padding: 100px 40px 48px;
+  background: linear-gradient(135deg, var(--cel-o), #1A5F8A);
+  transition: background 0.35s ease;
+}
+
+html.dark .desc-hero {
+  background: linear-gradient(135deg, #0A1E30, #0D2540);
+}
+
+.desc-hero-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.desc-hero-icon {
+  font-size: 3.5rem;
+}
+
+.desc-hero h1 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 900;
+  color: #FFFFFF;
+  margin-bottom: 6px;
+}
+
+.desc-hero p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.desc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 20px;
+  margin-top: 10px;
+}
+
+/* ── MAIN CONTENT ── */
+.desc-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+}
+
+/* ── TOOLBAR ── */
+.desc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.desc-count {
+  font-size: 0.95rem;
+  color: var(--txt-m);
+  font-weight: 600;
+}
+
+.btn-limpiar {
+  background: transparent;
+  color: var(--rojo);
+  border: 2px solid var(--rojo);
+  border-radius: 20px;
+  padding: 7px 18px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-limpiar:hover {
+  background: var(--rojo);
+  color: #FFFFFF;
+}
+
+/* ── GRID DE LIBROS GUARDADOS ── */
+.desc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 24px;
+}
+
+/* ── TARJETA DE DESCARGA ── */
+.desc-card {
+  background: var(--bg-card);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--sh);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.35s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.desc-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shf);
+}
+
+.desc-card-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 720/920;
+  object-fit: cover;
+  background: linear-gradient(145deg, var(--cel-o), #1A5F8A);
+}
+
+.desc-card-img.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  background: var(--bg-alt);
+  color: var(--txt-m);
+}
+
+.desc-card-body {
+  padding: 14px 16px 16px;
+}
+
+.desc-card-mat {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cel-o);
+  background: var(--cel-c);
+  padding: 2px 10px;
+  border-radius: 10px;
+  display: inline-block;
+  margin-bottom: 7px;
+}
+
+.desc-card-title {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--txt);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.desc-card-autor {
+  font-size: 0.8rem;
+  color: var(--txt-m);
+  margin-bottom: 10px;
+}
+
+.desc-card-fecha {
+  font-size: 0.72rem;
+  color: var(--txt-m);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Botón flotante para eliminar libro guardado */
+.desc-card-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(192, 57, 43, 0.85);
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.2s ease;
+  opacity: 0;
+  z-index: 5;
+}
+
+.desc-card:hover .desc-card-del {
+  opacity: 1;
+}
+
+.desc-card-del:hover {
+  background: var(--rojo);
+  transform: scale(1.12);
+}
+
+/* ── ESTADO VACÍO (EMPTY STATE) ── */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--txt-m);
+}
+
+.empty-icon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.empty-title {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.6rem;
+  color: var(--txt);
+  margin-bottom: 12px;
+}
+
+.empty-desc {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  max-width: 400px;
+  margin: 0 auto 28px;
+}
+
+/* ── RESPONSIVE DESCARGAS ── */
+@media (max-width: 600px) {
+  .desc-hero {
+    padding: 88px 20px 36px;
+  }
+  .desc-main {
+    padding: 32px 16px 60px;
+  }
+  .desc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
+}

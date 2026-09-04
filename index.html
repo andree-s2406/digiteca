@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+(function(){
+  try {
+    var d = localStorage.getItem("digi");
+    var isDark = d === "dark" || (d !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    document.documentElement.classList.add("preload");
+  } catch(e){}
+})();
+</script>
+<style id="auth-guard-css">html { visibility: hidden !important; opacity: 0 !important; }</style>
+<script>
+(function(){
+  try {
+    var raw = localStorage.getItem("digi-sesion");
+    if (!raw) { window.location.replace("login.html"); return; }
+    var s = JSON.parse(raw);
+    if (!s || !s.email) { window.location.replace("login.html"); return; }
+    var el = document.getElementById("auth-guard-css");
+    if (el) el.remove();
+  } catch(e) {
+    window.location.replace("login.html");
+  }
+})();
+</script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DigiTeca</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
+<link rel="stylesheet" href="css/variables.css"/>
+<link rel="stylesheet" href="css/global.css"/>
+<link rel="stylesheet" href="css/animations.css"/>
+<link rel="stylesheet" href="css/index.css"/>
+</head>
+<body>
+<nav id="navbar">
+  <a class="nav-brand" href="#hero">
+    <img src="img/logo.png" alt="Logo DigiTeca" class="logo-img"/>
+    <span class="nav-title">Digi<span>Teca</span></span>
+  </a>
+  <div class="nav-links" id="navLinks">
+    <a href="index.html" class="active">Inicio</a>
+    <a href="catalogo.html">Catálogo</a><a href="#novedades">Novedades</a>
+    <a href="#servicios">Servicios</a><a href="#acerca">Nosotros</a>
+    <a href="#contacto" class="btn-nav">Contacto</a>
+    
+  </div>
+  <div class="nav-right">
+    <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
+    <div class="user-menu-wrap" id="userMenuWrap">
+      <button class="user-avatar-btn" id="userAvatarBtn" title="Mi perfil" aria-label="Mi perfil" aria-expanded="false" onclick="toggleUserDropdown(event)">
+        <span class="user-avatar-letter" id="navUserInitial"></span>
+        <img class="user-avatar-img" id="navUserImg" src="" alt="avatar" style="display:none;"/>
+      </button>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="user-dropdown-header">
+          <div class="user-dropdown-avatar">
+            <span id="dropUserInitial"></span>
+            <img id="dropUserImg" src="" alt="avatar" style="display:none;"/>
+          </div>
+          <div class="user-dropdown-info">
+            <strong id="dropUserName">Estudiante</strong>
+            <span id="dropUserEmail">sin correo registrado</span>
+          </div>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <a href="micuenta.html" class="user-dropdown-item">
+          <i data-lucide="user" style="width:16px;height:16px"></i>
+          <span>Mi perfil</span>
+        </a>
+        <a href="descargas.html" class="user-dropdown-item">
+          <i data-lucide="download" style="width:16px;height:16px"></i>
+          <span>Mis descargas</span>
+        </a>
+        <div id="dropAdminItem" style="display:none">
+          <a href="admin.html" class="user-dropdown-item admin-item">
+            <i data-lucide="shield" style="width:16px;height:16px"></i>
+            <span>Panel de control</span>
+          </a>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <button class="user-dropdown-item logout" onclick="cerrarSesionGlobal()">
+          <i data-lucide="log-out" style="width:16px;height:16px"></i>
+          <span>Cerrar sesión</span>
+        </button>
+      </div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Menu"><i data-lucide="menu"></i></button>
+  </div>
+</nav>
+<section id="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <span class="hero-badge">Escuela Técnica N° 29 DE 6 - Reconquista de Buenos Aires</span>
+      <h1 class="hero-title">Bienvenido a<br/><span class="ac1">Digi</span><span class="ac2">Teca</span></h1>
+      <p class="hero-sub">La biblioteca digital de nuestra escuela. Accedé a libros, revistas, recursos educativos y material multimedia desde cualquier dispositivo, en cualquier momento.</p>
+      <div class="hero-btns">
+        <a href="catalogo.html" class="btn-p"><i data-lucide="book-open"></i> Ver catálogo completo &rarr;</a>
+        <a href="#servicios" class="btn-s">Nuestros servicios</a>
+      </div>
+    </div>
+    <div class="hero-logo-wrap">
+      <img src="img/logo.png" alt="Logo DigiTeca" class="hero-logo"/>
+    </div>
+  </div>
+</section>
+<section id="novedades">
+  <div class="sec-hdr">
+    <span class="sec-tag">Novedades</span>
+    <h2 class="sec-title">Ultimas <span class="hl">Incorporaciones</span></h2>
+    <p class="sec-desc">Material recien incorporado a la coleccion digital de la escuela.</p>
+  </div>
+  <div class="nov-grid">
+    <div class="nov-card"><div class="nov-hdr cel"><span class="nov-icon-wrap" style="width:58px;height:58px;color:var(--cel-o);background:rgba(255,255,255,0.7);border-radius:50%;box-shadow:0 6px 16px rgba(0,0,0,0.06);display:inline-flex;align-items:center;justify-content:center"><i data-lucide="dna" style="width:28px;height:28px"></i></span></div><div class="nov-body"><p class="nov-fecha">Marzo 2025</p><h3 class="nov-title">Biologia Celular y Molecular - 4ta Edicion</h3><p class="nov-desc">Texto completo para Ciencias Naturales con animaciones interactivas y autoevaluaciones.</p><a href="catalogo.html" class="nov-link">Ver en catalogo</a></div></div>
+    <div class="nov-card"><div class="nov-hdr am"><span class="nov-icon-wrap" style="width:58px;height:58px;color:var(--am-o,#b88b00);background:rgba(255,255,255,0.7);border-radius:50%;box-shadow:0 6px 16px rgba(0,0,0,0.06);display:inline-flex;align-items:center;justify-content:center"><i data-lucide="terminal" style="width:28px;height:28px"></i></span></div><div class="nov-body"><p class="nov-fecha">Febrero 2025</p><h3 class="nov-title">Fundamentos de Programacion en Python</h3><p class="nov-desc">Manual completo con ejercicios resueltos. Ideal para Tecnologia e Informatica.</p><a href="catalogo.html" class="nov-link">Ver en catalogo</a></div></div>
+    <div class="nov-card"><div class="nov-hdr mix"><span class="nov-icon-wrap" style="width:58px;height:58px;color:var(--cel-o);background:rgba(255,255,255,0.7);border-radius:50%;box-shadow:0 6px 16px rgba(0,0,0,0.06);display:inline-flex;align-items:center;justify-content:center"><i data-lucide="landmark" style="width:28px;height:28px"></i></span></div><div class="nov-body"><p class="nov-fecha">Enero 2025</p><h3 class="nov-title">Historia Argentina Contemporanea - S. XX y XXI</h3><p class="nov-desc">Recurso multimedia con documentos primarios, mapas historicos y lineas de tiempo.</p><a href="catalogo.html" class="nov-link">Ver en catalogo</a></div></div>
+  </div>
+</section>
+<section id="servicios">
+  <div class="sec-hdr">
+    <span class="sec-tag">Servicios</span>
+    <h2 class="sec-title">Que ofrece la <span class="hl">DigiTeca</span></h2>
+    <p class="sec-desc">Una plataforma pensada para estudiantes y docentes de la Escuela Tecnica N 29.</p>
+  </div>
+  <div class="serv-grid">
+    <div class="serv-card"><span class="serv-icon"><i data-lucide="book-open" style="width:36px;height:36px;color:var(--cel-o)"></i></span><h3 class="serv-title">Libros Digitales</h3><p class="serv-desc">Acceso a mas de 1.200 titulos en formato PDF, ePub e interactivo.</p></div>
+    <div class="serv-card"><span class="serv-icon"><i data-lucide="newspaper" style="width:36px;height:36px;color:var(--cel-o)"></i></span><h3 class="serv-title">Revistas y Articulos</h3><p class="serv-desc">Publicaciones academicas, revistas cientificas y articulos especializados.</p></div>
+    <div class="serv-card"><span class="serv-icon"><i data-lucide="library" style="width:36px;height:36px;color:var(--cel-o)"></i></span><h3 class="serv-title">Biblioteca Personal</h3><p class="serv-desc">Guarda libros en tu cuenta para leerlos sin conexion, en cualquier momento.</p></div>
+  </div>
+</section>
+<section id="acerca">
+  <div class="acerca-inner">
+    <img class="acerca-img" src="img/escuela.jpg" alt="Escuela Técnica N° 29 DE 6"/>
+    <div class="acerca-text">
+      <span class="acerca-tag">Quienes somos</span>
+      <h2 class="acerca-title">La biblioteca del <span>siglo XXI</span> en nuestra escuela</h2>
+      <p class="acerca-desc">La DigiTeca es el espacio de acceso a la informacion digital de la <strong>Escuela Tecnica N 29 DE 6 - Reconquista de Buenos Aires</strong>. Nacio con el objetivo de democratizar el acceso al conocimiento.</p>
+      <p class="acerca-desc">Nuestra mision es poner el saber al alcance de toda la comunidad educativa, sin barreras de horario ni de lugar.</p>
+      <ul class="acerca-lista">
+        <li>Mas de 1.200 recursos digitales</li>
+        <li>Coleccion organizada por ano y materia</li>
+        <li>Actualizaciones mensuales del catalogo</li>
+        <li>Acceso gratuito para alumnos y docentes</li>
+        <li>Soporte pedagogico del equipo bibliotecario</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<section id="contacto">
+  <div class="sec-hdr">
+    <span class="sec-tag">Contacto</span>
+    <h2 class="sec-title">Tenes una <span class="hl">consulta</span></h2>
+    <p class="sec-desc">Escribinos y el equipo de la DigiTeca te respondera a la brevedad.</p>
+  </div>
+  <div class="cont-inner"><div class="cont-form">
+    <div class="form-grid">
+      <div class="form-group"><label>Nombre completo</label><input type="text" id="nombre" placeholder="Tu nombre"/></div>
+      <div class="form-group"><label>Correo electronico</label><input type="email" id="email" placeholder="tu@email.com"/></div>
+      <div class="form-group"><label>Soy</label><select id="rol"><option value="">Selecciona tu rol</option><option>Estudiante</option><option>Docente</option><option>Directivo</option><option>Otro</option></select></div>
+      <div class="form-group"><label>Asunto</label><input type="text" id="asunto" placeholder="Sobre que nos escribis"/></div>
+      <div class="form-group full"><label>Mensaje</label><textarea id="mensaje" rows="5" placeholder="Contanos tu consulta o sugerencia..."></textarea></div>
+    </div>
+    <div class="form-submit">
+      <button class="btn-p" id="btnEnviar">Enviar mensaje</button>
+      <p id="form-msg"></p>
+    </div>
+  </div></div>
+</section>
+<footer>
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <a href="index.html" class="foot-logo-link">
+        <img src="img/logo.png" alt="Logo DigiTeca" class="foot-logo-img"/>
+        <div class="logo-txt"><span>Digi</span>Teca</div>
+      </a>
+      <p class="foot-school">Escuela Técnica N° 29 DE 6<br/>"Reconquista de Buenos Aires"</p>
+      <p class="foot-desc">Biblioteca Digital Escolar y repositorio educativo interactivo.</p>
+    </div>
+    <div class="foot-col">
+      <h5>Navegación</h5>
+      <a href="index.html">Inicio</a>
+      <a href="catalogo.html">Catálogo</a>
+      <a href="descargas.html">Descargas</a>
+      
+    </div>
+    <div class="foot-col">
+      <h5>Recursos</h5>
+      <a href="catalogo.html?categoria=libros">Libros Digitales</a>
+      <a href="catalogo.html?categoria=revistas">Revistas</a>
+      <a href="catalogo.html?categoria=guias">Guías y Apuntes</a>
+    </div>
+    <div class="foot-col">
+      <h5>Contacto</h5>
+      <p>ET N° 29 DE 6</p>
+      <p>Buenos Aires, Argentina</p>
+      <a href="index.html#contacto">Formulario de contacto</a>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <p class="foot-copy">© 2025 DigiTeca · Escuela Técnica N° 29 DE 6 Reconquista de Buenos Aires · Todos los derechos reservados.</p>
+  </div>
+</footer>
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <button class="modal-close" id="modalClose" aria-label="Cerrar"><i data-lucide="x" style="width:20px;height:20px"></i></button>
+    <img class="modal-img" id="mImg" src="" alt=""/>
+    <h3 class="modal-title" id="mTitle"></h3>
+    <p class="modal-autor" id="mAutor"></p>
+    <div class="modal-tags" id="mTags"></div>
+    <p class="modal-desc" id="mDesc"></p>
+    <div class="modal-btn"><a class="btn-p" id="modalAcceder" href="libro.html">Acceder al recurso</a></div>
+  </div>
+</div>
+<button id="scroll-top" title="Volver arriba" aria-label="Volver arriba"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/api.js"></script>
+<script>
+// Normaliza texto: minusculas sin acentos
+function norm(s){
+  return (s||"").toLowerCase()
+    .replace(/[áàäâã]/g,"a").replace(/[éèëê]/g,"e")
+    .replace(/[íìïî]/g,"i").replace(/[óòöôõ]/g,"o")
+    .replace(/[úùüû]/g,"u").replace(/[ñ]/g,"n");
+}
+
+var LIBROS = [];
+
+// Carga dinámica desde API y registro de visitas
+async function initInicioAPI(){
+  try {
+    if (window.API) {
+      if (window.API.stats) API.stats.registrarVisita().catch(function(){});
+      if (window.API.libros) {
+        const libs = await API.libros.getAll();
+        if (Array.isArray(libs)) {
+          LIBROS = libs;
+          renderCatalogo();
+        }
+      }
+    }
+  } catch(e){}
+}
+initInicioAPI();
+
+// ── CARGA DINÁMICA DEL CATÁLOGO ──
+// Los libros se cargan desde el panel de admin (localStorage) si existen,
+// de lo contrario se usan los datos base hardcodeados.
+(function(){
+  try{
+    var saved = localStorage.getItem("digi-admin-libros");
+    if(saved){
+      var parsed = JSON.parse(saved);
+      if(parsed && parsed.length > 0) LIBROS = parsed;
+    }
+  }catch(e){}
+})();
+// Filtrar libros por division especifica del usuario logueado
+(function(){
+  try{
+    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    var anio   = sesion.anio || "";
+    var div    = sesion.div  || "";
+    if(!anio && !div) return; // sin datos de cursada, no filtrar
+
+    // Override LIBROS to exclude books with divisiones that don't match
+    LIBROS = LIBROS.filter(function(l){
+      if(!l.divisiones || l.divisiones.length === 0) return true; // sin division = visible para todos
+      for(var i=0;i<l.divisiones.length;i++){
+        if(String(l.divisiones[i].anio)===String(anio) &&
+           String(l.divisiones[i].div) ===String(div)) return true;
+      }
+      return false; // tiene divisiones pero ninguna coincide
+    });
+  }catch(e){}
+})();
+
+
+
+function getImg(l){
+  if(l.img && l.img!=="") return l.img;
+  return "https://placehold.co/720x920/A8D8EE/2E7FB3?text="+encodeURIComponent(l.t.split(" ").slice(0,3).join("+"));
+}
+
+// Tema manejado por Morphicons (js/icons.js)
+if(typeof setupThemeToggle==="function") setupThemeToggle();
+
+// Catalogo
+function getRankingIds(){
+  try{
+    var r = localStorage.getItem("digi-admin-ranking");
+    if(r){
+      var parsed = JSON.parse(r);
+      if(parsed && parsed.length) return parsed.slice(0, 10);
+    }
+  }catch(e){}
+  // Default ranking: first 10 books
+  return LIBROS.slice(0, 10).map(function(l){ return l.id; });
+}
+
+function renderCatalogo(){
+  var grid = document.getElementById("catalogoGrid");
+  if(!grid) return;
+  var rankIds = getRankingIds();
+
+  // Build ordered list based on ranking
+  var ranked = [];
+  for(var ri=0; ri<rankIds.length && ranked.length<10; ri++){
+    for(var li=0; li<LIBROS.length; li++){
+      if(LIBROS[li].id === rankIds[ri]){
+        ranked.push({libro: LIBROS[li], pos: ri+1});
+        break;
+      }
+    }
+  }
+  // Fill to 10 if needed
+  if(ranked.length < 10){
+    for(var li=0; li<LIBROS.length && ranked.length<10; li++){
+      var already = ranked.some(function(item){ return item.libro.id === LIBROS[li].id; });
+      if(!already){
+        ranked.push({libro: LIBROS[li], pos: ranked.length+1});
+      }
+    }
+  }
+
+  var h="";
+  for(var i=0; i<ranked.length && i<10; i++){
+    var l   = ranked[i].libro;
+    var pos = ranked[i].pos;
+    h+='<div class="libro-card" onclick="abrirModal('+l.id+')">';
+    h+='<img class="libro-img" src="'+getImg(l)+'" alt="'+l.t+'" loading="lazy"/>';
+    if(pos>0) h+='<span class="libro-rank">'+DigiIcons.get("flame",{size:14,color:"#e85d04"})+' #'+pos+' más buscado</span>';
+    h+='<div class="libro-body">';
+    h+='<span class="libro-cat-tag">'+l.l+'</span>';
+    h+='<h3 class="libro-title">'+l.t+'</h3>';
+    h+='<p class="libro-autor">'+l.a+'</p>';
+    h+='</div></div>';
+  }
+  grid.innerHTML=h;
+}
+renderCatalogo();
+
+// Modal
+function abrirModal(id){
+  var l=null;
+  for(var i=0;i<LIBROS.length;i++){if(LIBROS[i].id===id){l=LIBROS[i];break;}}
+  if(!l)return;
+  document.getElementById("mImg").src=getImg(l);
+  document.getElementById("mImg").alt=l.t;
+  document.getElementById("mTitle").textContent=l.t;
+  document.getElementById("mAutor").textContent="Autor/a: "+l.a;
+  document.getElementById("mDesc").textContent=l.x;
+  document.getElementById("mTags").innerHTML='<span class="tag">'+(l.mat||l.l)+'</span><span class="tag">'+l.tipo+'</span>';
+  document.getElementById("modalAcceder").href="libro.html?id="+id;
+  document.getElementById("modalOverlay").classList.add("open");
+  document.body.style.overflow="hidden";
+}
+document.getElementById("modalOverlay").onclick=function(e){if(e.target===this)cerrarModal();};
+document.getElementById("modalClose").onclick=cerrarModal;
+function cerrarModal(){document.getElementById("modalOverlay").classList.remove("open");document.body.style.overflow="";}
+document.addEventListener("keydown",function(e){if(e.key==="Escape")cerrarModal();});
+
+// Formulario
+document.getElementById("btnEnviar").onclick=async function(){
+  var n=document.getElementById("nombre").value.trim();
+  var e=document.getElementById("email").value.trim();
+  var m=document.getElementById("mensaje").value.trim();
+  var a=document.getElementById("asunto").value.trim();
+  var r=document.getElementById("rol").value;
+  var msg=document.getElementById("form-msg");
+  if(!n||!e||!m){msg.style.display="block";msg.style.color="#C0392B";msg.textContent="Completa todos los campos obligatorios.";return;}
+  try {
+    if (window.API && window.API.contacto) {
+      await API.contacto.send({ nombre: n, email: e, rol: r, asunto: a, mensaje: m });
+    }
+  } catch (err) {
+    console.warn("Envío de contacto vía API:", err.message);
+  }
+
+  msg.style.display="block";msg.style.color="var(--cel-o)";msg.textContent="¡Mensaje enviado! Gracias, "+n+"!";
+  document.getElementById("nombre").value="";document.getElementById("email").value="";
+  document.getElementById("asunto").value="";document.getElementById("mensaje").value="";
+  document.getElementById("rol").selectedIndex=0;
+};
+
+// Scroll y nav
+function handleScroll(){
+  var sy = window.scrollY || document.documentElement.scrollTop || 0;
+  var nb = document.getElementById("navbar");
+  var st = document.getElementById("scroll-top");
+  if(nb) nb.classList.toggle("scrolled", sy > 30);
+  if(st) st.classList.toggle("visible", sy > 150);
+  var act = "";
+  ["hero","novedades","servicios","acerca","contacto"].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el && sy >= el.offsetTop - 120) act = id;
+  });
+  document.querySelectorAll(".nav-links a").forEach(function(a){
+    var href = a.getAttribute("href");
+    if(href && href.startsWith("#")){
+      a.classList.toggle("active", href === "#" + act);
+    }
+  });
+}
+window.addEventListener("scroll", handleScroll);
+window.addEventListener("DOMContentLoaded", handleScroll);
+handleScroll();
+
+var stBtn = document.getElementById("scroll-top");
+if(stBtn){
+  stBtn.onclick = function(){
+    window.scrollTo({top:0, behavior:"smooth"});
+  };
+}
+document.getElementById("hamburger").onclick=function(){document.getElementById("navLinks").classList.toggle("open");};
+
+// Panel de control — visible para admin, preceptor y profesor
+(function(){
+  var ADMIN_EMAILS = [
+    "andresfeliperodriguezmora448@gmail.com",
+    "franco.parrucci.058@alu.tecnica29de6.edu.ar",
+    "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
+    "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
+  ];
+  try{
+    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    var email  = (sesion.email||"").trim().toLowerCase();
+    var rol    = (sesion.rol||"").trim().toLowerCase();
+    var tieneAcceso = rol === "admin" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
+    if(tieneAcceso){
+      var link = document.createElement("a");
+      link.href = "admin.html";
+      link.innerHTML = DigiIcons.get("settings", {size:14, style:"margin-right:4px"}) + " Panel";
+      link.style.cssText = "font-weight:700;color:var(--rojo,#C0392B)!important;background:rgba(192,57,43,.1);border-radius:8px;padding:8px 14px";
+      var navLinks = document.getElementById("navLinks");
+      if(navLinks) navLinks.appendChild(link);
+    }
+  }catch(e){}
+})();
+
+// Saludo de bienvenida al usuario logueado
+(function(){
+  try{
+    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    if(sesion && sesion.email){
+      var nombre = "";
+      if(sesion.nombre) nombre = sesion.nombre;
+      else nombre = sesion.email.split("@")[0];
+
+      if(nombre){
+        var bar = document.createElement("div");
+        bar.id = "greetingBar";
+        bar.style.cssText = "position:fixed;top:72px;left:0;right:0;z-index:900;background:transparent;color:var(--txt);text-align:center;padding:12px 20px;font-size:1.25rem;font-weight:700;font-family:'Playfair Display',serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .5s";
+        var txt = document.createElement("span");
+        txt.innerHTML = DigiIcons.get("user", {size:18, style:"margin-right:6px"}) + " Hola, <strong style='margin-left:4px'>" + nombre + "</strong>";
+        var closeBtn = document.createElement("button");
+        closeBtn.innerHTML = '<i data-lucide="x" style="width:14px;height:14px"></i>';
+        closeBtn.style.cssText = "margin-left:12px;background:rgba(0,0,0,.08);border:none;color:var(--txt-m);border-radius:20px;padding:3px 12px;cursor:pointer;font-size:.82rem;font-family:inherit";
+        closeBtn.onclick = function(){
+          bar.style.opacity = "0";
+          setTimeout(function(){ if(bar.parentNode) bar.remove(); }, 500);
+        };
+        bar.appendChild(txt);
+        bar.appendChild(closeBtn);
+        document.body.appendChild(bar);
+        // Auto-ocultar después de 5 segundos
+        setTimeout(function(){
+          var el = document.getElementById("greetingBar");
+          if(el){ el.style.opacity="0"; setTimeout(function(){ if(el.parentNode) el.remove(); }, 500); }
+        }, 5000);
+      }
+    }
+  }catch(e){}
+})();
+
+// Registrar visita
+(function(){
+  try{
+    var stats = JSON.parse(localStorage.getItem("digi-stats")||"{}");
+    stats.visitas = (stats.visitas||0) + 1;
+    localStorage.setItem("digi-stats", JSON.stringify(stats));
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

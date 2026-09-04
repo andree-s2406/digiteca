@@ -1,0 +1,28 @@
+{
+  "name": "digiteca-backend",
+  "version": "1.0.0",
+  "description": "Backend y API REST con CockroachDB para la biblioteca digital DigiTeca",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node db/seed.js",
+    "test-api": "node test_api.js"
+  },
+  "keywords": [
+    "digiteca",
+    "cockroachdb",
+    "express",
+    "library",
+    "api"
+  ],
+  "author": "DigiTeca - Escuela Técnica N° 29 DE 6",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.1"
+  }
+}

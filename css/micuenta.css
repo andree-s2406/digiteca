@@ -1,0 +1,599 @@
+/**
+ * DigiTeca - Mi Cuenta Page Styles (micuenta.html)
+ * Perfil de usuario, avatar interactivo, acordeón de datos, cambio de contraseña seguro
+ */
+
+/* ── HERO DE CUENTA ── */
+.cuenta-hero {
+  padding: 100px 40px 48px;
+  background: linear-gradient(135deg, var(--cel-o), #1A5F8A);
+  transition: background 0.35s ease;
+}
+
+html.dark .cuenta-hero {
+  background: linear-gradient(135deg, #0A1E30, #0D2540);
+}
+
+.cuenta-hero-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 36px;
+}
+
+.avatar-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  position: relative;
+}
+
+.avatar-img:hover {
+  border-color: rgba(255, 255, 255, 0.85);
+  transform: scale(1.02);
+}
+
+.avatar-img img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: none;
+}
+
+.avatar-edit-btn {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--am);
+  color: #1A202C;
+  border: 2px solid #FFFFFF;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+  z-index: 5;
+}
+
+.avatar-edit-btn:hover {
+  transform: scale(1.12);
+  background: var(--am-o);
+  color: #FFFFFF;
+}
+
+.cuenta-hero-info h1 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #FFFFFF;
+  margin-bottom: 4px;
+}
+
+.cuenta-hero-info p {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+}
+
+.cuenta-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cbadge {
+  background: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+}
+
+/* ── LAYOUT DE SECCIONES ── */
+.cuenta-layout {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ── TARJETAS ACORDEÓN ── */
+.sec-card {
+  background: var(--bg-card);
+  border-radius: 20px;
+  box-shadow: var(--sh);
+  border: 1px solid var(--borde);
+  overflow: hidden;
+  transition: background 0.35s ease, border-color 0.35s ease;
+}
+
+.sec-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--borde);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.sec-card-header:hover {
+  background: var(--bg-alt);
+}
+
+.sec-card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sec-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--cel-c);
+  color: var(--cel-o);
+}
+
+.sec-label {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--txt);
+}
+
+.sec-sublabel {
+  font-size: 0.82rem;
+  color: var(--txt-m);
+  margin-top: 2px;
+}
+
+.sec-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--txt-m);
+  transition: transform 0.25s ease;
+}
+
+.sec-card:not(.collapsed) .sec-chevron {
+  transform: rotate(180deg);
+}
+
+.sec-card.collapsed .sec-chevron {
+  transform: rotate(0deg);
+}
+
+.sec-body {
+  display: block;
+  padding: 28px;
+}
+
+.sec-card.collapsed .sec-body {
+  display: none;
+}
+
+/* ── CAMPOS DE FORMULARIO DE CUENTA ── */
+.field-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.field-group.single {
+  grid-template-columns: 1fr;
+}
+
+.field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-wrap label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--txt-m);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field-wrap input,
+.field-wrap select {
+  border: 2px solid var(--borde);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--txt);
+  background: var(--inp);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.35s ease, color 0.35s ease;
+}
+
+.field-wrap input:focus,
+.field-wrap select:focus {
+  border-color: var(--cel-o);
+  box-shadow: 0 0 0 3px rgba(91, 175, 214, 0.18);
+}
+
+.field-wrap input:disabled,
+.field-wrap select:disabled {
+  background: var(--bg-alt);
+  color: var(--txt-m);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.field-note {
+  font-size: 0.75rem;
+  color: var(--txt-m);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* ── DESBLOQUEO / COMPUERTA DE SEGURIDAD ── */
+.pwd-gate {
+  background: var(--bg-alt);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--borde);
+  transition: background 0.35s ease;
+}
+
+.pwd-gate p {
+  font-size: 0.88rem;
+  color: var(--txt-m);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pwd-gate-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.pwd-gate-row input {
+  flex: 1;
+  border: 2px solid var(--borde);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--txt);
+  background: var(--inp);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.pwd-gate-row input:focus {
+  border-color: var(--cel-o);
+}
+
+.btn-unlock {
+  background: var(--cel-o);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-unlock:hover {
+  background: var(--cel);
+}
+
+.unlock-msg {
+  font-size: 0.78rem;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.unlock-msg.ok { color: var(--verde); }
+.unlock-msg.err { color: var(--rojo); }
+
+/* ── BOTONES DE ACCIÓN ── */
+.sec-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.btn-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cel-o);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.btn-save:hover {
+  background: var(--cel);
+  transform: translateY(-1px);
+}
+
+.btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-alt);
+  color: var(--txt-m);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn-cancel:hover {
+  background: var(--borde);
+  color: var(--txt);
+}
+
+.btn-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(192, 57, 43, 0.08);
+  color: var(--rojo);
+  border: 1.5px solid rgba(192, 57, 43, 0.25);
+  border-radius: 12px;
+  padding: 12px 28px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+  background: var(--rojo);
+  color: #FFFFFF;
+  border-color: var(--rojo);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(192, 57, 43, 0.3);
+}
+
+/* ── MODAL DE AVATAR ── */
+.avatar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(20, 40, 60, 0.70);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  padding: 20px;
+}
+
+.avatar-modal-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.avatar-modal {
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.35);
+  transform: scale(0.94);
+  transition: transform 0.3s ease, background 0.35s ease;
+  position: relative;
+}
+
+.avatar-modal-overlay.open .avatar-modal {
+  transform: scale(1);
+}
+
+.avatar-modal h3 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--txt);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.avatar-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.avatar-tab {
+  flex: 1;
+  padding: 9px;
+  border-radius: 10px;
+  border: 2px solid var(--borde);
+  background: transparent;
+  color: var(--txt-m);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.avatar-tab.active {
+  background: var(--cel-o);
+  color: #FFFFFF;
+  border-color: var(--cel-o);
+}
+
+.avatar-tab-panel {
+  display: none;
+}
+
+.avatar-tab-panel.active {
+  display: block;
+}
+
+.drop-zone {
+  border: 2px dashed var(--borde);
+  border-radius: 14px;
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  margin-bottom: 16px;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+  border-color: var(--cel-o);
+  background: var(--cel-c);
+}
+
+.drop-zone p {
+  font-size: 0.88rem;
+  color: var(--txt-m);
+  margin-top: 8px;
+}
+
+.drop-zone input {
+  display: none;
+}
+
+.avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 16px;
+  display: none;
+  border: 3px solid var(--cel-c);
+}
+
+.avatar-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: var(--borde);
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--txt);
+  transition: background 0.2s ease;
+}
+
+.avatar-modal-close:hover {
+  background: var(--cel-c);
+}
+
+.pwd-strength {
+  height: 4px;
+  border-radius: 4px;
+  margin-top: 6px;
+  background: var(--borde);
+  transition: background 0.3s ease;
+}
+
+.pwd-strength-label {
+  font-size: 0.72rem;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+/* ── RESPONSIVE MI CUENTA ── */
+@media (max-width: 700px) {
+  .cuenta-hero {
+    padding: 88px 20px 36px;
+  }
+  .cuenta-hero-inner {
+    flex-direction: column;
+    gap: 20px;
+    text-align: center;
+  }
+  .cuenta-badges {
+    justify-content: center;
+  }
+  .cuenta-layout {
+    padding: 28px 16px 60px;
+  }
+  .field-group {
+    grid-template-columns: 1fr;
+  }
+  .sec-body {
+    padding: 20px 16px;
+  }
+  .sec-card-header {
+    padding: 16px 20px;
+  }
+  .sec-actions {
+    flex-direction: column;
+  }
+  .btn-save,
+  .btn-cancel,
+  .btn-logout {
+    width: 100%;
+    justify-content: center;
+  }
+}
