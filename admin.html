@@ -42,402 +42,626 @@
 </script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Panel de Control – DigiTeca</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+<title>Centro de Control – DigiTeca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
 <link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
 <link rel="stylesheet" href="css/variables.css"/>
 <link rel="stylesheet" href="css/global.css"/>
 <link rel="stylesheet" href="css/animations.css"/>
 <link rel="stylesheet" href="css/admin.css"/>
+<script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 
-<!-- ═══ LOGIN ADMIN ═══ -->
+<!-- ════════════════════════════════════════════════
+     ACCESO ADMINISTRATIVO (LOGIN MODAL)
+════════════════════════════════════════════════ -->
 <div id="loginScreen">
   <div class="login-box">
-    <img class="login-logo" src="img/logo.png" alt="Logo DigiTeca"/>
-    <h2 class="login-title">Panel de Control</h2>
-    <p class="login-sub"><span>Digi</span>Teca · Escuela Técnica N° 29 DE 6</p>
-    <div style="text-align:center">
-      <span class="login-badge"><i data-lucide="shield" style="width:14px;height:14px;margin-right:5px"></i>Acceso restringido a administradores</span>
+    <div class="login-brand-header">
+      <img class="login-logo" src="img/logo.png" alt="Logo DigiTeca"/>
+      <h2 class="login-title">Centro de Control</h2>
+      <p class="login-sub">Biblioteca Digital · <span>Escuela Técnica N° 29 DE 6</span></p>
     </div>
-    <div class="login-err" id="loginErr">Credenciales incorrectas o sin acceso de administrador.</div>
+    
+    <div class="login-err" id="loginErr">Credenciales inválidas o sin permisos de gestión.</div>
+
     <div class="lfield">
-      <label for="loginEmail">Correo electrónico institucional</label>
-      <input type="email" id="loginEmail" placeholder="tu@tecnica29de6.edu.ar" autocomplete="email"/>
+      <label for="loginEmail">Correo institucional</label>
+      <input type="email" id="loginEmail" placeholder="usuario@tecnica29de6.edu.ar" autocomplete="email"/>
     </div>
+
     <div class="lfield">
-      <label for="loginPwd">Contraseña de acceso</label>
+      <label for="loginPwd">Contraseña</label>
       <div class="pwd-wrap">
-        <input type="password" id="loginPwd" placeholder="Contraseña"/>
-        <button class="pwd-toggle" id="pwdToggleAdmin" type="button" title="Mostrar/ocultar contraseña"><i data-lucide="eye" style="width:18px;height:18px"></i></button>
+        <input type="password" id="loginPwd" placeholder="••••••••"/>
+        <button class="pwd-toggle" id="pwdToggleAdmin" type="button" title="Mostrar u ocultar contraseña">
+          <i data-lucide="eye" style="width:16px;height:16px"></i>
+        </button>
       </div>
     </div>
-    <button class="btn-login" id="btnLoginAdmin"><i data-lucide="unlock" style="width:18px;height:18px;margin-right:6px"></i>Ingresar al panel</button>
-    <div style="text-align:center;margin-top:20px">
-      <a href="index.html" style="font-size:0.86rem;color:var(--cel-o);font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px">
-        <i data-lucide="arrow-left" style="width:14px;height:14px"></i> Volver a DigiTeca
+
+    <button class="btn-login" id="btnLoginAdmin">
+      <i data-lucide="lock" style="width:16px;height:16px"></i> Iniciar sesión
+    </button>
+
+    <div class="login-footer">
+      <a href="index.html" class="back-link">
+        <i data-lucide="arrow-left" style="width:14px;height:14px"></i> Volver al portal público
       </a>
     </div>
   </div>
 </div>
 
-<!-- ═══ APP ═══ -->
+<!-- ════════════════════════════════════════════════
+     APLICACIÓN PRINCIPAL (COMMAND DASHBOARD)
+════════════════════════════════════════════════ -->
 <div id="app">
-  <!-- Overlay móvil -->
+  <!-- Cortina móvil -->
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
-  <!-- Sidebar -->
+  <!-- Barra Lateral de Comando -->
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-brand">
-      <img class="sidebar-logo" src="img/logo.png" alt="Logo DigiTeca"/>
-      <span class="sidebar-name">Digi<span>Teca</span></span>
+    <div class="sidebar-top">
+      <a href="index.html" class="sidebar-brand">
+        <img class="sidebar-logo" src="img/logo.png" alt="DigiTeca"/>
+        <div class="brand-text">
+          <span class="brand-name">Digi<span>Teca</span></span>
+          <span class="brand-org">ET N° 29 DE 6</span>
+        </div>
+      </a>
     </div>
-    <div class="sidebar-user">
-      <div class="sidebar-user-meta">
+
+    <!-- Tarjeta de Usuario Activo -->
+    <div class="sidebar-user-card">
+      <div class="user-avatar-wrap">
         <div class="sidebar-user-avatar" id="sidebarAvatar">A</div>
-        <div class="sidebar-user-info">
-          <strong id="sidebarNombre">Admin</strong>
-          <span id="sidebarEmail">admin@tecnica29de6.edu.ar</span>
+        <span class="status-indicator"></span>
+      </div>
+      <div class="user-meta">
+        <strong class="user-name" id="sidebarNombre">Admin</strong>
+        <span class="user-email" id="sidebarEmail">admin@tecnica29de6.edu.ar</span>
+        <div class="user-badge-row">
+          <span class="user-role-badge" id="sidebarRoleLabel">Administrador</span>
         </div>
       </div>
-      <span class="user-role"><i data-lucide="shield" style="width:13px;height:13px;margin-right:3px"></i><span id="sidebarRoleLabel">Administrador</span></span>
     </div>
+
+    <!-- Navegación Modular -->
     <div class="sidebar-nav">
-      <div class="nav-section">General</div>
+      <div class="nav-group-title">Métricas & Analítica</div>
       <div class="nav-item active" data-panel="panelResumen" onclick="cambiarPanel(this)">
-        <span class="ni"><i data-lucide="bar-chart-2" style="width:16px;height:16px"></i></span> Resumen
+        <span class="nav-icon"><i data-lucide="bar-chart-3" style="width:16px;height:16px"></i></span>
+        <span class="nav-label">Resumen General</span>
       </div>
-      <div class="nav-section">Catálogo</div>
+
+      <div class="nav-group-title">Colección Digital</div>
       <div class="nav-item" data-panel="panelLibros" onclick="cambiarPanel(this)">
-        <span class="ni"><i data-lucide="book-open" style="width:16px;height:16px"></i></span> Gestionar libros
+        <span class="nav-icon"><i data-lucide="book-open" style="width:16px;height:16px"></i></span>
+        <span class="nav-label">Gestionar Libros</span>
       </div>
       <div class="nav-item" data-panel="panelMasBuscados" onclick="cambiarPanel(this)">
-        <span class="ni"><i data-lucide="flame" style="width:14px;height:14px;color:#e85d04"></i></span> Más buscados
+        <span class="nav-icon"><i data-lucide="flame" style="width:16px;height:16px"></i></span>
+        <span class="nav-label">Más Buscados</span>
       </div>
-      <div class="nav-section">Usuarios</div>
+
+      <div class="nav-group-title">Comunidad Escolar</div>
       <div class="nav-item" data-panel="panelUsuarios" onclick="cambiarPanel(this)">
-        <span class="ni"><i data-lucide="users" style="width:16px;height:16px"></i></span> Cuentas de usuario
+        <span class="nav-icon"><i data-lucide="users" style="width:16px;height:16px"></i></span>
+        <span class="nav-label">Cuentas de Usuario</span>
       </div>
     </div>
+
+    <!-- Pie de Barra Lateral -->
     <div class="sidebar-footer">
-      <button class="btn-logout" onclick="cerrarSesion()"><i data-lucide="log-out" style="width:16px;height:16px;margin-right:6px"></i>Cerrar sesión</button>
+      <button class="btn-logout" onclick="cerrarSesion()">
+        <i data-lucide="log-out" style="width:15px;height:15px"></i> Cerrar sesión
+      </button>
     </div>
   </aside>
 
-  <!-- Main -->
-  <div class="main">
-    <div class="topbar">
-      <div style="display:flex;align-items:center;gap:16px">
-        <button class="hamburger-admin" onclick="toggleSidebar()" aria-label="Menú"><span></span><span></span><span></span></button>
-        <div style="display:flex;flex-direction:column">
-          <span style="font-size:.72rem;font-weight:700;color:var(--cel-o);letter-spacing:.06em;text-transform:uppercase">Panel de Gestión</span>
-          <h1 id="topbarTitle">Resumen</h1>
+  <!-- Área de Contenido Principal -->
+  <main class="main">
+    <!-- Topbar Desacoplada de Alta Gama -->
+    <header class="topbar" id="topbar">
+      <div class="topbar-left">
+        <button class="hamburger-admin" onclick="toggleSidebar()" aria-label="Abrir menú">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="topbar-breadcrumb">
+          <span class="crumb-root">Panel</span>
+          <span class="crumb-sep">/</span>
+          <h1 class="crumb-current" id="topbarTitle">Resumen</h1>
         </div>
       </div>
-      <div class="topbar-right">
-        <div class="db-status-pill" style="display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:20px;background:rgba(46,125,82,0.08);border:1px solid rgba(46,125,82,0.22);color:var(--verde);font-size:.76rem;font-weight:700">
-          <span style="width:7px;height:7px;border-radius:50%;background:var(--verde);box-shadow:0 0 8px var(--verde);display:inline-block"></span>
-          CockroachDB Conectado
-        </div>
-        <a href="index.html" target="_blank" class="btn-topbar-link"><i data-lucide="external-link" style="width:14px;height:14px"></i> Ver sitio</a>
-        <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
-      </div>
-    </div>
 
+      <div class="topbar-right">
+        <a href="index.html" target="_blank" class="action-chip" title="Ver sitio en pestaña nueva">
+          <i data-lucide="globe" style="width:14px;height:14px"></i>
+          <span>Portal Público</span>
+        </a>
+        <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema">
+          <svg class="theme-morph-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path class="theme-morph-path"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Contenedor Dinámico de Paneles -->
     <div class="content">
 
-      <!-- ═══ PANEL RESUMEN ═══ -->
-      <div class="panel active" id="panelResumen">
-
-        <div class="panel-header">
-          <h2 class="panel-title"><i data-lucide="bar-chart-2" style="width:14px;height:14px"></i> Resumen</h2>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <button class="btn btn-ghost btn-sm" id="btnRefreshStats" onclick="refreshStats()" title="Actualizar datos"><i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar</button>
-            <button class="btn btn-success btn-sm" onclick="descargarReporte()"><i data-lucide="download" style="width:14px;height:14px"></i> Descargar reporte</button>
+      <!-- ════════════════════════════════════════════════
+           PANEL 1: RESUMEN GENERAL & KPIS BENTO
+      ════════════════════════════════════════════════ -->
+      <section class="panel active" id="panelResumen">
+        <div class="panel-hero-header">
+          <div>
+            <h2 class="section-heading">Resumen de Actividad</h2>
+            <p class="section-subheading">Telemetría de lectura, uso del catálogo y métricas escolares en tiempo real.</p>
+          </div>
+          <div class="panel-header-actions">
+            <button class="btn btn-ghost btn-sm" id="btnRefreshStats" onclick="refreshStats()">
+              <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="descargarReporte()">
+              <i data-lucide="download" style="width:14px;height:14px"></i> Exportar informe
+            </button>
           </div>
         </div>
 
-        <!-- Filtro de período -->
-        <div class="periodo-wrap">
-          <span style="font-size:.85rem;font-weight:700;color:var(--txt-m);white-space:nowrap"><i data-lucide="calendar" style="width:14px;height:14px"></i> Período:</span>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-sm periodo-btn active" data-periodo="todo" onclick="setPeriodo(this,'todo')">Todo</button>
-            <button class="btn btn-sm periodo-btn" data-periodo="24h" onclick="setPeriodo(this,'24h')">Últimas 24hs</button>
-            <button class="btn btn-sm periodo-btn" data-periodo="semana" onclick="setPeriodo(this,'semana')">Última semana</button>
-            <button class="btn btn-sm periodo-btn" data-periodo="mes" onclick="setPeriodo(this,'mes')">Último mes</button>
-            <button class="btn btn-sm periodo-btn" data-periodo="anio" onclick="setPeriodo(this,'anio')">Último año</button>
-            <button class="btn btn-sm periodo-btn" data-periodo="custom" onclick="setPeriodo(this,'custom')"><i data-lucide="calendar" style="width:14px;height:14px"></i> Personalizado</button>
+        <!-- Filtro Temporal Modular -->
+        <div class="periodo-toolbar">
+          <div class="periodo-label-group">
+            <i data-lucide="calendar" style="width:14px;height:14px;color:var(--cel-o)"></i>
+            <span>Rango:</span>
           </div>
-          <div id="customDateWrap" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">
-            <input type="date" id="fechaDesde" style="border:2px solid var(--borde);border-radius:8px;padding:6px 10px;font-size:.82rem;font-family:inherit;color:var(--txt);background:var(--inp);outline:none" onchange="onDesdeChange()"/>
-            <span style="font-size:.82rem;color:var(--txt-m)">hasta</span>
-            <input type="date" id="fechaHasta" style="border:2px solid var(--borde);border-radius:8px;padding:6px 10px;font-size:.82rem;font-family:inherit;color:var(--txt);background:var(--inp);outline:none" onchange="aplicarFiltro()"/>
+          <div class="periodo-pills">
+            <button class="periodo-pill active" data-periodo="todo" onclick="setPeriodo(this,'todo')">Histórico</button>
+            <button class="periodo-pill" data-periodo="24h" onclick="setPeriodo(this,'24h')">24 horas</button>
+            <button class="periodo-pill" data-periodo="semana" onclick="setPeriodo(this,'semana')">Semana</button>
+            <button class="periodo-pill" data-periodo="mes" onclick="setPeriodo(this,'mes')">Mes</button>
+            <button class="periodo-pill" data-periodo="anio" onclick="setPeriodo(this,'anio')">Año</button>
+            <button class="periodo-pill" data-periodo="custom" onclick="setPeriodo(this,'custom')">Personalizado</button>
           </div>
-          <span id="periodoLabel" style="font-size:.8rem;color:var(--txt-m);margin-left:auto;font-style:italic"></span>
+          <div id="customDateWrap" class="custom-date-row" style="display:none">
+            <input type="date" id="fechaDesde" onchange="onDesdeChange()"/>
+            <span>a</span>
+            <input type="date" id="fechaHasta" onchange="aplicarFiltro()"/>
+          </div>
+          <span id="periodoLabel" class="periodo-caption"></span>
         </div>
 
-        <!-- Stat cards KPI -->
-        <div class="stats-row">
-          <div class="stat-card cel">
-            <div class="stat-header"><span class="stat-label">Libros en catálogo</span><div class="stat-icon-wrap"><i data-lucide="book-open" style="width:18px;height:18px"></i></div></div>
-            <div class="stat-val" id="statLibros">0</div>
+        <!-- Bento Grid de KPIs de 8 Celdas -->
+        <div class="kpi-bento-grid">
+          <div class="kpi-card cel">
+            <div class="kpi-head">
+              <span class="kpi-title">Libros en Catálogo</span>
+              <div class="kpi-icon"><i data-lucide="book-open" style="width:16px;height:16px"></i></div>
+            </div>
+            <div class="kpi-value" id="statLibros">0</div>
           </div>
-          <div class="stat-card am">
-            <div class="stat-header"><span class="stat-label">Usuarios registrados</span><div class="stat-icon-wrap"><i data-lucide="users" style="width:18px;height:18px"></i></div></div>
-            <div class="stat-val" id="statUsuarios">0</div>
+
+          <div class="kpi-card am">
+            <div class="kpi-head">
+              <span class="kpi-title">Usuarios Totales</span>
+              <div class="kpi-icon"><i data-lucide="users" style="width:16px;height:16px"></i></div>
+            </div>
+            <div class="kpi-value" id="statUsuarios">0</div>
           </div>
-          <div class="stat-card verde">
-            <div class="stat-header"><span class="stat-label">Usuarios activos</span><div class="stat-icon-wrap"><i data-lucide="user-check" style="width:18px;height:18px"></i></div></div>
-            <div class="stat-val" id="statActivos">0</div>
+
+          <div class="kpi-card verde">
+            <div class="kpi-head">
+              <span class="kpi-title">Usuarios Activos</span>
+              <div class="kpi-icon"><i data-lucide="user-check" style="width:16px;height:16px"></i></div>
+            </div>
+            <div class="kpi-value" id="statActivos">0</div>
           </div>
-          <div class="stat-card rojo">
-            <div class="stat-header"><span class="stat-label">Restringidos</span><div class="stat-icon-wrap"><i data-lucide="shield-alert" style="width:18px;height:18px"></i></div></div>
-            <div class="stat-val" id="statRestringidos">0</div>
+
+          <div class="kpi-card rojo">
+            <div class="kpi-head">
+              <span class="kpi-title">Restringidos</span>
+              <div class="kpi-icon"><i data-lucide="shield-alert" style="width:16px;height:16px"></i></div>
+            </div>
+            <div class="kpi-value" id="statRestringidos">0</div>
           </div>
-          <div class="stat-card cel">
-            <div class="stat-header"><span class="stat-label">Visitas totales</span><div class="stat-icon-wrap"><i data-lucide="eye" style="width:18px;height:18px"></i></div></div>
-            <div class="stat-val" id="statVisitas">0</div>
+
+          <div class="kpi-card cel">
+            <div class="kpi-head">
+              <span class="kpi-title">Visitas Totales</span>
+              <div class="kpi-icon"><i data-lucide="eye" style="width:16px;height:16px"></i></div>
+            </div>
+            <div class="kpi-value" id="statVisitas">0</div>
           </div>
-          <div class="stat-card am">
-            <div class="stat-header"><span class="stat-label">Lecturas abiertas</span><div class="stat-icon-wrap"><i data-lucide="book-marked" style="width:18px;height:18px"></i></div></div>
-            <div class="stat-val" id="statLibrosAbiertos">0</div>
+
+          <div class="kpi-card am">
+            <div class="kpi-head">
+              <span class="kpi-title">Lecturas Realizadas</span>
+              <div class="kpi-icon"><i data-lucide="book-marked" style="width:16px;height:16px"></i></div>
+            </div>
+            <div class="kpi-value" id="statLibrosAbiertos">0</div>
           </div>
-          <div class="stat-card purpura">
-            <div class="stat-header"><span class="stat-label">Guardados en cuenta</span><div class="stat-icon-wrap"><i data-lucide="download" style="width:18px;height:18px"></i></div></div>
-            <div class="stat-val" id="statDescargados">0</div>
+
+          <div class="kpi-card purpura">
+            <div class="kpi-head">
+              <span class="kpi-title">Guardados en Cuenta</span>
+              <div class="kpi-icon"><i data-lucide="bookmark" style="width:16px;height:16px"></i></div>
+            </div>
+            <div class="kpi-value" id="statDescargados">0</div>
           </div>
-          <div class="stat-card verde">
-            <div class="stat-header"><span class="stat-label">Logins hoy</span><div class="stat-icon-wrap"><i data-lucide="log-in" style="width:18px;height:18px"></i></div></div>
-            <div class="stat-val" id="statSesionesHoy">0</div>
+
+          <div class="kpi-card verde">
+            <div class="kpi-head">
+              <span class="kpi-title">Logins Hoy</span>
+              <div class="kpi-icon"><i data-lucide="log-in" style="width:16px;height:16px"></i></div>
+            </div>
+            <div class="kpi-value" id="statSesionesHoy">0</div>
           </div>
         </div>
 
-        <!-- Fila de analítica visual -->
-        <div class="charts-grid">
-
-          <!-- Ingresos por día de la semana -->
-          <div class="chart-card">
-            <h3 class="chart-title"><i data-lucide="calendar" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;color:var(--cel-o)"></i> Actividad semanal</h3>
-            <div id="chartDias" style="display:flex;align-items:flex-end;gap:10px;height:130px;padding-bottom:8px"></div>
-            <div id="chartDiasLabels" style="display:flex;gap:10px;margin-top:6px"></div>
+        <!-- Analítica Visual -->
+        <div class="charts-bento-grid">
+          <!-- Gráfico Semanal -->
+          <div class="surface-card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i data-lucide="activity" style="width:16px;height:16px;color:var(--cel-o)"></i> Actividad Semanal
+              </h3>
+            </div>
+            <div id="chartDias" class="bars-container"></div>
+            <div id="chartDiasLabels" class="bars-labels"></div>
           </div>
 
-          <!-- Año de cursada más activo -->
-          <div class="chart-card">
-            <h3 class="chart-title"><i data-lucide="graduation-cap" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;color:var(--am-o)"></i> Actividad por año de cursada</h3>
-            <div id="chartAnios" style="display:flex;flex-direction:column;gap:10px"></div>
+          <!-- Gráfico por Año de Cursada -->
+          <div class="surface-card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i data-lucide="graduation-cap" style="width:16px;height:16px;color:var(--am-o)"></i> Actividad por Año
+              </h3>
+            </div>
+            <div id="chartAnios" class="anios-list"></div>
+          </div>
+        </div>
+
+        <!-- Honor Board & Actividad Reciente -->
+        <div class="records-bento-grid">
+          <!-- Top 5 Libros Más Abiertos -->
+          <div class="surface-card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i data-lucide="flame" style="width:16px;height:16px;color:#e85d04"></i> Top 5 Libros Más Leídos
+              </h3>
+            </div>
+            <div id="topLibros" class="honor-list"></div>
           </div>
 
-        </div>
-
-        <!-- Fila de listas de actividad -->
-        <div class="lists-grid" style="margin-bottom:24px">
-
-          <!-- Libros más vistos -->
-          <div class="chart-card">
-            <h3 class="chart-title"><i data-lucide="flame" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;color:#e85d04"></i> Top 5 libros más abiertos</h3>
-            <div id="topLibros"></div>
+          <!-- Últimos Ingresos -->
+          <div class="surface-card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i data-lucide="clock" style="width:16px;height:16px;color:var(--cel-o)"></i> Últimos Ingresos
+              </h3>
+            </div>
+            <div id="ultimosIngresos" class="recent-logins"></div>
           </div>
+        </div>
 
-          <!-- Últimos ingresos -->
-          <div class="chart-card">
-            <h3 class="chart-title"><i data-lucide="clock" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;color:var(--cel-o)"></i> Últimos ingresos al sistema</h3>
-            <div id="ultimosIngresos"></div>
+        <!-- Distribución de Roles -->
+        <div class="surface-card roles-card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <i data-lucide="pie-chart" style="width:16px;height:16px;color:var(--cel-o)"></i> Distribución de Cuentas por Rol
+            </h3>
           </div>
+          <div id="chartRoles" class="roles-distribution-content"></div>
+        </div>
+      </section>
 
+      <!-- ════════════════════════════════════════════════
+           PANEL 2: GESTIONAR LIBROS (CATÁLOGO COMPLETO)
+      ════════════════════════════════════════════════ -->
+      <section class="panel" id="panelLibros">
+        <div class="panel-hero-header">
+          <div>
+            <h2 class="section-heading">Inventario de Libros</h2>
+            <p class="section-subheading">Administrá, publicá y editá títulos, portadas y documentos PDF del catálogo.</p>
+          </div>
+          <button class="btn btn-primary" onclick="abrirModalLibro(null)">
+            <i data-lucide="plus" style="width:15px;height:15px"></i> Agregar Nuevo Libro
+          </button>
         </div>
 
-        <!-- Actividad por rol -->
-        <div class="chart-card" style="margin-bottom:20px">
-          <h3 style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:800;color:var(--txt);margin-bottom:16px"><i data-lucide="users" style="width:14px;height:14px"></i> Usuarios por rol</h3>
-          <div id="chartRoles" style="display:flex;gap:24px;flex-wrap:wrap;align-items:center"></div>
+        <!-- Barra de Búsqueda y Filtros Rápidos -->
+        <div class="inventory-controls">
+          <div class="search-input-wrap">
+            <i data-lucide="search" style="width:16px;height:16px"></i>
+            <input type="text" id="buscarLibroAdmin" placeholder="Buscar por título, autor o materia..." oninput="renderTablaLibros()"/>
+          </div>
+          <div class="select-wrap">
+            <select id="filtroMatAdmin" onchange="renderTablaLibros()">
+              <option value="">Todas las materias</option>
+              <option>Matemática</option><option>Física</option><option>Química</option>
+              <option>Biología</option><option>Historia</option><option>Geografía</option>
+              <option>Lengua y Literatura</option><option>Inglés</option>
+              <option>Informática</option><option>Ciencias Naturales</option>
+            </select>
+          </div>
         </div>
 
-      </div>
-
-      <!-- ═══ PANEL LIBROS ═══ -->
-      <div class="panel" id="panelLibros">
-        <div class="panel-header">
-          <h2 class="panel-title"><i data-lucide="book-open" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;color:var(--cel-o)"></i>Gestionar libros</h2>
-          <button class="btn btn-primary" onclick="abrirModalLibro(null)"><i data-lucide="plus" style="width:15px;height:15px;margin-right:6px"></i>Agregar libro</button>
-        </div>
-        <div class="filter-bar">
-          <input type="text" id="buscarLibroAdmin" placeholder="Buscar por título, autor..." oninput="renderTablaLibros()"/>
-          <select id="filtroMatAdmin" onchange="renderTablaLibros()">
-            <option value="">Todas las materias</option>
-            <option>Matemática</option><option>Física</option><option>Química</option>
-            <option>Biología</option><option>Historia</option><option>Geografía</option>
-            <option>Lengua y Literatura</option><option>Inglés</option>
-            <option>Informática</option><option>Ciencias Naturales</option>
-          </select>
-        </div>
-        <div class="table-wrap">
-          <table class="tbl">
+        <!-- Tabla Estilizada de Alta Densidad -->
+        <div class="data-table-container">
+          <table class="data-table">
             <thead>
               <tr>
-                <th>ID</th><th>Portada</th><th>Título</th><th>Autor</th>
-                <th>Materia</th><th>Años</th><th>Div. específica</th><th>Tipo</th><th>PDF</th><th>Acciones</th>
+                <th>ID</th>
+                <th>Portada</th>
+                <th>Título</th>
+                <th>Autor</th>
+                <th>Materia</th>
+                <th>Años</th>
+                <th>División</th>
+                <th>Tipo</th>
+                <th>PDF</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="tbodyLibros"></tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-            <!-- ═══ PANEL MÁS BUSCADOS (AUTOMÁTICO POR LECTURAS REALES) ═══ -->
-      <div class="panel" id="panelMasBuscados">
-        <div class="panel-header">
-          <h2 class="panel-title"><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;color:#e85d04"></i> Top 5 Libros Más Abiertos / Más Buscados</h2>
-          <button class="btn btn-ghost" onclick="cargarRankingAutomatico()"><i data-lucide="refresh-cw" style="width:15px;height:15px;margin-right:6px"></i>Actualizar métricas</button>
+      <!-- ════════════════════════════════════════════════
+           PANEL 3: MÁS BUSCADOS (RANKING AUTOMATIZADO)
+      ════════════════════════════════════════════════ -->
+      <section class="panel" id="panelMasBuscados">
+        <div class="panel-hero-header">
+          <div>
+            <h2 class="section-heading">Top 5 Libros Más Buscados</h2>
+            <p class="section-subheading">Calculado automáticamente en tiempo real según las aperturas y lecturas de la comunidad.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="cargarRankingAutomatico()">
+            <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar Métricas
+          </button>
         </div>
-        <p style="color:var(--txt-m);font-size:.9rem;margin-bottom:20px;line-height:1.6">
-          Este ranking se calcula <strong>100% de forma automática</strong> en tiempo real con las aperturas y lecturas de los estudiantes y docentes.
-          Los 5 libros con mayor cantidad de aperturas se destacan automáticamente en la página de inicio con la insignia <strong><i data-lucide="flame" style="width:14px;height:14px;color:#e85d04"></i> #N más buscado</strong>.
-        </p>
-        <div id="rankingActual" style="max-width:850px;margin-top:16px"></div>
-      </div>
 
-      <!-- ═══ PANEL USUARIOS ═══ -->
-      <div class="panel" id="panelUsuarios">
-        <div class="panel-header">
-          <h2 class="panel-title"><i data-lucide="users" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;color:var(--cel-o)"></i>Cuentas de usuario</h2>
-          <button class="btn btn-primary" onclick="abrirModalUsuario(null)"><i data-lucide="plus" style="width:15px;height:15px;margin-right:6px"></i>Registrar usuario</button>
+        <div class="info-callout">
+          <i data-lucide="sparkles" style="width:18px;height:18px;color:var(--am-o);flex-shrink:0"></i>
+          <div>
+            <strong>Sincronización Automática:</strong> Los 5 títulos con mayor cantidad de lecturas acumuladas se destacan inmediatamente en la portada de la página principal con la insignia <code>#N más buscado</code>.
+          </div>
         </div>
-        <div class="filter-bar">
-          <input type="text" id="buscarUsuAdmin" placeholder="Buscar por nombre o correo..." oninput="renderTablaUsuarios()"/>
-          <select id="filtroRolAdmin" onchange="renderTablaUsuarios()">
-            <option value="">Todos los roles</option>
-            <option value="admin">Administrador</option>
-            <option value="preceptor">Preceptor</option>
-            <option value="alumno">Alumno</option>
-          </select>
-          <select id="filtroEstAdmin" onchange="renderTablaUsuarios()">
-            <option value="">Todos los estados</option>
-            <option value="activo">Activo</option>
-            <option value="restringido">Restringido</option>
-          </select>
+
+        <div id="rankingActual" class="ranking-telemetry-grid"></div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════
+           PANEL 4: CUENTAS DE USUARIO
+      ════════════════════════════════════════════════ -->
+      <section class="panel" id="panelUsuarios">
+        <div class="panel-hero-header">
+          <div>
+            <h2 class="section-heading">Directorio de Usuarios</h2>
+            <p class="section-subheading">Control de accesos institucionales para estudiantes, preceptores, docentes y administradores.</p>
+          </div>
+          <button class="btn btn-primary" onclick="abrirModalUsuario(null)">
+            <i data-lucide="user-plus" style="width:15px;height:15px"></i> Registrar Usuario
+          </button>
         </div>
-        <div class="table-wrap">
-          <table class="tbl">
+
+        <div class="inventory-controls">
+          <div class="search-input-wrap">
+            <i data-lucide="search" style="width:16px;height:16px"></i>
+            <input type="text" id="buscarUsuAdmin" placeholder="Buscar usuario por nombre o correo institucional..." oninput="renderTablaUsuarios()"/>
+          </div>
+          <div class="select-wrap">
+            <select id="filtroRolAdmin" onchange="renderTablaUsuarios()">
+              <option value="">Todos los roles</option>
+              <option value="admin">Administrador</option>
+              <option value="preceptor">Preceptor</option>
+              <option value="profesor">Profesor</option>
+              <option value="alumno">Alumno</option>
+            </select>
+          </div>
+          <div class="select-wrap">
+            <select id="filtroEstAdmin" onchange="renderTablaUsuarios()">
+              <option value="">Todos los estados</option>
+              <option value="activo">Activo</option>
+              <option value="restringido">Restringido</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="data-table-container">
+          <table class="data-table">
             <thead>
-              <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Año / Div.</th><th>Estado</th><th>Acciones</th></tr>
+              <tr>
+                <th>Usuario</th>
+                <th>Correo Electrónico</th>
+                <th>Rol</th>
+                <th>Curso / División</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
             </thead>
             <tbody id="tbodyUsuarios"></tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-    </div><!-- /content -->
-  </div><!-- /main -->
-</div><!-- /app -->
+    </div><!-- /.content -->
+  </main>
+</div><!-- /#app -->
 
-<!-- ═══ MODAL LIBRO ═══ -->
+<!-- ════════════════════════════════════════════════
+     MODAL: AGREGAR / EDITAR LIBRO
+════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modalLibro">
-  <div class="modal-box">
+  <div class="modal-dialog">
     <div class="modal-header">
-      <h3 class="modal-title" id="modalLibroTitle">Agregar libro</h3>
-      <button class="modal-close" onclick="cerrarModal('modalLibro')"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+      <div class="modal-header-icon"><i data-lucide="book" style="width:18px;height:18px"></i></div>
+      <h3 class="modal-title" id="modalLibroTitle">Agregar Nuevo Libro</h3>
+      <button class="modal-close-btn" onclick="cerrarModal('modalLibro')"><i data-lucide="x" style="width:16px;height:16px"></i></button>
     </div>
-    <div class="form-grid">
-      <div class="fg"><label>Título</label><input type="text" id="lTitulo" placeholder="Título del libro"/></div>
-      <div class="fg"><label>Autor/a</label><input type="text" id="lAutor" placeholder="Nombre del autor"/></div>
-      <div class="fg"><label>Materia</label>
-        <input type="text" id="lMat" list="listaMaterias" placeholder="Ej: Matemática, Física..." autocomplete="off"/>
-        <datalist id="listaMaterias">
-          <option>Matemática</option><option>Física</option><option>Química</option>
-          <option>Biología</option><option>Historia</option><option>Geografía</option>
-          <option>Lengua y Literatura</option><option>Inglés</option>
-          <option>Informática</option><option>Ciencias Naturales</option>
-          <option>Educación Física</option><option>Arte</option><option>Música</option>
-          <option>Tecnología</option><option>Economía</option><option>Filosofía</option>
-        </datalist>
+
+    <div class="modal-form-body">
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label for="lTitulo">Título de la publicación</label>
+          <input type="text" id="lTitulo" placeholder="Ej: Física Universitaria"/>
+        </div>
+        <div class="form-group">
+          <label for="lAutor">Autor / Autores</label>
+          <input type="text" id="lAutor" placeholder="Ej: Sears & Zemansky"/>
+        </div>
       </div>
-      <div class="fg"><label>Tipo</label>
-        <input type="text" id="lTipo" list="listaTipos" placeholder="Ej: Libro, Video..." autocomplete="off"/>
-        <datalist id="listaTipos">
-          <option>Libro</option><option>Video</option>
-          <option>Revista</option><option>Simulador</option>
-          <option>Artículo</option><option>Podcast</option><option>Imagen</option>
-        </datalist>
+
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label for="lMat">Materia o Área</label>
+          <input type="text" id="lMat" list="listaMaterias" placeholder="Seleccioná o escribí materia..." autocomplete="off"/>
+          <datalist id="listaMaterias">
+            <option>Matemática</option><option>Física</option><option>Química</option>
+            <option>Biología</option><option>Historia</option><option>Geografía</option>
+            <option>Lengua y Literatura</option><option>Inglés</option>
+            <option>Informática</option><option>Ciencias Naturales</option>
+            <option>Educación Física</option><option>Arte</option><option>Música</option>
+            <option>Tecnología</option><option>Economía</option><option>Filosofía</option>
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label for="lTipo">Formato del Recurso</label>
+          <input type="text" id="lTipo" list="listaTipos" placeholder="Ej: Libro, Manual, Apunte..." autocomplete="off"/>
+          <datalist id="listaTipos">
+            <option>Libro</option><option>Manual</option>
+            <option>Revista</option><option>Simulador</option>
+            <option>Artículo</option><option>Guía de Ejercicios</option>
+          </datalist>
+        </div>
       </div>
-      <div class="fg full"><label>Años de cursada (separados por coma, ej: 4,5,6 — vacío = General)</label>
-        <input type="text" id="lAnios" placeholder="Ej: 4,5,6"/>
+
+      <div class="form-group">
+        <label for="lAnios">Años de Cursada Destinados (separados por coma, ej: 1, 2, 3)</label>
+        <input type="text" id="lAnios" placeholder="Dejar vacío para acceso General a todos los años"/>
       </div>
-      <div class="fg full" style="background:var(--bg-alt);border-radius:10px;padding:12px;border:1px solid var(--borde)">
-        <label style="margin-bottom:8px;display:block">División específica <span style="font-weight:400;opacity:.7">(opcional — para preceptores y profesores)</span></label>
-        <div id="libroDiv" style="display:flex;flex-direction:column;gap:8px"></div>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="agregarDivLibro()" style="margin-top:8px">+ Agregar año/división</button>
+
+      <div class="form-group divisions-box">
+        <label>Divisiones Específicas <span class="label-hint">(Para preceptores y docentes)</span></label>
+        <div id="libroDiv" class="divisions-wrap"></div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="agregarDivLibro()">
+          <i data-lucide="plus" style="width:13px;height:13px"></i> Asignar Año y División
+        </button>
       </div>
-      <div class="fg full"><label>Descripción</label>
-        <textarea id="lDesc" rows="3" placeholder="Breve descripción del contenido..."></textarea>
+
+      <div class="form-group">
+        <label for="lDesc">Sinopsis o Resumen Curricular</label>
+        <textarea id="lDesc" rows="3" placeholder="Breve descripción de los contenidos del recurso..."></textarea>
       </div>
-      <div class="fg full"><label>URL o ruta de portada (720x920px)</label>
-        <input type="text" id="lImg" placeholder="imagenes/portada.jpg o https://..."/>
+
+      <div class="form-group">
+        <label for="lImg">Enlace de Imagen de Portada (Opcional)</label>
+        <input type="text" id="lImg" placeholder="https://... o ruta relativa de portada"/>
       </div>
-      <div class="fg full">
-        <label>Archivo PDF o URL</label>
-        <label for="lPdfFile" id="pdfDropZone" onclick="var fi=document.getElementById('lPdfFile');if(fi)fi.value=''" style="border:2px dashed var(--borde);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--bg-alt);display:block" ondragover="event.preventDefault();document.getElementById('pdfDropZone').style.borderColor='var(--cel-o)';document.getElementById('pdfDropZone').style.background='var(--cel-c)'" ondragleave="document.getElementById('pdfDropZone').style.borderColor='var(--borde)';document.getElementById('pdfDropZone').style.background='var(--bg-alt)'" ondrop="handlePdfDrop(event)">
-          <div style="margin-bottom:8px"><i data-lucide="file-text" style="width:14px;height:14px"></i></div>
-          <p style="font-size:.88rem;color:var(--txt-m);margin-bottom:4px"><strong>Arrastrá el PDF aquí</strong> o hacé clic para buscar</p>
-          <p style="font-size:.75rem;color:var(--txt-m)">Formatos: PDF</p>
+
+      <div class="form-group">
+        <label>Archivo Digital PDF</label>
+        <label for="lPdfFile" id="pdfDropZone" class="pdf-drop-target" onclick="var fi=document.getElementById('lPdfFile');if(fi)fi.value=''" ondragover="event.preventDefault();this.classList.add('drag-active')" ondragleave="this.classList.remove('drag-active')" ondrop="handlePdfDrop(event)">
+          <div class="drop-icon"><i data-lucide="file-up" style="width:24px;height:24px"></i></div>
+          <p class="drop-text"><strong>Arrastrá el archivo PDF aquí</strong> o hacé clic para examinar</p>
+          <span class="drop-subtext">Compatibilidad garantizada con lector seguro</span>
           <input type="file" id="lPdfFile" accept=".pdf" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" onchange="handlePdfFile(this)"/>
         </label>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <span style="font-size:.75rem;color:var(--txt-m);white-space:nowrap">O pegar URL:</span>
-          <input type="text" id="lPdf" placeholder="https://drive.google.com/... o pdfs/libro.pdf" style="flex:1;border:2px solid var(--borde);border-radius:8px;padding:8px 12px;font-size:.88rem;font-family:inherit;color:var(--txt);background:var(--inp);outline:none" oninput="actualizarPdfPreview()"/>
+        <div class="pdf-url-fallback">
+          <span>O enlace web:</span>
+          <input type="text" id="lPdf" placeholder="https://drive.google.com/... o enlace directo al archivo" oninput="actualizarPdfPreview()"/>
         </div>
-        <div id="pdfPreviewLabel" style="font-size:.78rem;color:var(--verde);margin-top:6px;display:none"></div>
+        <div id="pdfPreviewLabel" class="pdf-file-badge" style="display:none"></div>
       </div>
     </div>
-    <div class="modal-actions">
+
+    <div class="modal-footer">
       <button class="btn btn-ghost" onclick="cerrarModal('modalLibro')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarLibro()"><i data-lucide="check" style="width:15px;height:15px;margin-right:6px"></i>Guardar</button>
+      <button class="btn btn-primary" onclick="guardarLibro()">
+        <i data-lucide="check" style="width:15px;height:15px"></i> Guardar Publicación
+      </button>
     </div>
   </div>
 </div>
 
-<!-- ═══ MODAL USUARIO ═══ -->
+<!-- ════════════════════════════════════════════════
+     MODAL: AGREGAR / EDITAR USUARIO
+════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modalUsuario">
-  <div class="modal-box">
+  <div class="modal-dialog">
     <div class="modal-header">
-      <h3 class="modal-title" id="modalUsuarioTitle">Registrar usuario</h3>
-      <button class="modal-close" onclick="cerrarModal('modalUsuario')"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+      <div class="modal-header-icon"><i data-lucide="user" style="width:18px;height:18px"></i></div>
+      <h3 class="modal-title" id="modalUsuarioTitle">Registrar Usuario</h3>
+      <button class="modal-close-btn" onclick="cerrarModal('modalUsuario')"><i data-lucide="x" style="width:16px;height:16px"></i></button>
     </div>
-    <div class="form-grid">
-      <div class="fg"><label>Nombre</label><input type="text" id="uNombre" placeholder="Nombre"/></div>
-      <div class="fg"><label>Apellido</label><input type="text" id="uApellido" placeholder="Apellido"/></div>
-      <div class="fg full"><label>Correo electrónico</label><input type="email" id="uEmail" placeholder="correo@tecnica29de6.edu.ar"/></div>
-      <div class="fg"><label>Contraseña</label><input type="password" id="uPwd" placeholder="Contraseña inicial"/></div>
-      <div class="fg"><label>Rol</label>
-        <select id="uRol" onchange="actualizarCamposRol()">
-          <option value="alumno">Alumno</option>
-          <option value="preceptor">Preceptor</option>
-          <option value="profesor">Profesor</option>
-          <option value="admin">Administrador</option>
-        </select>
+
+    <div class="modal-form-body">
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label for="uNombre">Nombre</label>
+          <input type="text" id="uNombre" placeholder="Nombre completo"/>
+        </div>
+        <div class="form-group">
+          <label for="uApellido">Apellido</label>
+          <input type="text" id="uApellido" placeholder="Apellido"/>
+        </div>
       </div>
-      <!-- Campos dinámicos según rol -->
-      <div class="fg full" id="camposRol"></div>
-      <div class="fg"><label>Estado</label>
+
+      <div class="form-group">
+        <label for="uEmail">Correo Institucional</label>
+        <input type="email" id="uEmail" placeholder="usuario@tecnica29de6.edu.ar"/>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label for="uPwd">Contraseña</label>
+          <input type="password" id="uPwd" placeholder="Contraseña de acceso"/>
+        </div>
+        <div class="form-group">
+          <label for="uRol">Rol del Usuario</label>
+          <select id="uRol" onchange="actualizarCamposRol()">
+            <option value="alumno">Alumno</option>
+            <option value="preceptor">Preceptor</option>
+            <option value="profesor">Profesor</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="camposRol"></div>
+
+      <div class="form-group">
+        <label for="uEstado">Estado de la Cuenta</label>
         <select id="uEstado">
-          <option value="activo">Activo</option>
-          <option value="restringido">Restringido</option>
+          <option value="activo">Activo (Acceso Completo)</option>
+          <option value="restringido">Restringido (Sin Acceso)</option>
         </select>
       </div>
     </div>
-    <div class="modal-actions">
+
+    <div class="modal-footer">
       <button class="btn btn-ghost" onclick="cerrarModal('modalUsuario')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarUsuario()"><i data-lucide="check" style="width:15px;height:15px;margin-right:6px"></i>Guardar</button>
+      <button class="btn btn-primary" onclick="guardarUsuario()">
+        <i data-lucide="check" style="width:15px;height:15px"></i> Guardar Usuario
+      </button>
     </div>
   </div>
 </div>
 
-<!-- ═══ CONFIRM ═══ -->
-<div class="confirm-overlay" id="confirmOverlay">
-  <div class="confirm-box">
-    <div class="confirm-icon" id="confirmIcon"><i data-lucide="alert-triangle" style="width:36px;height:36px;color:var(--rojo)"></i></div>
-    <h3 class="confirm-title" id="confirmTitle">¿Confirmar acción?</h3>
+<!-- ════════════════════════════════════════════════
+     MODAL DE CONFIRMACIÓN (ACCIONES CRÍTICAS)
+════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal-dialog modal-dialog-sm">
+    <div class="confirm-icon-wrap" id="confirmIcon">
+      <i data-lucide="alert-triangle" style="width:32px;height:32px;color:var(--rojo)"></i>
+    </div>
+    <h3 class="confirm-title" id="confirmTitle">¿Confirmar Acción?</h3>
     <p class="confirm-msg" id="confirmMsg"></p>
     <div class="confirm-actions">
       <button class="btn btn-ghost" onclick="cerrarConfirm()">Cancelar</button>
@@ -447,7 +671,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/api.js"></script>
@@ -621,6 +844,7 @@ async function initPanel(){
   renderTablaLibros();
   renderTablaUsuarios();
   cargarRankingAutomatico();
+  if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
 }
 
 // ── ESTADÍSTICAS ──
@@ -805,6 +1029,7 @@ function cambiarPanel(el){
   document.getElementById("topbarTitle").textContent = PANEL_TITLES[id]||"";
   if(id === "panelMasBuscados") cargarRankingAutomatico();
   if(id === "panelResumen") actualizarStats();
+  if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
   if(window.innerWidth <= 768) toggleSidebar();
 }
 
