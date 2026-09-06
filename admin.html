@@ -376,11 +376,11 @@
         <!-- Barra de Búsqueda y Filtros Rápidos -->
         <div class="inventory-controls">
           <div class="search-input-wrap">
-            <i data-lucide="search" style="width:16px;height:16px"></i>
-            <input type="text" id="buscarLibroAdmin" placeholder="Buscar por título, autor o materia..." oninput="renderTablaLibros()"/>
+            <i data-lucide="search" class="search-icon" style="width:16px;height:16px"></i>
+            <input type="text" class="search-input" id="buscarLibroAdmin" placeholder="Buscar por título, autor o materia..." oninput="renderTablaLibros()"/>
           </div>
           <div class="select-wrap">
-            <select id="filtroMatAdmin" onchange="renderTablaLibros()">
+            <select class="filter-select" id="filtroMatAdmin" onchange="renderTablaLibros()">
               <option value="">Todas las materias</option>
               <option>Matemática</option><option>Física</option><option>Química</option>
               <option>Biología</option><option>Historia</option><option>Geografía</option>
@@ -452,11 +452,11 @@
 
         <div class="inventory-controls">
           <div class="search-input-wrap">
-            <i data-lucide="search" style="width:16px;height:16px"></i>
-            <input type="text" id="buscarUsuAdmin" placeholder="Buscar usuario por nombre o correo institucional..." oninput="renderTablaUsuarios()"/>
+            <i data-lucide="search" class="search-icon" style="width:16px;height:16px"></i>
+            <input type="text" class="search-input" id="buscarUsuAdmin" placeholder="Buscar usuario por nombre o correo institucional..." oninput="renderTablaUsuarios()"/>
           </div>
           <div class="select-wrap">
-            <select id="filtroRolAdmin" onchange="renderTablaUsuarios()">
+            <select class="filter-select" id="filtroRolAdmin" onchange="renderTablaUsuarios()">
               <option value="">Todos los roles</option>
               <option value="admin">Administrador</option>
               <option value="preceptor">Preceptor</option>
@@ -465,7 +465,7 @@
             </select>
           </div>
           <div class="select-wrap">
-            <select id="filtroEstAdmin" onchange="renderTablaUsuarios()">
+            <select class="filter-select" id="filtroEstAdmin" onchange="renderTablaUsuarios()">
               <option value="">Todos los estados</option>
               <option value="activo">Activo</option>
               <option value="restringido">Restringido</option>
