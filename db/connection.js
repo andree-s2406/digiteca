@@ -43,25 +43,40 @@ const pool = new Pool({
   ssl: sslConfig,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: 30000, // 30s para absorber el arranque en frío (cold start) de CockroachDB Serverless
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 pool.on('error', (err) => {
   console.error('Error imprevisto en el pool de CockroachDB:', err.message);
 });
 
-async function query(text, params) {
+async function query(text, params, retries = 2) {
   const start = Date.now();
-  try {
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    if (process.env.DEBUG_SQL) {
-      console.log('Query ejecutada:', { text, duration, rows: res.rowCount });
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      const res = await pool.query(text, params);
+      const duration = Date.now() - start;
+      if (process.env.DEBUG_SQL) {
+        console.log('Query ejecutada:', { text, duration, rows: res.rowCount });
+      }
+      return res;
+    } catch (err) {
+      const isTransient = 
+        err.message.includes('timeout') ||
+        err.message.includes('terminated unexpectedly') ||
+        err.message.includes('ECONNRESET') ||
+        err.message.includes('ETIMEDOUT');
+
+      if (isTransient && attempt <= retries) {
+        console.warn(`[CockroachDB] Reintentando query tras desconexión/arranque en frío (intento ${attempt} de ${retries + 1})...`);
+        await new Promise(r => setTimeout(r, 1500 * attempt));
+        continue;
+      }
+      console.error('Error al ejecutar query en CockroachDB:', { text, error: err.message });
+      throw err;
     }
-    return res;
-  } catch (err) {
-    console.error('Error al ejecutar query en CockroachDB:', { text, error: err.message });
-    throw err;
   }
 }
 
