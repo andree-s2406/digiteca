@@ -116,7 +116,6 @@
       <p class="libro-autor-txt" id="libroAutor"></p>
       <div class="libro-meta" id="libroMeta"></div>
       <p class="libro-desc" id="libroDesc"></p>
-      <div class="libro-indice" id="libroIndice"></div>
       <div class="libro-acciones">
         <button class="btn-leer" onclick="irAlVisor()"><i data-lucide="book-open" style="width:18px;height:18px;margin-right:6px"></i>Leer ahora</button>
         <button class="btn-guardar" id="btnGuardar" onclick="guardarEnCuenta()"><i data-lucide="bookmark" style="width:16px;height:16px;margin-right:6px"></i> Guardar en mi cuenta</button>
@@ -314,18 +313,6 @@ function renderDetalleLibro(l){
 
   // Descripción
   document.getElementById("libroDesc").textContent = l.x || "Sin descripción proporcionada.";
-
-  // Índice
-  document.getElementById("libroIndice").innerHTML =
-    '<p class="indice-title">Contenido</p>'+
-    '<ul class="indice-list">'+
-    '<li>Introducción <span>p. 1</span></li>'+
-    '<li>Capítulo 1 <span>p. 12</span></li>'+
-    '<li>Capítulo 2 <span>p. 48</span></li>'+
-    '<li>Capítulo 3 <span>p. 96</span></li>'+
-    '<li>Ejercicios <span>p. 140</span></li>'+
-    '<li>Apéndice <span>p. 180</span></li>'+
-    '</ul>';
 
   // Portada
   var emojiEl = document.getElementById("coverEmoji");
