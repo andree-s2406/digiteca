@@ -33,6 +33,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Catálogo – DigiTeca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet"/>
 <link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
 <link rel="stylesheet" href="css/variables.css"/>
@@ -221,7 +223,9 @@
     <p class="modal-autor" id="mAutor"></p>
     <div class="modal-tags" id="mTags"></div>
     <p class="modal-desc" id="mDesc"></p>
-    <div class="modal-btn"><a class="btn-p" id="modalAcceder" href="libro.html"><i data-lucide="book" style="width:14px;height:14px"></i> Acceder al recurso</a></div>
+    <div class="modal-btn">
+      <a class="btn-p" id="modalAcceder" href="libro.html"><i data-lucide="book-open" style="width:14px;height:14px"></i> Leer recurso</a>
+    </div>
   </div>
 </div>
 
@@ -230,17 +234,30 @@
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/api.js"></script>
+<script src="js/quick-nav.js" defer></script>
 <script>
-// PORTADAS: ponele a cada img:"" la ruta de la imagen. Ej: img:"imagenes/algebra.jpg"
-// Tamaño recomendado: 720x920px. Si img queda vacio se muestra un placeholder automatico.
-var LIBROS = [];
+var ADMIN_EMAILS = [
+  "andresfeliperodriguezmora448@gmail.com",
+  "franco.parrucci.058@alu.tecnica29de6.edu.ar",
+  "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
+  "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
+];
 
-// Carga inicial y asíncrona desde CockroachDB
+// PORTADAS: inicialización instantánea desde caché local (0 ms de espera)
+var LIBROS = [];
+try {
+  var cacheLocal = JSON.parse(localStorage.getItem("digi-admin-libros") || "[]");
+  if (Array.isArray(cacheLocal) && cacheLocal.length > 0) {
+    LIBROS = cacheLocal;
+  }
+} catch(e) {}
+
+// Carga asíncrona en segundo plano para actualizar y sincronizar silenciosamente (SWR)
 async function cargarLibrosAPI(){
   try {
     if (window.API && window.API.libros) {
       const librosDB = await API.libros.getAll();
-      if (Array.isArray(librosDB)) {
+      if (Array.isArray(librosDB) && librosDB.length > 0) {
         LIBROS = librosDB;
         filtrarPorDivisionUsuario();
         filtrados = LIBROS.slice();
@@ -248,21 +265,38 @@ async function cargarLibrosAPI(){
         if(statEl) statEl.textContent = LIBROS.length;
         buildSidebar();
         aplicar();
+
+        // Guardar copia local ligera (sin PDFs pesados) para la próxima apertura instantánea
+        try {
+          var copiaLigera = librosDB.map(function(l){
+            var c = Object.assign({}, l);
+            if (c.pdf && c.pdf.startsWith("data:")) c.pdf = "archivo:cargado";
+            return c;
+          });
+          localStorage.setItem("digi-admin-libros", JSON.stringify(copiaLigera));
+        } catch(errLS) {}
       }
     }
   } catch (err) {
-    console.warn("Carga desde API falló, usando datos en memoria:", err.message);
+    console.warn("Sincronización en segundo plano con API falló:", err.message);
   }
 }
 
 function filtrarPorDivisionUsuario(){
   try{
     var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    var rol    = (sesion.rol || "").trim().toLowerCase();
+    var email  = (sesion.email || "").trim().toLowerCase();
+    // Administradores, preceptores, profesores y correos autorizados nunca se filtran por división
+    if(rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0){
+      return;
+    }
     var anio   = sesion.anio || "";
     var div    = sesion.div  || "";
-    if(!anio && !div) return;
+    // Si no tiene año o división configurada, o es "Otro", mostrar todo el catálogo
+    if(!anio || !div || anio === "Otro") return;
     LIBROS = LIBROS.filter(function(l){
-      if(!l.divisiones || l.divisiones.length === 0) return true;
+      if(!l.divisiones || l.divisiones.length === 0) return true; // libros generales para todos
       for(var i=0;i<l.divisiones.length;i++){
         if(String(l.divisiones[i].anio)===String(anio) &&
            String(l.divisiones[i].div) ===String(div)) return true;
@@ -287,28 +321,8 @@ var filtQ     = "";
 /* ── Stats ── */
 document.getElementById("statTotal").textContent = LIBROS.length;
 
-/* ── TEMA ── */
-(function(){
-  var h = document.documentElement, b = document.getElementById("themeBtn");
-  if (!b) return;
-  function set(d){
-    if (d) {
-      h.classList.add("dark");
-      if (window.DigiIcons) b.innerHTML = DigiIcons.get("sun", {size: 18});
-      b.setAttribute("title", "Cambiar a modo claro");
-    } else {
-      h.classList.remove("dark");
-      if (window.DigiIcons) b.innerHTML = DigiIcons.get("moon", {size: 18});
-      b.setAttribute("title", "Cambiar a modo oscuro");
-    }
-    try { localStorage.setItem("digi", d ? "dark" : "light"); } catch(e){}
-  }
-  var s = ""; try { s = localStorage.getItem("digi") || ""; } catch(e){}
-  if (s === "dark") set(true);
-  else if (s !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme:dark)").matches) set(true);
-  else set(false);
-  b.onclick = function(){ set(!h.classList.contains("dark")); };
-})();
+// Tema manejado por Morphicons (js/icons.js)
+if(typeof setupThemeToggle==="function") setupThemeToggle();
 
 /* ── ACORDEÓN ── */
 function initAcc(btnId, bodyId){
@@ -329,8 +343,9 @@ function anioLabel(k){
   return k + "° Año";
 }
 function libroTieneAnio(l, k){
-  if(k === "otros") return l.anios.length === 0;
-  return l.anios.indexOf(parseInt(k)) >= 0;
+  var anios = Array.isArray(l.anios) ? l.anios : [];
+  if(k === "otros") return anios.length === 0;
+  return anios.indexOf(parseInt(k)) >= 0;
 }
 
 /* ── CONSTRUIR SIDEBAR ── */
@@ -505,7 +520,8 @@ function render(lista, pag){
   for(var i = 0; i < slice.length; i++){
     var l    = slice[i];
     var rank = lista.indexOf(l) + 1;
-    var al   = l.anios.length > 0 ? l.anios[0] + "°" : "Otros";
+    var aniosArr = Array.isArray(l.anios) ? l.anios : [];
+    var al   = aniosArr.length > 0 ? aniosArr[0] + "°" : "Otros";
     h += '<div class="libro-card" onclick="abrirModal(\'' + l.id + '\')">';
     
     h += '<img class="libro-emoji" src="' + (l.img||'https://placehold.co/720x920/A8D8EE/2E7FB3?text='+encodeURIComponent(l.t.split(' ').slice(0,3).join('+'))) + '" alt="' + l.t + '" loading="lazy"/>';

@@ -2,9 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
 
+let cachedRanking = null;
+let lastRankingFetch = 0;
+const RANKING_CACHE_TTL_MS = 20 * 1000; // 20 segundos
+
 // GET /api/ranking - Obtener Top 5 libros más abiertos / más buscados
 router.get('/', async (req, res) => {
   try {
+    const now = Date.now();
+    if (cachedRanking && (now - lastRankingFetch < RANKING_CACHE_TTL_MS)) {
+      return res.json(cachedRanking);
+    }
+
     const result = await query(
       `SELECT l.id AS libro_id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios,
               COUNT(e.id) AS veces_abierto
@@ -29,13 +38,18 @@ router.get('/', async (req, res) => {
     }));
 
     const ids = ranking.map(r => r.libro_id);
-
-    res.json({
+    cachedRanking = {
       ids: ids,
       ranking: ranking
-    });
+    };
+    lastRankingFetch = now;
+
+    res.json(cachedRanking);
   } catch (err) {
     console.error('Error en GET /api/ranking:', err);
+    if (cachedRanking) {
+      return res.json(cachedRanking);
+    }
     res.status(500).json({ error: 'Error al consultar ranking dinámico' });
   }
 });
@@ -59,6 +73,10 @@ router.put('/', async (req, res) => {
         );
       }
     }
+
+    // Invalidar caché
+    cachedRanking = null;
+    lastRankingFetch = 0;
 
     res.json({ message: 'Ranking actualizado exitosamente', ids });
   } catch (err) {

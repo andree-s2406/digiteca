@@ -47,10 +47,45 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
 <link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
-<link rel="stylesheet" href="css/variables.css"/>
-<link rel="stylesheet" href="css/global.css"/>
-<link rel="stylesheet" href="css/animations.css"/>
-<link rel="stylesheet" href="css/admin.css"/>
+<link rel="stylesheet" href="css/variables.css?v=2.2"/>
+<link rel="stylesheet" href="css/global.css?v=2.2"/>
+<link rel="stylesheet" href="css/animations.css?v=2.2"/>
+<link rel="stylesheet" href="css/admin.css?v=2.2"/>
+<style>
+  /* Garantía visual absoluta para el botón de tema y logos circulares */
+  .theme-btn, #themeBtn {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    border: 1px solid var(--borde) !important;
+    background: var(--bg-card) !important;
+    color: var(--txt) !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+  }
+  .theme-btn:hover, #themeBtn:hover {
+    background: var(--bg-alt) !important;
+    border-color: var(--cel-o) !important;
+    transform: scale(1.06) !important;
+  }
+  .theme-btn:active, #themeBtn:active {
+    transform: scale(0.92) !important;
+  }
+  .sidebar-logo, .login-logo, .logo-img {
+    border-radius: 50% !important;
+    background: #FFFFFF !important;
+    border: 2px solid var(--cel-c) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+    object-fit: cover !important;
+    flex-shrink: 0 !important;
+  }
+</style>
 <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -61,7 +96,7 @@
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-brand-header">
-      <img class="login-logo" src="img/logo.png" alt="Logo DigiTeca"/>
+      <img class="login-logo logo-img" src="img/logo.png" alt="Logo DigiTeca"/>
       <h2 class="login-title">Centro de Control</h2>
       <p class="login-sub">Biblioteca Digital · <span>Escuela Técnica N° 29 DE 6</span></p>
     </div>
@@ -106,7 +141,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-top">
       <a href="index.html" class="sidebar-brand">
-        <img class="sidebar-logo" src="img/logo.png" alt="DigiTeca"/>
+        <img class="sidebar-logo logo-img" src="img/logo.png" alt="DigiTeca"/>
         <div class="brand-text">
           <span class="brand-name">Digi<span>Teca</span></span>
           <span class="brand-org">ET N° 29 DE 6</span>
@@ -182,11 +217,7 @@
           <i data-lucide="globe" style="width:14px;height:14px"></i>
           <span>Portal Público</span>
         </a>
-        <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema">
-          <svg class="theme-morph-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path class="theme-morph-path"></path>
-          </svg>
-        </button>
+        <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
       </div>
     </header>
 
@@ -260,14 +291,6 @@
             <div class="kpi-value" id="statActivos">0</div>
           </div>
 
-          <div class="kpi-card rojo">
-            <div class="kpi-head">
-              <span class="kpi-title">Restringidos</span>
-              <div class="kpi-icon"><i data-lucide="shield-alert" style="width:16px;height:16px"></i></div>
-            </div>
-            <div class="kpi-value" id="statRestringidos">0</div>
-          </div>
-
           <div class="kpi-card cel">
             <div class="kpi-head">
               <span class="kpi-title">Visitas Totales</span>
@@ -282,22 +305,6 @@
               <div class="kpi-icon"><i data-lucide="book-marked" style="width:16px;height:16px"></i></div>
             </div>
             <div class="kpi-value" id="statLibrosAbiertos">0</div>
-          </div>
-
-          <div class="kpi-card purpura">
-            <div class="kpi-head">
-              <span class="kpi-title">Guardados en Cuenta</span>
-              <div class="kpi-icon"><i data-lucide="bookmark" style="width:16px;height:16px"></i></div>
-            </div>
-            <div class="kpi-value" id="statDescargados">0</div>
-          </div>
-
-          <div class="kpi-card verde">
-            <div class="kpi-head">
-              <span class="kpi-title">Logins Hoy</span>
-              <div class="kpi-icon"><i data-lucide="log-in" style="width:16px;height:16px"></i></div>
-            </div>
-            <div class="kpi-value" id="statSesionesHoy">0</div>
           </div>
         </div>
 
@@ -368,9 +375,14 @@
             <h2 class="section-heading">Inventario de Libros</h2>
             <p class="section-subheading">Administrá, publicá y editá títulos, portadas y documentos PDF del catálogo.</p>
           </div>
-          <button class="btn btn-primary" onclick="abrirModalLibro(null)">
-            <i data-lucide="plus" style="width:15px;height:15px"></i> Agregar Nuevo Libro
-          </button>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-ghost" onclick="forzarSincronizacionLibros()" title="Sincronizar catálogo con CockroachDB">
+              <i data-lucide="refresh-cw" style="width:15px;height:15px"></i> Sincronizar
+            </button>
+            <button class="btn btn-primary" onclick="abrirModalLibro(null)">
+              <i data-lucide="plus" style="width:15px;height:15px"></i> Agregar Nuevo Libro
+            </button>
+          </div>
         </div>
 
         <!-- Barra de Búsqueda y Filtros Rápidos -->
@@ -674,10 +686,17 @@
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/api.js"></script>
+<script src="js/quick-nav.js" defer></script>
 <script>
 // ════════════════════════════════════════════════
 // ADMINISTRADORES AUTORIZADOS
 // ════════════════════════════════════════════════
+var ADMIN_EMAILS = [
+  "andresfeliperodriguezmora448@gmail.com",
+  "franco.parrucci.058@alu.tecnica29de6.edu.ar",
+  "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
+  "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
+];
 var ADMINS = [];
 
 // ── LIBROS BASE ──
@@ -690,38 +709,100 @@ var adminActual = null;
 var libroEditando = null;
 var usuarioEditando = null;
 var confirmCallback = null;
+var MEMORIA_LIBROS = null;
+var MEMORIA_USUARIOS = null;
 
 function LS_get(k, def){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
 function LS_set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 
-function getLibros(){ return LS_get("digi-admin-libros", []); }
-function setLibros(v){ LS_set("digi-admin-libros", v); }
+function getLibros(){
+  if(Array.isArray(MEMORIA_LIBROS) && MEMORIA_LIBROS.length > 0) return MEMORIA_LIBROS;
+  return LS_get("digi-admin-libros", []);
+}
+function setLibros(v){
+  if(Array.isArray(v)) MEMORIA_LIBROS = v;
+  LS_set("digi-admin-libros", v);
+}
 
-function getUsuarios(){ return LS_get("digi-admin-usuarios", []); }
-function setUsuarios(v){ LS_set("digi-admin-usuarios", v); }
+function getUsuarios(){
+  if(Array.isArray(MEMORIA_USUARIOS) && MEMORIA_USUARIOS.length > 0) return MEMORIA_USUARIOS;
+  return LS_get("digi-admin-usuarios", []);
+}
+function setUsuarios(v){
+  if(Array.isArray(v)) MEMORIA_USUARIOS = v;
+  LS_set("digi-admin-usuarios", v);
+}
 
 function getRanking(){ return LS_get("digi-admin-ranking", [1,2,3,4,5,6,7,8,9,10,11,12]); }
 function setRanking(v){ LS_set("digi-admin-ranking", v); }
 
-// Sincronización asíncrona con CockroachDB
+// Sincronización asíncrona y paralela con CockroachDB
 async function sincronizarConBackend(){
   try {
     if (window.API) {
-      if (window.API.libros) {
-        const libs = await API.libros.getAll();
-        if (Array.isArray(libs)) setLibros(libs);
+      const [libs, usrs, rk, st] = await Promise.all([
+        window.API.libros ? API.libros.getAll().catch(function(e){ console.warn("libros sync:", e); return null; }) : Promise.resolve(null),
+        window.API.usuarios ? API.usuarios.getAll().catch(function(e){ console.warn("usuarios sync:", e); return null; }) : Promise.resolve(null),
+        window.API.ranking ? API.ranking.get().catch(function(e){ console.warn("ranking sync:", e); return null; }) : Promise.resolve(null),
+        window.API.stats ? API.stats.get().catch(function(e){ console.warn("stats sync:", e); return null; }) : Promise.resolve(null)
+      ]);
+
+      if (Array.isArray(libs) && libs.length > 0) {
+        MEMORIA_LIBROS = libs;
+        setLibros(libs);
+        renderTablaLibros(libs);
       }
-      if (window.API.usuarios) {
-        const usrs = await API.usuarios.getAll();
-        if (Array.isArray(usrs)) setUsuarios(usrs);
+      if (Array.isArray(usrs) && usrs.length > 0) {
+        MEMORIA_USUARIOS = usrs;
+        setUsuarios(usrs);
+        renderTablaUsuarios();
       }
-      if (window.API.ranking) {
-        const rk = await API.ranking.get();
-        if (rk && Array.isArray(rk.ids)) setRanking(rk.ids);
+      if (rk && Array.isArray(rk.ids)) {
+        setRanking(rk.ids);
       }
+      if (st && st.resumen) {
+        var currentStats = getStats();
+        if (typeof st.resumen.visitas === "number") currentStats.visitas = st.resumen.visitas;
+        if (typeof st.resumen.librosAbiertos === "number") currentStats.totalAbiertos = st.resumen.librosAbiertos;
+        if (Array.isArray(st.topLibros) && st.topLibros.length > 0) {
+          currentStats.librosAbiertos = currentStats.librosAbiertos || {};
+          st.topLibros.forEach(function(item){
+            currentStats.librosAbiertos[item.id] = parseInt(item.veces, 10);
+          });
+        }
+        if (Array.isArray(st.ingresosPorDia)) currentStats.ingresosPorDia = st.ingresosPorDia;
+        if (st.ingresosPorAnio) currentStats.ingresosPorAnio = st.ingresosPorAnio;
+        if (Array.isArray(st.ultimosIngresos)) currentStats.ultimosIngresos = st.ultimosIngresos;
+        setStats(currentStats);
+      }
+
+      actualizarStats();
+      if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
     }
   } catch (e) {
     console.warn("Sincronización con backend falló:", e.message);
+  }
+}
+
+async function forzarSincronizacionLibros(){
+  toast("Sincronizando con base de datos...", "ok");
+  try {
+    if(!window.API || !window.API.libros){
+      toast("Cliente API no disponible", "err");
+      return;
+    }
+    const libs = await API.libros.getAll();
+    if(Array.isArray(libs) && libs.length > 0){
+      MEMORIA_LIBROS = libs;
+      setLibros(libs);
+      renderTablaLibros(libs);
+      actualizarStats();
+      toast("Catálogo sincronizado: " + libs.length + " libros", "ok");
+    } else {
+      toast("No se encontraron libros en la base de datos", "err");
+    }
+  } catch(e) {
+    toast("Error de sincronización: " + (e.message || "Fallo de conexión"), "err");
   }
 }
 
@@ -755,7 +836,7 @@ if (ptAdmin) {
     if (ses && ses.email) {
       var rol = (ses.rol || "").toLowerCase();
       var email = (ses.email || "").toLowerCase();
-      var esAdmin = rol === "admin" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
+      var esAdmin = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
       if (esAdmin) {
         adminActual = ses;
         document.getElementById("loginScreen").style.display = "none";
@@ -838,13 +919,16 @@ function cerrarSesion(){
 // ════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════
-async function initPanel(){
-  await sincronizarConBackend();
+function initPanel(){
+  // 1. Render instantáneo (0 ms) con datos en almacenamiento local / caché
   actualizarStats();
   renderTablaLibros();
   renderTablaUsuarios();
   cargarRankingAutomatico();
   if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
+
+  // 2. Sincronización concurrente en segundo plano con backend
+  sincronizarConBackend();
 }
 
 // ── ESTADÍSTICAS ──
@@ -867,19 +951,20 @@ function actualizarStats(){
   var descargados = 0;
   try{ var d=JSON.parse(localStorage.getItem("digi-descargas")||"[]"); descargados=d.length; }catch(e){}
 
-  document.getElementById("statLibros").textContent        = libros.length;
-  document.getElementById("statUsuarios").textContent      = usuarios.length;
-  document.getElementById("statActivos").textContent       = activos;
-  document.getElementById("statRestringidos").textContent  = rest;
-  document.getElementById("statVisitas").textContent       = stats.visitas||0;
-  document.getElementById("statDescargados").textContent   = descargados;
-  document.getElementById("statSesionesHoy").textContent   = stats.sesionesHoy||0;
+  var elLibros = document.getElementById("statLibros"); if(elLibros) elLibros.textContent = libros.length;
+  var elUsuarios = document.getElementById("statUsuarios"); if(elUsuarios) elUsuarios.textContent = usuarios.length;
+  var elActivos = document.getElementById("statActivos"); if(elActivos) elActivos.textContent = activos;
+  var elVisitas = document.getElementById("statVisitas"); if(elVisitas) elVisitas.textContent = stats.visitas||0;
 
   // Libros abiertos (suma total)
   var totalAbiertos = 0;
-  var librosAb = stats.librosAbiertos||{};
-  for(var k in librosAb) totalAbiertos += (librosAb[k]||0);
-  document.getElementById("statLibrosAbiertos").textContent = totalAbiertos;
+  if(typeof stats.totalAbiertos === "number"){
+    totalAbiertos = stats.totalAbiertos;
+  } else {
+    var librosAb = stats.librosAbiertos||{};
+    for(var k in librosAb) totalAbiertos += (librosAb[k]||0);
+  }
+  var elAbiertos = document.getElementById("statLibrosAbiertos"); if(elAbiertos) elAbiertos.textContent = totalAbiertos;
 
   renderChartDias(stats);
   renderChartAnios(stats);
@@ -1029,6 +1114,14 @@ function cambiarPanel(el){
   document.getElementById("topbarTitle").textContent = PANEL_TITLES[id]||"";
   if(id === "panelMasBuscados") cargarRankingAutomatico();
   if(id === "panelResumen") actualizarStats();
+  if(id === "panelLibros") {
+    renderTablaLibros();
+    sincronizarConBackend();
+  }
+  if(id === "panelUsuarios") {
+    renderTablaUsuarios();
+    sincronizarConBackend();
+  }
   if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
   if(window.innerWidth <= 768) toggleSidebar();
 }
@@ -1067,23 +1160,26 @@ function libroPerteneceCursos(libro, cursos){
   return false;
 }
 
-function renderTablaLibros(){
-  var rol   = adminActual ? (adminActual.rol||"admin") : "admin";
+function renderTablaLibros(librosParam){
+  var rol   = (adminActual ? (adminActual.rol||"admin") : "admin").toLowerCase();
+  var email = (adminActual ? (adminActual.email||"") : "").toLowerCase();
+  var esSuperAdmin = rol === "admin" || rol === "administrador" || ADMIN_EMAILS.indexOf(email) >= 0;
   var cursos = adminActual ? (adminActual.cursosACargo||[]) : [];
-  var q   = norm(document.getElementById("buscarLibroAdmin").value);
-  var mat = document.getElementById("filtroMatAdmin").value;
-  var todosLibros = getLibros();
+  var q   = norm(document.getElementById("buscarLibroAdmin") ? document.getElementById("buscarLibroAdmin").value : "");
+  var mat = document.getElementById("filtroMatAdmin") ? document.getElementById("filtroMatAdmin").value : "";
+  var todosLibros = (Array.isArray(librosParam) && librosParam.length > 0) ? librosParam : getLibros();
 
   // Filtrar según rol
   var libros = todosLibros.filter(function(l){
     var mq = !q || norm(l.t).indexOf(q)>=0 || norm(l.a).indexOf(q)>=0;
     var mm = !mat || l.mat===mat;
     if(!mq || !mm) return false;
-    if(rol === "admin") return true;
+    if(esSuperAdmin) return true;
     if(rol === "preceptor") return libroPerteneceCursos(l, cursos);
     if(rol === "profesor"){
-      // Solo libros que él subió Y que corresponden a su curso Y su materia
-      if(!l.subioPor || norm(l.subioPor) !== norm(adminActual.email)) return false;
+      // Libros subidos por él o compartidos por el sistema
+      var esMio = !l.subioPor || l.subioPor === "sistema" || norm(l.subioPor) === norm(email);
+      if(!esMio) return false;
       if(!libroPerteneceCursos(l, cursos)) return false;
       // Verificar que la materia del libro coincida con la materia del profesor en ese curso
       if(cursos && cursos.length > 0 && l.mat){
@@ -1096,7 +1192,7 @@ function renderTablaLibros(){
       }
       return true;
     }
-    return false;
+    return true;
   });
 
   // Botón agregar — ocultar para profesor si no cumple condición
@@ -1107,40 +1203,56 @@ function renderTablaLibros(){
 
   var h = "";
   for(var i=0;i<libros.length;i++){
-    var l = libros[i];
-    var imgH = l.img ? '<img class="tbl-img" src="'+l.img+'" alt=""/>' :
-               '<div class="tbl-img-placeholder">'+l.e+'</div>';
-    var aniosStr = l.anios&&l.anios.length>0 ? l.anios.join(", ") : "Gral.";
-    var pdfH = l.pdf ? '<span class="badge badge-verde">'+DigiIcons.get("check",{size:11,style:"margin-right:3px"})+'Sí</span>' :
-                       '<span class="badge badge-gray">No</span>';
-    // Permisos de edición/eliminación
-    var puedeEditar = true;
-    var puedeEliminar = true;
-    if(rol === "profesor"){
-      puedeEditar   = !!(l.subioPor && norm(l.subioPor)===norm(adminActual.email));
-      puedeEliminar = puedeEditar;
+    try {
+      var l = libros[i];
+      var imgH = l.img ? '<img class="tbl-img" src="'+l.img+'" alt="" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=\\\'tbl-img-placeholder\\\'>📖</div>\'"/>' :
+                 '<div class="tbl-img-placeholder">'+(l.e||"📚")+'</div>';
+      var aniosArr = Array.isArray(l.anios) ? l.anios : [];
+      var aniosStr = aniosArr.length > 0 ? aniosArr.join(", ") : "Gral.";
+      var pdfH = l.pdf ? '<span class="badge badge-verde">'+DigiIcons.get("check",{size:11,style:"margin-right:3px"})+'Sí</span>' :
+                         '<span class="badge badge-gray">No</span>';
+      var puedeEditar = true;
+      var puedeEliminar = true;
+      if(!esSuperAdmin && rol === "profesor"){
+        puedeEditar   = !!(l.subioPor && norm(l.subioPor)===norm(email));
+        puedeEliminar = puedeEditar;
+      }
+      var divStr = '<span style="color:var(--txt-m);font-size:.78rem;font-style:italic">General</span>';
+      if(l.divisiones && Array.isArray(l.divisiones) && l.divisiones.length > 0){
+        divStr = l.divisiones.map(function(d){
+          if(typeof d === "string" || typeof d === "number") return String(d);
+          if(d && typeof d === "object"){
+            var an = d.anio || "";
+            var di = d.div || "";
+            if(an && di) return an + "°" + di;
+            if(an) return an + "°";
+            if(di) return di;
+          }
+          return "General";
+        }).join(", ");
+      }
+      h += '<tr>';
+      h += '<td><span style="color:var(--txt-m);font-size:.8rem">#'+l.id+'</span></td>';
+      h += '<td>'+imgH+'</td>';
+      h += '<td style="font-weight:700;max-width:200px">'+(l.t||"Sin título")+'</td>';
+      h += '<td style="color:var(--txt-m)">'+(l.a||"Autor no especificado")+'</td>';
+      h += '<td><span class="badge badge-cel">'+(l.mat||"General")+'</span></td>';
+      h += '<td style="color:var(--txt-m);font-size:.82rem">'+aniosStr+'</td>';
+      h += '<td style="font-size:.8rem;color:var(--txt-m)">'+divStr+'</td>';
+      h += '<td><span class="badge badge-gray">'+(l.tipo||"Libro")+'</span></td>';
+      h += '<td>'+pdfH+'</td>';
+      h += '<td><div style="display:flex;gap:6px">';
+      if(puedeEditar)   h += '<button class="btn btn-warning btn-sm" onclick="editarLibro(\''+l.id+'\')" title="Editar">'+DigiIcons.get("pencil",{size:13})+'</button>';
+      if(puedeEliminar) h += '<button class="btn btn-danger btn-sm" onclick="confirmarEliminarLibro(\''+l.id+'\')" title="Eliminar">'+DigiIcons.get("trash-2",{size:13})+'</button>';
+      if(!puedeEditar && !puedeEliminar) h += '<span style="font-size:.78rem;color:var(--txt-m)">Solo lectura</span>';
+      h += '</div></td>';
+      h += '</tr>';
+    } catch(rowErr) {
+      console.warn("Error renderizando fila de libro en admin:", rowErr);
     }
-    h += '<tr>';
-    h += '<td><span style="color:var(--txt-m);font-size:.8rem">#'+l.id+'</span></td>';
-    h += '<td>'+imgH+'</td>';
-    h += '<td style="font-weight:700;max-width:200px">'+l.t+'</td>';
-    h += '<td style="color:var(--txt-m)">'+l.a+'</td>';
-    h += '<td><span class="badge badge-cel">'+l.mat+'</span></td>';
-    h += '<td style="color:var(--txt-m);font-size:.82rem">'+aniosStr+'</td>';
-    var divStr = (l.divisiones && l.divisiones.length > 0) ?
-      l.divisiones.map(function(d){ return d.anio+"°"+d.div; }).join(", ") :
-      '<span style="color:var(--txt-m);font-size:.78rem;font-style:italic">General</span>';
-    h += '<td style="font-size:.8rem;color:var(--txt-m)">'+divStr+'</td>';
-    h += '<td><span class="badge badge-gray">'+l.tipo+'</span></td>';
-    h += '<td>'+pdfH+'</td>';
-    h += '<td><div style="display:flex;gap:6px">';
-    if(puedeEditar)   h += '<button class="btn btn-warning btn-sm" onclick="editarLibro(\''+l.id+'\')" title="Editar">'+DigiIcons.get("pencil",{size:13})+'</button>';
-    if(puedeEliminar) h += '<button class="btn btn-danger btn-sm" onclick="confirmarEliminarLibro(\''+l.id+'\')" title="Eliminar">'+DigiIcons.get("trash-2",{size:13})+'</button>';
-    if(!puedeEditar && !puedeEliminar) h += '<span style="font-size:.78rem;color:var(--txt-m)">Solo lectura</span>';
-    h += '</div></td>';
-    h += '</tr>';
   }
-  document.getElementById("tbodyLibros").innerHTML = h || '<tr><td colspan="10" style="text-align:center;color:var(--txt-m);padding:32px">Sin resultados para tu rol</td></tr>';
+  var tbody = document.getElementById("tbodyLibros");
+  if(tbody) tbody.innerHTML = h || '<tr><td colspan="10" style="text-align:center;color:var(--txt-m);padding:32px">Sin resultados para tu rol</td></tr>';
 }
 
 function abrirModalLibro(id){
@@ -1196,7 +1308,24 @@ async function guardarLibro(){
   var desc = document.getElementById("lDesc").value.trim();
   var img  = document.getElementById("lImg").value.trim();
   var pdfRaw = document.getElementById("lPdf").value.trim();
-  var pdf = (pdfRaw.startsWith("archivo:") && window._pdfDataUrl) ? window._pdfDataUrl : pdfRaw;
+  var pdf = pdfRaw;
+
+  // Si se seleccionó un archivo local, subirlo directamente al disco del servidor (/libros/)
+  if (window._pendingPdfFile && window.API && window.API.upload) {
+    try {
+      toast("Subiendo archivo PDF al servidor...", "info");
+      var uploadRes = await API.upload.pdf(window._pendingPdfFile);
+      if (uploadRes && uploadRes.url) {
+        pdf = uploadRes.url;
+        window._pendingPdfFile = null;
+      }
+    } catch(uErr) {
+      console.warn("Subida a disco falló, usando respaldo:", uErr.message);
+      if (window._pdfDataUrl) pdf = window._pdfDataUrl;
+    }
+  } else if (pdfRaw.startsWith("archivo:") && window._pdfDataUrl) {
+    pdf = window._pdfDataUrl;
+  }
   var aniosRaw = document.getElementById("lAnios").value.trim();
 
   if(!t||!a||!mat){ toast("Completá título, autor y materia","err"); return; }
@@ -1779,7 +1908,7 @@ function descargarReporte(){
 var periodoActual = "todo";
 
 function setPeriodo(btn, periodo){
-  document.querySelectorAll(".periodo-btn").forEach(function(b){ b.classList.remove("active"); });
+  document.querySelectorAll(".periodo-pill, .periodo-btn").forEach(function(b){ b.classList.remove("active"); });
   btn.classList.add("active");
   periodoActual = periodo;
   var wrap = document.getElementById("customDateWrap");
@@ -1872,11 +2001,6 @@ function aplicarFiltro(){
   } else {
     label.textContent = labels[periodoActual]||"";
   }
-
-  // ── Stat card logins ──
-  document.getElementById("statSesionesHoy").textContent = ingresosFiltrados.length;
-  var lblEl = document.getElementById("statSesionesHoy").closest(".stat-card").querySelector(".stat-label");
-  if(lblEl) lblEl.innerHTML = periodoActual==="todo" ? `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${window.DigiIcons?DigiIcons["key"]:""}</span> Logins hoy` : `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${window.DigiIcons?DigiIcons["key"]:""}</span> Logins (período)`;
 
   // ── Re-render con datos filtrados ──
   var statsTemp = JSON.parse(JSON.stringify(stats));
@@ -2007,8 +2131,10 @@ function setCursosPreceptor(cursos){
 }
 
 function aplicarRestriccionesPorRol(rol){
-  // Admin ve todo sin restricciones
-  if(rol === "admin") return;
+  var normRol = (rol || "").toLowerCase();
+  var email = (adminActual ? (adminActual.email || "") : "").toLowerCase();
+  var esSuperAdmin = normRol === "admin" || normRol === "administrador" || ADMIN_EMAILS.indexOf(email) >= 0;
+  if(esSuperAdmin) return;
   var esRestringido = (rol === "preceptor" || rol === "profesor");
   // Ocultar Resumen y Más buscados en sidebar solo para preceptor/profesor
   document.querySelectorAll(".nav-item").forEach(function(el){
@@ -2090,19 +2216,14 @@ function setLibroDivs(divs){
 function handlePdfFile(input){
   if(!input.files||!input.files[0]) return;
   var file = input.files[0];
+  window._pendingPdfFile = file;
   var lbl = document.getElementById("pdfPreviewLabel");
   var dz  = document.getElementById("pdfDropZone");
-  // Store as data URL (base64) — for production use server upload
-  var reader = new FileReader();
-  reader.onload = function(e){
-    // Store filename for display, actual path for use
-    document.getElementById("lPdf").value = "archivo:" + file.name;
-    window._pdfDataUrl = e.target.result;
-    if(lbl){ lbl.style.display="block"; lbl.innerHTML = `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${DigiIcons["check"]}</span> Archivo cargado: ` + file.name; }
-    if(dz){ dz.style.borderColor="var(--verde)"; dz.style.background="var(--verde-c)";
-      dz.innerHTML = '<div style="font-size:1.5rem"><i data-lucide="file-text" style="width:14px;height:14px"></i></div><p style="font-size:.88rem;font-weight:700;color:var(--verde)">'+file.name+'</p><p style="font-size:.75rem;color:var(--txt-m)">Hacé clic para cambiar</p>'; }
-  };
-  reader.readAsDataURL(file);
+  document.getElementById("lPdf").value = "archivo:" + file.name;
+  var mb = (file.size / (1024 * 1024)).toFixed(1);
+  if(lbl){ lbl.style.display="block"; lbl.innerHTML = `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${DigiIcons["check"]}</span> Archivo listo para subir: ` + file.name + ' (' + mb + ' MB)'; }
+  if(dz){ dz.style.borderColor="var(--verde)"; dz.style.background="var(--verde-c)";
+    dz.innerHTML = '<div style="font-size:1.5rem"><i data-lucide="file-text" style="width:14px;height:14px"></i></div><p style="font-size:.88rem;font-weight:700;color:var(--verde)">'+file.name+' ('+mb+' MB)</p><p style="font-size:.75rem;color:var(--txt-m)">Se guardará en el disco del servidor · Hacé clic para cambiar</p>'; }
 }
 
 function handlePdfDrop(e){
@@ -2271,7 +2392,10 @@ document.addEventListener("click", function(e){
   }
 });
 
-// PDF click handled via label[for=lPdfFile]
+// Disparar sincronización inmediata con CockroachDB en segundo plano
+if(typeof sincronizarConBackend === "function"){
+  sincronizarConBackend();
+}
 </script>
 </body>
 </html>

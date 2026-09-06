@@ -33,6 +33,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Libro – DigiTeca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet"/>
 <link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
 <link rel="stylesheet" href="css/variables.css"/>
@@ -127,7 +129,10 @@
 <div class="visor-section" id="visorSection">
   <div class="visor-header">
     <h2><i data-lucide="book-open" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;color:var(--cel-o)"></i>Leyendo ahora</h2>
-    <button class="ctrl-btn" id="btnFullscreen" onclick="pantallaCompleta()"><i data-lucide="maximize" style="width:16px;height:16px;margin-right:6px"></i> Pantalla completa</button>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="meta-badge" style="font-size:.78rem;background:rgba(46,127,179,.1);color:var(--cel-o)"><i data-lucide="shield-check" style="width:12px;height:12px;margin-right:4px"></i>Lectura protegida</span>
+      <button class="ctrl-btn" id="btnFullscreen" onclick="pantallaCompleta()"><i data-lucide="maximize" style="width:16px;height:16px;margin-right:6px"></i> Pantalla completa</button>
+    </div>
   </div>
   <div class="pdf-wrap" id="pdfWrap">
     <button class="btn-exit-fs" id="btnExitFs" onclick="salirPantallaCompleta()"><i data-lucide="minimize" style="width:15px;height:15px;margin-right:6px"></i>Salir de pantalla completa</button>
@@ -183,6 +188,7 @@
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/api.js"></script>
+<script src="js/quick-nav.js" defer></script>
 <script>
 // ════════════════════════════════════════════════════
 // LIBROS — Para cada libro:
@@ -209,10 +215,21 @@ var LIBROS = [];
 // Filtrar libros por division especifica del usuario logueado
 (function(){
   try{
+    var ADMIN_EMAILS = [
+      "andresfeliperodriguezmora448@gmail.com",
+      "franco.parrucci.058@alu.tecnica29de6.edu.ar",
+      "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
+      "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
+    ];
     var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    var rol    = (sesion.rol || "").trim().toLowerCase();
+    var email  = (sesion.email || "").trim().toLowerCase();
+    if(rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0){
+      return;
+    }
     var anio   = sesion.anio || "";
     var div    = sesion.div  || "";
-    if(!anio && !div) return; // sin datos de cursada, no filtrar
+    if(!anio || !div || anio === "Otro") return; // sin datos de cursada específicos, no filtrar
 
     // Override LIBROS to exclude books with divisiones that don't match
     LIBROS = LIBROS.filter(function(l){
@@ -240,34 +257,56 @@ async function cargarLibro(){
   var idParam = params.get("id");
   var l = null;
 
-  // 1. Cargar desde la API / CockroachDB
-  if(idParam && window.API && window.API.libros){
-    try {
-      l = await API.libros.getById(idParam);
-    } catch(e){
-      console.warn("API getById:", e.message);
-    }
-  }
-
-  // 2. Si no se encontró, buscar en libros guardados localmente
-  if(!l && idParam){
+  // 1. CARGA INSTANTÁNEA (0 ms): Renderizar inmediatamente desde la caché local
+  if(idParam){
     var localLibros = [];
     try { localLibros = JSON.parse(localStorage.getItem("digi-admin-libros")||"[]"); }catch(e){}
     for(var i=0; i<localLibros.length; i++){
-      if(String(localLibros[i].id) === String(idParam)){ l = localLibros[i]; break; }
+      if(String(localLibros[i].id) === String(idParam)){
+        l = localLibros[i];
+        break;
+      }
     }
   }
 
-  // 3. Si aún no hay libro, intentar traer el primero disponible
-  if(!l && window.API && window.API.libros){
+  // Si no se especificó id o no está en caché, intentar usar el primer recurso guardado
+  if(!l && (!idParam || idParam === "")){
     try {
-      var all = await API.libros.getAll();
-      if(all && all.length > 0) l = all[0];
+      var localAll = JSON.parse(localStorage.getItem("digi-admin-libros")||"[]");
+      if(localAll && localAll.length > 0) l = localAll[0];
     } catch(e){}
   }
 
-  // 4. Si la base de datos está totalmente vacía:
-  if(!l){
+  // Si tenemos datos en caché, renderizar al instante sin esperar la red
+  if(l){
+    libroActual = l;
+    renderDetalleLibro(l);
+  }
+
+  // 2. SINCRONIZACIÓN EN SEGUNDO PLANO CON LA API (SWR)
+  if(idParam && window.API && window.API.libros){
+    try {
+      var fresh = await API.libros.getById(idParam);
+      if(fresh && fresh.id){
+        libroActual = fresh;
+        renderDetalleLibro(fresh);
+      }
+    } catch(e){
+      console.warn("API getById:", e.message);
+    }
+  } else if(!l && window.API && window.API.libros){
+    try {
+      var all = await API.libros.getAll();
+      if(all && all.length > 0){
+        l = all[0];
+        libroActual = l;
+        renderDetalleLibro(l);
+      }
+    } catch(e){}
+  }
+
+  // 3. Si definitivamente no existe el libro:
+  if(!libroActual && !l){
     document.getElementById("libroTitulo").textContent = "Recurso no encontrado";
     document.getElementById("libroAutor").innerHTML    = "DigiTeca";
     document.getElementById("libroDesc").textContent   = "El libro solicitado no se encuentra disponible actualmente en la base de datos.";
@@ -277,18 +316,14 @@ async function cargarLibro(){
     return;
   }
 
-  libroActual = l;
-
-  // Registrar lectura en CockroachDB
+  // Registrar evento de lectura en segundo plano
   try {
     var sesion = JSON.parse(localStorage.getItem("digi-sesion") || "{}");
-    if (window.API && window.API.stats && l.id) {
-      API.stats.registrarLectura(l.id, sesion.email, sesion.anio);
+    var targetId = libroActual ? libroActual.id : (l ? l.id : idParam);
+    if (window.API && window.API.stats && targetId) {
+      API.stats.registrarLectura(targetId, sesion.email, sesion.anio).catch(function(){});
     }
   } catch(e){}
-
-  // Renderizar información en la página
-  renderDetalleLibro(l);
 }
 
 function renderDetalleLibro(l){
@@ -396,7 +431,7 @@ function cargarPDF(l){
       currentBlobUrl = URL.createObjectURL(blob);
       noDisp.style.display = "none";
       frame.style.display  = "block";
-      // toolbar=0 deshabilita herramientas de descarga e impresión en visores embebidos
+      // toolbar=0 deshabilita las herramientas de descarga e impresión del navegador en visores embebidos (Lectura Protegida)
       frame.src = currentBlobUrl + "#toolbar=0&navpanes=0&scrollbar=1&view=FitH";
       return;
     } catch(err){
@@ -421,12 +456,33 @@ function cargarPDF(l){
     return;
   }
 
-  // 4. URL directa
-  if(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/") || url.match(/\.pdf(\?.*)?$/i)){
-    var sep = url.indexOf("?") >= 0 ? "&" : "#";
-    var finalUrl = url.match(/\.pdf(\?.*)?$/i) ? (url + sep + "toolbar=0&navpanes=0&scrollbar=1&view=FitH") : url;
+  // 4. URL directa o archivo en servidor (Cifrado en Blob temporal para ofuscar la ruta real)
+  if(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/") || url.startsWith("libros/") || url.match(/\.pdf(\?.*)?$/i)){
     noDisp.style.display = "none";
     frame.style.display  = "block";
+
+    // Si es del mismo origen o ruta local, cargar como Blob temporal en RAM (la URL se convierte en blob:... y oculta el enlace)
+    var esLocal = !url.startsWith("http://") && !url.startsWith("https://") || (url.indexOf(window.location.host) >= 0);
+    if(esLocal){
+      fetch(url)
+        .then(function(res){
+          if(!res.ok) throw new Error("HTTP " + res.status);
+          return res.blob();
+        })
+        .then(function(blob){
+          if(currentBlobUrl){ try{ URL.revokeObjectURL(currentBlobUrl); }catch(e){} }
+          currentBlobUrl = URL.createObjectURL(blob);
+          frame.src = currentBlobUrl + "#toolbar=0&navpanes=0&scrollbar=1&view=FitH";
+        })
+        .catch(function(){
+          var sep = url.indexOf("?") >= 0 ? "&" : "#";
+          frame.src = url.match(/\.pdf(\?.*)?$/i) ? (url + sep + "toolbar=0&navpanes=0&scrollbar=1&view=FitH") : url;
+        });
+      return;
+    }
+
+    var sep = url.indexOf("?") >= 0 ? "&" : "#";
+    var finalUrl = url.match(/\.pdf(\?.*)?$/i) ? (url + sep + "toolbar=0&navpanes=0&scrollbar=1&view=FitH") : url;
     frame.src = finalUrl;
     return;
   }

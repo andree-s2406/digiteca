@@ -2,6 +2,16 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
 
+// In-memory cache para estadísticas con TTL de 20 segundos
+let cachedStats = null;
+let lastStatsFetch = 0;
+const STATS_CACHE_TTL = 20 * 1000; // 20 segundos
+
+function invalidarCacheStats() {
+  cachedStats = null;
+  lastStatsFetch = 0;
+}
+
 // POST /api/stats/visita - Registrar visita
 router.post('/visita', async (req, res) => {
   try {
@@ -10,6 +20,7 @@ router.post('/visita', async (req, res) => {
       `INSERT INTO estadisticas_eventos (tipo, dia_semana) VALUES ('visita', $1)`,
       [diaSemana]
     );
+    invalidarCacheStats();
     res.json({ ok: true });
   } catch (err) {
     console.error('Error en /api/stats/visita:', err);
@@ -27,6 +38,7 @@ router.post('/libro-abierto', async (req, res) => {
        VALUES ('libro_abierto', $1, $2, $3, $4)`,
       [libroId ? parseInt(libroId, 10) : null, usuarioEmail || null, diaSemana, anio || 'Otro']
     );
+    invalidarCacheStats();
     res.json({ ok: true });
   } catch (err) {
     console.error('Error en /api/stats/libro-abierto:', err);
@@ -59,8 +71,14 @@ function getDateFilter(periodo, desde, hasta) {
 // GET /api/stats - Obtener métricas y estadísticas
 router.get('/', async (req, res) => {
   try {
-    const { periodo = 'todo', desde, hasta } = req.query;
+    const { periodo = 'todo', desde, hasta, nocache } = req.query;
     const { dateDesde, dateHasta } = getDateFilter(periodo, desde, hasta);
+
+    // Servir inmediatamente desde memoria RAM (<2ms) si es la consulta por defecto
+    const esConsultaDefault = periodo === 'todo' && !desde && !hasta && nocache !== 'true';
+    if (esConsultaDefault && cachedStats && (Date.now() - lastStatsFetch < STATS_CACHE_TTL)) {
+      return res.json(cachedStats);
+    }
 
     let filterSql = '';
     const params = [];
@@ -70,53 +88,52 @@ router.get('/', async (req, res) => {
       filterSql = ` AND fecha >= $1 AND fecha <= $2`;
     }
 
-    // 1. Conteo total de libros
-    const { rows: rLibros } = await query(`SELECT COUNT(*) AS total FROM libros;`);
+    // Ejecutar todas las consultas de agregación concurrentemente para reducir la latencia al mínimo
+    const [
+      { rows: rLibros },
+      { rows: rUsuarios },
+      { rows: rVisitas },
+      { rows: rAbiertos },
+      { rows: rHoy },
+      { rows: rDesc },
+      { rows: rDias },
+      { rows: rAnios },
+      { rows: rTop },
+      { rows: rUltimos }
+    ] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM libros;`),
+      query(`
+        SELECT 
+          COUNT(*) AS total,
+          COUNT(CASE WHEN estado = 'activo' THEN 1 END) AS activos,
+          COUNT(CASE WHEN estado = 'restringido' THEN 1 END) AS restringidos,
+          COUNT(CASE WHEN rol = 'admin' THEN 1 END) AS admins,
+          COUNT(CASE WHEN rol = 'preceptor' THEN 1 END) AS preceptores,
+          COUNT(CASE WHEN rol = 'profesor' THEN 1 END) AS profesores,
+          COUNT(CASE WHEN rol = 'alumno' THEN 1 END) AS alumnos
+        FROM usuarios;
+      `),
+      query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'visita' ${filterSql};`, params),
+      query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE (tipo = 'libro_abierto' OR tipo = 'lectura') ${filterSql};`, params),
+      query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'ingreso' AND fecha::date = CURRENT_DATE;`),
+      query(`SELECT COUNT(*) AS total FROM descargas;`),
+      query(`SELECT dia_semana, COUNT(*) AS cantidad FROM estadisticas_eventos WHERE tipo = 'ingreso' ${filterSql} GROUP BY dia_semana;`, params),
+      query(`SELECT COALESCE(anio_cursada, 'Otro') AS anio, COUNT(*) AS cantidad FROM estadisticas_eventos WHERE tipo = 'ingreso' ${filterSql} GROUP BY anio_cursada;`, params),
+      query(`SELECT e.referencia_id AS id, l.titulo, l.autor, l.materia, COUNT(*) AS veces
+             FROM estadisticas_eventos e
+             JOIN libros l ON e.referencia_id = l.id
+             WHERE (e.tipo = 'libro_abierto' OR e.tipo = 'lectura') ${filterSql}
+             GROUP BY e.referencia_id, l.titulo, l.autor, l.materia
+             ORDER BY veces DESC
+             LIMIT 10;`, params),
+      query(`SELECT usuario_nombre AS nombre, usuario_email AS email, usuario_rol AS rol, fecha
+             FROM estadisticas_eventos
+             WHERE tipo = 'ingreso'
+             ORDER BY fecha DESC
+             LIMIT 10;`)
+    ]);
+
     const totalLibros = parseInt(rLibros[0].total, 10);
-
-    // 2. Conteo de usuarios
-    const { rows: rUsuarios } = await query(`
-      SELECT 
-        COUNT(*) AS total,
-        COUNT(CASE WHEN estado = 'activo' THEN 1 END) AS activos,
-        COUNT(CASE WHEN estado = 'restringido' THEN 1 END) AS restringidos,
-        COUNT(CASE WHEN rol = 'admin' THEN 1 END) AS admins,
-        COUNT(CASE WHEN rol = 'preceptor' THEN 1 END) AS preceptores,
-        COUNT(CASE WHEN rol = 'profesor' THEN 1 END) AS profesores,
-        COUNT(CASE WHEN rol = 'alumno' THEN 1 END) AS alumnos
-      FROM usuarios;
-    `);
-
-    // 3. Conteo de visitas en el período
-    const { rows: rVisitas } = await query(
-      `SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'visita' ${filterSql};`,
-      params
-    );
-
-    // 4. Conteo de libros abiertos en el período
-    const { rows: rAbiertos } = await query(
-      `SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE (tipo = 'libro_abierto' OR tipo = 'lectura') ${filterSql};`,
-      params
-    );
-
-    // 5. Sesiones hoy
-    const { rows: rHoy } = await query(`
-      SELECT COUNT(*) AS total 
-      FROM estadisticas_eventos 
-      WHERE tipo = 'ingreso' AND fecha::date = CURRENT_DATE;
-    `);
-
-    // 6. Conteo de descargas guardadas totales
-    const { rows: rDesc } = await query(`SELECT COUNT(*) AS total FROM descargas;`);
-
-    // 7. Ingresos por día de la semana
-    const { rows: rDias } = await query(
-      `SELECT dia_semana, COUNT(*) AS cantidad 
-       FROM estadisticas_eventos 
-       WHERE tipo = 'ingreso' ${filterSql}
-       GROUP BY dia_semana;`,
-      params
-    );
     const ingresosPorDia = [0, 0, 0, 0, 0, 0, 0];
     rDias.forEach(r => {
       if (r.dia_semana !== null && r.dia_semana >= 0 && r.dia_semana < 7) {
@@ -124,39 +141,10 @@ router.get('/', async (req, res) => {
       }
     });
 
-    // 8. Actividad por año de cursada
-    const { rows: rAnios } = await query(
-      `SELECT COALESCE(anio_cursada, 'Otro') AS anio, COUNT(*) AS cantidad
-       FROM estadisticas_eventos 
-       WHERE tipo = 'ingreso' ${filterSql}
-       GROUP BY anio_cursada;`,
-      params
-    );
     const ingresosPorAnio = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "Otro": 0 };
     rAnios.forEach(r => {
       ingresosPorAnio[r.anio] = parseInt(r.cantidad, 10);
     });
-
-    // 9. Top 10 libros más abiertos
-    const { rows: rTop } = await query(
-      `SELECT e.referencia_id AS id, l.titulo, l.autor, l.materia, COUNT(*) AS veces
-       FROM estadisticas_eventos e
-       JOIN libros l ON e.referencia_id = l.id
-       WHERE (e.tipo = 'libro_abierto' OR e.tipo = 'lectura') ${filterSql}
-       GROUP BY e.referencia_id, l.titulo, l.autor, l.materia
-       ORDER BY veces DESC
-       LIMIT 10;`,
-      params
-    );
-
-    // 10. Últimos 10 ingresos
-    const { rows: rUltimos } = await query(`
-      SELECT usuario_nombre AS nombre, usuario_email AS email, usuario_rol AS rol, fecha
-      FROM estadisticas_eventos
-      WHERE tipo = 'ingreso'
-      ORDER BY fecha DESC
-      LIMIT 10;
-    `);
 
     const ultimosIngresos = rUltimos.map(r => ({
       nombre: r.nombre || r.email,
@@ -166,7 +154,7 @@ router.get('/', async (req, res) => {
              ' ' + new Date(r.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
     }));
 
-    res.json({
+    const responseData = {
       resumen: {
         totalLibros,
         usuarios: rUsuarios[0],
@@ -179,7 +167,14 @@ router.get('/', async (req, res) => {
       ingresosPorAnio,
       topLibros: rTop,
       ultimosIngresos
-    });
+    };
+
+    if (esConsultaDefault) {
+      cachedStats = responseData;
+      lastStatsFetch = Date.now();
+    }
+
+    res.json(responseData);
   } catch (err) {
     console.error('Error en GET /api/stats:', err);
     res.status(500).json({ error: 'Error al calcular estadísticas' });
@@ -200,45 +195,39 @@ router.get('/reporte-texto', async (req, res) => {
       filterSql = ` AND fecha >= $1 AND fecha <= $2`;
     }
 
-    const { rows: rLibros } = await query(`SELECT COUNT(*) AS total FROM libros;`);
-    const { rows: rUsuarios } = await query(`SELECT * FROM usuarios ORDER BY id ASC;`);
-    const { rows: rVisitas } = await query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'visita' ${filterSql};`, params);
-    const { rows: rAbiertos } = await query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE (tipo = 'libro_abierto' OR tipo = 'lectura') ${filterSql};`, params);
-    const { rows: rHoy } = await query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'ingreso' AND fecha::date = CURRENT_DATE;`);
-    const { rows: rDesc } = await query(`SELECT COUNT(*) AS total FROM descargas;`);
-
-    const { rows: rDias } = await query(
-      `SELECT dia_semana, COUNT(*) AS cantidad FROM estadisticas_eventos WHERE tipo = 'ingreso' ${filterSql} GROUP BY dia_semana;`,
-      params
-    );
-    const ingDia = [0, 0, 0, 0, 0, 0, 0];
-    rDias.forEach(r => { if (r.dia_semana >= 0 && r.dia_semana < 7) ingDia[r.dia_semana] = parseInt(r.cantidad, 10); });
-
-    const { rows: rAnios } = await query(
-      `SELECT COALESCE(anio_cursada, 'Otro') AS anio, COUNT(*) AS cantidad FROM estadisticas_eventos WHERE tipo = 'ingreso' ${filterSql} GROUP BY anio_cursada;`,
-      params
-    );
-    const ingAnio = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "Otro": 0 };
-    rAnios.forEach(r => { ingAnio[r.anio] = parseInt(r.cantidad, 10); });
-
-    const { rows: rTop } = await query(
-      `SELECT l.titulo, l.autor, COUNT(*) AS veces
-       FROM estadisticas_eventos e
-       JOIN libros l ON e.referencia_id = l.id
-       WHERE (e.tipo = 'libro_abierto' OR e.tipo = 'lectura') ${filterSql}
-       GROUP BY l.titulo, l.autor
-       ORDER BY veces DESC
-       LIMIT 10;`,
-      params
-    );
-
-    const { rows: rUlt } = await query(
-      `SELECT usuario_nombre, usuario_email, usuario_rol, fecha
-       FROM estadisticas_eventos
-       WHERE tipo = 'ingreso'
-       ORDER BY fecha DESC
-       LIMIT 10;`
-    );
+    const [
+      { rows: rLibros },
+      { rows: rUsuarios },
+      { rows: rVisitas },
+      { rows: rAbiertos },
+      { rows: rHoy },
+      { rows: rDesc },
+      { rows: rDias },
+      { rows: rAnios },
+      { rows: rTop },
+      { rows: rUlt }
+    ] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM libros;`),
+      query(`SELECT id, email, nombre, apellido, rol, estado FROM usuarios ORDER BY id ASC;`),
+      query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'visita' ${filterSql};`, params),
+      query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE (tipo = 'libro_abierto' OR tipo = 'lectura') ${filterSql};`, params),
+      query(`SELECT COUNT(*) AS total FROM estadisticas_eventos WHERE tipo = 'ingreso' AND fecha::date = CURRENT_DATE;`),
+      query(`SELECT COUNT(*) AS total FROM descargas;`),
+      query(`SELECT dia_semana, COUNT(*) AS cantidad FROM estadisticas_eventos WHERE tipo = 'ingreso' ${filterSql} GROUP BY dia_semana;`, params),
+      query(`SELECT COALESCE(anio_cursada, 'Otro') AS anio, COUNT(*) AS cantidad FROM estadisticas_eventos WHERE tipo = 'ingreso' ${filterSql} GROUP BY anio_cursada;`, params),
+      query(`SELECT l.titulo, l.autor, COUNT(*) AS veces
+             FROM estadisticas_eventos e
+             JOIN libros l ON e.referencia_id = l.id
+             WHERE (e.tipo = 'libro_abierto' OR e.tipo = 'lectura') ${filterSql}
+             GROUP BY l.titulo, l.autor
+             ORDER BY veces DESC
+             LIMIT 10;`, params),
+      query(`SELECT usuario_nombre, usuario_email, usuario_rol, fecha
+             FROM estadisticas_eventos
+             WHERE tipo = 'ingreso'
+             ORDER BY fecha DESC
+             LIMIT 10;`)
+    ]);
 
     const ahora = new Date();
     const fechaStr = ahora.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });

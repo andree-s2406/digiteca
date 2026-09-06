@@ -14,20 +14,86 @@ const rankingRoutes = require('./routes/ranking');
 const uploadRoutes = require('./routes/upload');
 const contactoRoutes = require('./routes/contacto');
 
+const compression = require('compression');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Ocultar cabecera del servidor por seguridad
+app.disable('x-powered-by');
+
+// Compresión GZIP de alta velocidad para respuestas HTTP
+app.use(compression({
+  threshold: 1024
+}));
+
+// Cabeceras de seguridad HTTP
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 
 // Middlewares
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Servir archivos estáticos del frontend
-app.use(express.static(path.join(__dirname)));
-app.use('/libros', express.static(path.join(__dirname, 'libros')));
-app.use('/img', express.static(path.join(__dirname, 'img')));
-app.use('/favicon', express.static(path.join(__dirname, 'favicon')));
-app.use('/js', express.static(path.join(__dirname, 'js')));
+// Rate Limiter en memoria para prevenir fuerza bruta en el login
+const loginAttempts = new Map();
+function loginRateLimiter(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minuto
+  const maxAttempts = 15;
+
+  const userAttempts = loginAttempts.get(ip) || [];
+  const recentAttempts = userAttempts.filter(t => now - t < windowMs);
+
+  if (recentAttempts.length >= maxAttempts) {
+    return res.status(429).json({
+      error: 'Demasiados intentos de acceso. Por favor, aguardá 1 minuto antes de reintentar.'
+    });
+  }
+
+  recentAttempts.push(now);
+  loginAttempts.set(ip, recentAttempts);
+
+  if (loginAttempts.size > 2000) {
+    loginAttempts.clear();
+  }
+
+  next();
+}
+app.use('/api/auth/login', loginRateLimiter);
+
+// Servir archivos estáticos del frontend con caché controlada
+const staticOptions = { maxAge: '1d', etag: true };
+
+// Protección de enlace directo: Si el usuario intenta entrar directamente al link del PDF o descargarlo desde la barra de direcciones, redirigir al catálogo
+app.use('/libros', (req, res, next) => {
+  const isDirectNav = req.headers['sec-fetch-dest'] === 'document' || req.headers['sec-fetch-mode'] === 'navigate';
+  if (isDirectNav && req.path.toLowerCase().endsWith('.pdf')) {
+    return res.redirect('/catalogo.html');
+  }
+  next();
+});
+
+app.use('/libros', express.static(path.join(__dirname, 'libros'), {
+  maxAge: '1d',
+  etag: true,
+  setHeaders: (res) => {
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  }
+}));
+app.use('/img', express.static(path.join(__dirname, 'img'), staticOptions));
+app.use('/favicon', express.static(path.join(__dirname, 'favicon'), staticOptions));
+app.use('/css', express.static(path.join(__dirname, 'css'), { maxAge: 0, etag: true }));
+app.use('/js', express.static(path.join(__dirname, 'js'), { maxAge: 0, etag: true }));
+app.use(express.static(path.join(__dirname), { maxAge: 0, etag: true }));
 
 // Middleware de seguridad de autenticación para la API REST
 function apiAuthGuard(req, res, next) {
@@ -63,7 +129,7 @@ function apiAuthGuard(req, res, next) {
   // Rutas administrativas restringidas
   const adminEndpoints = ['/usuarios', '/stats', '/upload'];
   const userRole = (req.headers['x-user-rol'] || '').toLowerCase();
-  const isAdmin = userRole === 'admin' || userRole === 'preceptor' || userRole === 'profesor';
+  const isAdmin = userRole === 'admin' || userRole === 'administrador' || userRole === 'preceptor' || userRole === 'profesor';
 
   if (req.method !== 'GET' && req.path.startsWith('/libros') && !isAdmin) {
     return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });

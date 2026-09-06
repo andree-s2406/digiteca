@@ -163,28 +163,8 @@
 <script src="js/icons.js"></script>
 <script src="js/api.js"></script>
 <script>
-/* ── TEMA ── */
-(function(){
-  var h = document.documentElement, b = document.getElementById("themeBtn");
-  if (!b) return;
-  function set(d){
-    if (d) {
-      h.classList.add("dark");
-      if (window.DigiIcons) b.innerHTML = DigiIcons.get("sun", {size: 18});
-      b.setAttribute("title", "Cambiar a modo claro");
-    } else {
-      h.classList.remove("dark");
-      if (window.DigiIcons) b.innerHTML = DigiIcons.get("moon", {size: 18});
-      b.setAttribute("title", "Cambiar a modo oscuro");
-    }
-    try { localStorage.setItem("digi", d ? "dark" : "light"); } catch(e){}
-  }
-  var s = ""; try { s = localStorage.getItem("digi") || ""; } catch(e){}
-  if (s === "dark") set(true);
-  else if (s !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme:dark)").matches) set(true);
-  else set(false);
-  b.onclick = function(){ set(!h.classList.contains("dark")); };
-})();
+// Tema manejado por Morphicons (js/icons.js)
+if(typeof setupThemeToggle==="function") setupThemeToggle();
 
 /* ── CARGAR DESCARGAS ── */
 async function cargarDescargas(){
@@ -250,6 +230,9 @@ async function cargarDescargas(){
     h += '<h3 class="desc-card-title">'+l.t+'</h3>';
     h += '<p class="desc-card-autor">'+l.a+'</p>';
     h += '<p class="desc-card-fecha">' + DigiIcons.get("calendar", {size:13, style:"margin-right:4px;vertical-align:middle"}) + 'Guardado el '+l.fecha+'</p>';
+    h += '<div class="desc-card-actions" style="display:flex;gap:8px;margin-top:12px">';
+    h += '  <a href="libro.html?id='+l.id+'" class="btn-card-read" style="flex:1;background:var(--cel-o);color:#fff;text-decoration:none;border-radius:8px;padding:8px 12px;font-size:.84rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px">'+DigiIcons.get("book-open",{size:14})+' Leer en línea</a>';
+    h += '</div>';
     h += '</div></div>';
   }
   h += '</div>';
@@ -258,7 +241,7 @@ async function cargarDescargas(){
   /* Click en card → ir al libro */
   grid.querySelectorAll(".desc-card").forEach(function(card){
     card.onclick = function(e){
-      if(e.target.classList.contains("desc-card-del")) return;
+      if(e.target.closest(".desc-card-del") || e.target.closest(".btn-card-read")) return;
       window.location.href = "libro.html?id="+this.getAttribute("data-id");
     };
   });

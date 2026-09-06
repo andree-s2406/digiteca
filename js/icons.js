@@ -334,6 +334,8 @@
     var btn = document.getElementById("themeBtn");
     var root = document.documentElement;
     if (!btn) return;
+    if (btn._themeToggleInitialized) return;
+    btn._themeToggleInitialized = true;
 
     // Asegurar estructura SVG con path para Morphicons
     var path = btn.querySelector(".theme-morph-path");

@@ -236,6 +236,7 @@
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/api.js"></script>
+<script src="js/quick-nav.js" defer></script>
 <script>
 // Normaliza texto: minusculas sin acentos
 function norm(s){
@@ -289,10 +290,21 @@ initInicioAPI();
 // Filtrar libros por division especifica del usuario logueado
 (function(){
   try{
+    var ADMIN_EMAILS = [
+      "andresfeliperodriguezmora448@gmail.com",
+      "franco.parrucci.058@alu.tecnica29de6.edu.ar",
+      "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
+      "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
+    ];
     var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+    var rol    = (sesion.rol || "").trim().toLowerCase();
+    var email  = (sesion.email || "").trim().toLowerCase();
+    if(rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0){
+      return;
+    }
     var anio   = sesion.anio || "";
     var div    = sesion.div  || "";
-    if(!anio && !div) return; // sin datos de cursada, no filtrar
+    if(!anio || !div || anio === "Otro") return; // sin datos de cursada específicos, no filtrar
 
     // Override LIBROS to exclude books with divisiones that don't match
     LIBROS = LIBROS.filter(function(l){

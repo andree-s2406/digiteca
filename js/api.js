@@ -4,10 +4,34 @@
  */
 const API_BASE = window.location.origin.includes('http') ? '' : 'http://localhost:3000';
 
+const _cache = new Map();
+const _inFlight = new Map();
+const CACHE_TTL_MS = 5000; // 5 segundos para llamadas GET idénticas
+
 const API = {
   // Base request wrapper
   async request(endpoint, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
     const url = `${API_BASE}${endpoint}`;
+
+    // Si es mutación, limpiar caché de lecturas
+    if (method !== 'GET') {
+      _cache.clear();
+    }
+
+    // Cache hit para GET si no se fuerza bypass
+    if (method === 'GET' && !options.noCache) {
+      const cached = _cache.get(url);
+      if (cached && (Date.now() - cached.time < CACHE_TTL_MS)) {
+        return JSON.parse(JSON.stringify(cached.data));
+      }
+
+      // Deduplicación si ya hay una petición idéntica en vuelo
+      if (_inFlight.has(url)) {
+        return _inFlight.get(url);
+      }
+    }
+
     let sesion = {};
     try {
       sesion = JSON.parse(localStorage.getItem('digi-sesion') || '{}');
@@ -22,17 +46,32 @@ const API = {
       ...(options.headers || {})
     };
 
-    try {
-      const response = await fetch(url, { ...options, headers });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP error ${response.status}`);
+    const fetchPromise = (async () => {
+      try {
+        const response = await fetch(url, { ...options, headers });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || `HTTP error ${response.status}`);
+        }
+        if (method === 'GET' && !options.noCache) {
+          _cache.set(url, { data, time: Date.now() });
+        }
+        return data;
+      } catch (err) {
+        console.warn(`[API] Fallo en ${endpoint}:`, err.message);
+        throw err;
+      } finally {
+        if (method === 'GET') {
+          _inFlight.delete(url);
+        }
       }
-      return data;
-    } catch (err) {
-      console.warn(`[API] Fallo en ${endpoint}:`, err.message);
-      throw err;
+    })();
+
+    if (method === 'GET' && !options.noCache) {
+      _inFlight.set(url, fetchPromise);
     }
+
+    return fetchPromise;
   },
 
   // 1. Autenticación
@@ -184,23 +223,45 @@ const API = {
   // 7. Subida de archivos
   upload: {
     async pdf(file) {
+      let sesion = {};
+      try { sesion = JSON.parse(localStorage.getItem('digi-sesion') || '{}'); } catch(e) {}
+      const headers = {};
+      if (sesion.email) {
+        headers['x-user-email'] = sesion.email;
+        headers['x-user-rol'] = sesion.rol || 'admin';
+      }
       const formData = new FormData();
       formData.append('pdf', file);
       const res = await fetch(`${API_BASE}/api/upload/pdf`, {
         method: 'POST',
+        headers: headers,
         body: formData
       });
-      if (!res.ok) throw new Error('Error al subir PDF');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al subir PDF');
+      }
       return res.json();
     },
     async portada(file) {
+      let sesion = {};
+      try { sesion = JSON.parse(localStorage.getItem('digi-sesion') || '{}'); } catch(e) {}
+      const headers = {};
+      if (sesion.email) {
+        headers['x-user-email'] = sesion.email;
+        headers['x-user-rol'] = sesion.rol || 'admin';
+      }
       const formData = new FormData();
       formData.append('imagen', file);
       const res = await fetch(`${API_BASE}/api/upload/portada`, {
         method: 'POST',
+        headers: headers,
         body: formData
       });
-      if (!res.ok) throw new Error('Error al subir portada');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al subir portada');
+      }
       return res.json();
     }
   },

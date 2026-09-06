@@ -6,7 +6,7 @@ const { query } = require('../db/connection');
 router.get('/', async (req, res) => {
   try {
     const result = await query(
-      `SELECT id, email, password AS pwd, nombre, apellido, rol, anio, estado, avatar, creado_en 
+      `SELECT id, email, nombre, apellido, rol, anio, estado, avatar, creado_en 
        FROM usuarios 
        ORDER BY id ASC;`
     );
@@ -49,7 +49,7 @@ router.post('/', async (req, res) => {
     const result = await query(
       `INSERT INTO usuarios (id, email, password, nombre, apellido, rol, anio, estado)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, email, password AS pwd, nombre, apellido, rol, anio, estado, avatar, creado_en;`,
+       RETURNING id, email, nombre, apellido, rol, anio, estado, avatar, creado_en;`,
       [
         nextId,
         trimmedEmail,
@@ -104,7 +104,7 @@ router.put('/perfil', async (req, res) => {
          avatar = COALESCE($4, avatar),
          password = $5
        WHERE LOWER(email) = $6
-       RETURNING id, email, password AS pwd, nombre, apellido, rol, anio, estado, avatar;`,
+       RETURNING id, email, nombre, apellido, rol, anio, estado, avatar;`,
       [
         nombre ? nombre.trim() : user.nombre,
         apellido ? apellido.trim() : user.apellido,
@@ -146,7 +146,7 @@ router.put('/:id', async (req, res) => {
          anio = COALESCE($6, anio),
          estado = COALESCE($7, estado)
        WHERE id = $8
-       RETURNING id, email, password AS pwd, nombre, apellido, rol, anio, estado, avatar;`,
+       RETURNING id, email, nombre, apellido, rol, anio, estado, avatar;`,
       [
         email ? email.trim().toLowerCase() : null,
         finalPwd || null,
