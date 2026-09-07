@@ -15,6 +15,21 @@ html.dark .cat-hero {
   background: linear-gradient(135deg, #0A1E30, #0D2540);
 }
 
+.cat-hero-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.cat-logo {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25), 0 0 0 6px rgba(245, 217, 106, 0.35);
+  animation: flotar 4s ease-in-out infinite;
+}
+
 .cat-hero h1 {
   font-family: "Playfair Display", Georgia, serif;
   font-size: clamp(2rem, 4vw, 3.2rem);
@@ -481,24 +496,86 @@ html.dark .libro-anio-tag {
   }
   .sidebar.open {
     display: block;
+    margin-bottom: 24px;
   }
   .sidebar-toggle {
     display: flex;
+    width: 100%;
+    justify-content: center;
   }
 }
 
 @media (max-width: 600px) {
   .cat-hero {
-    padding: 100px 20px 40px;
+    padding: 85px 20px 32px;
   }
-  .cat-search {
-    padding: 20px;
+  .cat-logo {
+    width: 76px;
+    height: 76px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), 0 0 0 5px rgba(245, 217, 106, 0.35);
   }
-  .cat-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 14px;
+  .cat-hero h1 {
+    font-size: 1.85rem;
+    margin-bottom: 8px;
+  }
+  .cat-hero p {
+    font-size: 0.95rem;
+    margin-bottom: 24px;
   }
   .hero-stats {
-    gap: 24px;
+    gap: 20px;
+  }
+  .h-stat-num {
+    font-size: 1.6rem;
+  }
+  .cat-search {
+    padding: 16px 20px;
+  }
+  .cat-search .search-wrap {
+    flex-direction: column;
+    border-radius: 16px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    gap: 10px;
+  }
+  .cat-search .search-wrap input {
+    border-radius: 50px;
+    border: 3px solid rgba(232, 184, 20, 0.40);
+    background: var(--bg-card);
+    padding: 13px 20px;
+    font-size: 0.95rem;
+    width: 100%;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+  .cat-search .btn-buscar {
+    border-radius: 50px;
+    padding: 13px 20px;
+    justify-content: center;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+  .sidebar-toggle {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 18px;
+    font-size: 0.92rem;
+  }
+  .cat-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .sort-wrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .sort-wrap select {
+    flex: 1;
+    max-width: 200px;
+  }
+  .cat-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
   }
 }
