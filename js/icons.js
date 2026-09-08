@@ -289,14 +289,8 @@
       if (dropLetter) dropLetter.style.display = "flex";
     }
 
-    var ADMIN_EMAILS = [
-      "andresfeliperodriguezmora448@gmail.com",
-    "franco.parrucci.058@alu.tecnica29de6.edu.ar",
-      "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
-      "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
-    ];
     var rol = (sesion.rol || "").toLowerCase();
-    var esAdmin = rol === "admin" || rol === "preceptor" || rol === "profesor" || (email && ADMIN_EMAILS.indexOf(email.toLowerCase()) >= 0);
+    var esAdmin = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
     var dropAdmin = document.getElementById("dropAdminItem");
     if (dropAdmin) {
       dropAdmin.style.display = esAdmin ? "block" : "none";

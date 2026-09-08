@@ -18,20 +18,13 @@
 <style id="auth-guard-css">html { visibility: hidden !important; opacity: 0 !important; }</style>
 <script>
 (function(){
-  var ADMIN_EMAILS = [
-    "andresfeliperodriguezmora448@gmail.com",
-    "franco.parrucci.058@alu.tecnica29de6.edu.ar",
-    "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
-    "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
-  ];
   try {
     var raw = localStorage.getItem("digi-sesion");
     if (!raw) { window.location.replace("login.html"); return; }
     var s = JSON.parse(raw);
     if (!s || !s.email) { window.location.replace("login.html"); return; }
     var rol = (s.rol || "").toLowerCase();
-    var email = (s.email || "").toLowerCase();
-    var esAdmin = rol === "admin" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
+    var esAdmin = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
     if (!esAdmin) { window.location.replace("index.html"); return; }
     var el = document.getElementById("auth-guard-css");
     if (el) el.remove();
@@ -157,7 +150,7 @@
       </div>
       <div class="user-meta">
         <strong class="user-name" id="sidebarNombre">Admin</strong>
-        <span class="user-email" id="sidebarEmail">admin@tecnica29de6.edu.ar</span>
+        <span class="user-email" id="sidebarEmail">—</span>
         <div class="user-badge-row">
           <span class="user-role-badge" id="sidebarRoleLabel">Administrador</span>
         </div>
@@ -202,22 +195,30 @@
     <!-- Topbar Desacoplada de Alta Gama -->
     <header class="topbar" id="topbar">
       <div class="topbar-left">
-        <button class="hamburger-admin" onclick="toggleSidebar()" aria-label="Abrir menú">
+        <button class="hamburger-admin desktop-only" onclick="toggleSidebar()" aria-label="Abrir menú">
           <span></span><span></span><span></span>
         </button>
         <div class="topbar-breadcrumb">
           <span class="crumb-root">Panel</span>
           <span class="crumb-sep">/</span>
-          <h1 class="crumb-current" id="topbarTitle">Resumen</h1>
+          <span class="crumb-current" id="topbarTitle">Resumen</span>
         </div>
       </div>
 
       <div class="topbar-right">
-        <a href="index.html" target="_blank" class="action-chip" title="Ver sitio en pestaña nueva">
+        <a href="index.html" target="_blank" class="action-chip desktop-only" title="Ver sitio en pestaña nueva">
           <i data-lucide="globe" style="width:14px;height:14px"></i>
           <span>Portal Público</span>
         </a>
-        <button class="theme-btn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
+        <!-- Switch Píldora Sol / Luna idéntico a la imagen -->
+        <div class="theme-switch-pill" id="themeSwitchPill" onclick="toggleThemePill()" role="button" tabindex="0" title="Cambiar tema" aria-label="Cambiar tema claro u oscuro">
+          <span class="pill-icon-wrap pill-sun"><i data-lucide="sun" style="width:13px;height:13px"></i></span>
+          <span class="pill-icon-wrap pill-moon"><i data-lucide="moon" style="width:13px;height:13px"></i></span>
+          <div class="pill-slider-thumb">
+            <i data-lucide="sun" class="thumb-icon-sun" style="width:13px;height:13px"></i>
+            <i data-lucide="moon" class="thumb-icon-moon" style="width:13px;height:13px"></i>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -229,80 +230,74 @@
       ════════════════════════════════════════════════ -->
       <section class="panel active" id="panelResumen">
         <div class="panel-hero-header">
-          <div>
-            <h2 class="section-heading">Resumen de Actividad</h2>
-            <p class="section-subheading">Telemetría de lectura, uso del catálogo y métricas escolares en tiempo real.</p>
+          <div class="panel-header-main">
+            <div class="panel-title-row">
+              <h2 class="section-heading" style="margin:0">Resumen</h2>
+              <button class="sync-btn" id="btnSyncResumen" onclick="sincronizarTodo('resumen')" title="Actualizar métricas" aria-label="Actualizar métricas">
+                <i data-lucide="refresh-cw" class="sync-icon" style="width:17px;height:17px"></i>
+              </button>
+            </div>
+            <p class="section-subheading" style="margin-top:4px">Telemetría y métricas escolares en tiempo real.</p>
           </div>
-          <div class="panel-header-actions">
-            <button class="btn btn-ghost btn-sm" id="btnRefreshStats" onclick="refreshStats()">
-              <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar
+          <div class="panel-header-actions" style="display:flex;align-items:center;gap:6px">
+            <button class="btn btn-ghost btn-sm" id="btnFiltroPeriodo" onclick="abrirModalFiltroPeriodo()" style="border:1px solid var(--borde);display:inline-flex;align-items:center;gap:6px" title="Filtrar por período">
+              <i data-lucide="calendar" style="width:14px;height:14px;color:var(--cel-o)"></i>
+              <span id="periodoBtnLabel">Rango</span>
+              <i data-lucide="chevron-down" style="width:12px;height:12px;color:var(--txt-m)"></i>
             </button>
-            <button class="btn btn-primary btn-sm" onclick="descargarReporte()">
+            <button class="btn btn-primary btn-sm desktop-only" onclick="descargarReporte()" style="display:inline-flex;align-items:center;gap:6px">
               <i data-lucide="download" style="width:14px;height:14px"></i> Exportar informe
             </button>
           </div>
         </div>
 
-        <!-- Filtro Temporal Modular -->
-        <div class="periodo-toolbar">
-          <div class="periodo-label-group">
-            <i data-lucide="calendar" style="width:14px;height:14px;color:var(--cel-o)"></i>
-            <span>Rango:</span>
-          </div>
-          <div class="periodo-pills">
-            <button class="periodo-pill active" data-periodo="todo" onclick="setPeriodo(this,'todo')">Histórico</button>
-            <button class="periodo-pill" data-periodo="24h" onclick="setPeriodo(this,'24h')">24 horas</button>
-            <button class="periodo-pill" data-periodo="semana" onclick="setPeriodo(this,'semana')">Semana</button>
-            <button class="periodo-pill" data-periodo="mes" onclick="setPeriodo(this,'mes')">Mes</button>
-            <button class="periodo-pill" data-periodo="anio" onclick="setPeriodo(this,'anio')">Año</button>
-            <button class="periodo-pill" data-periodo="custom" onclick="setPeriodo(this,'custom')">Personalizado</button>
-          </div>
-          <div id="customDateWrap" class="custom-date-row" style="display:none">
-            <input type="date" id="fechaDesde" onchange="onDesdeChange()"/>
-            <span>a</span>
-            <input type="date" id="fechaHasta" onchange="aplicarFiltro()"/>
-          </div>
-          <span id="periodoLabel" class="periodo-caption"></span>
+        <!-- Indicador de Filtro Activo (visible si se filtra) -->
+        <div id="periodoActiveIndicator" style="display:none;margin-bottom:12px;align-items:center;gap:8px;padding:4px 12px;background:rgba(46,127,179,0.08);border:1px solid rgba(46,127,179,0.25);border-radius:20px;width:fit-content">
+          <i data-lucide="calendar" style="width:13px;height:13px;color:var(--cel-o)"></i>
+          <span id="periodoLabel" style="font-size:0.78rem;font-weight:700;color:var(--cel-o)"></span>
+          <button onclick="resetPeriodoFiltro()" style="background:none;border:none;color:var(--txt-m);cursor:pointer;padding:0 2px;display:flex;align-items:center" title="Quitar filtro">
+            <i data-lucide="x" style="width:12px;height:12px"></i>
+          </button>
         </div>
 
-        <!-- Bento Grid de KPIs de 8 Celdas -->
+        <!-- Bento Grid de KPIs de 5 Celdas -->
         <div class="kpi-bento-grid">
           <div class="kpi-card cel">
             <div class="kpi-head">
-              <span class="kpi-title">Libros en Catálogo</span>
-              <div class="kpi-icon"><i data-lucide="book-open" style="width:16px;height:16px"></i></div>
+              <span class="kpi-title">Libros</span>
+              <div class="kpi-icon"><i data-lucide="book-open" style="width:15px;height:15px"></i></div>
             </div>
             <div class="kpi-value" id="statLibros">0</div>
           </div>
 
           <div class="kpi-card am">
             <div class="kpi-head">
-              <span class="kpi-title">Usuarios Totales</span>
-              <div class="kpi-icon"><i data-lucide="users" style="width:16px;height:16px"></i></div>
+              <span class="kpi-title">Usuarios</span>
+              <div class="kpi-icon"><i data-lucide="users" style="width:15px;height:15px"></i></div>
             </div>
             <div class="kpi-value" id="statUsuarios">0</div>
           </div>
 
           <div class="kpi-card verde">
             <div class="kpi-head">
-              <span class="kpi-title">Usuarios Activos</span>
-              <div class="kpi-icon"><i data-lucide="user-check" style="width:16px;height:16px"></i></div>
+              <span class="kpi-title">Activos</span>
+              <div class="kpi-icon"><i data-lucide="user-check" style="width:15px;height:15px"></i></div>
             </div>
             <div class="kpi-value" id="statActivos">0</div>
           </div>
 
           <div class="kpi-card cel">
             <div class="kpi-head">
-              <span class="kpi-title">Visitas Totales</span>
-              <div class="kpi-icon"><i data-lucide="eye" style="width:16px;height:16px"></i></div>
+              <span class="kpi-title">Visitas</span>
+              <div class="kpi-icon"><i data-lucide="eye" style="width:15px;height:15px"></i></div>
             </div>
             <div class="kpi-value" id="statVisitas">0</div>
           </div>
 
           <div class="kpi-card am">
             <div class="kpi-head">
-              <span class="kpi-title">Lecturas Realizadas</span>
-              <div class="kpi-icon"><i data-lucide="book-marked" style="width:16px;height:16px"></i></div>
+              <span class="kpi-title">Lecturas</span>
+              <div class="kpi-icon"><i data-lucide="flame" style="width:15px;height:15px"></i></div>
             </div>
             <div class="kpi-value" id="statLibrosAbiertos">0</div>
           </div>
@@ -334,16 +329,6 @@
 
         <!-- Honor Board & Actividad Reciente -->
         <div class="records-bento-grid">
-          <!-- Top 5 Libros Más Abiertos -->
-          <div class="surface-card">
-            <div class="card-header">
-              <h3 class="card-title">
-                <i data-lucide="flame" style="width:16px;height:16px;color:#e85d04"></i> Top 5 Libros Más Leídos
-              </h3>
-            </div>
-            <div id="topLibros" class="honor-list"></div>
-          </div>
-
           <!-- Últimos Ingresos -->
           <div class="surface-card">
             <div class="card-header">
@@ -354,16 +339,6 @@
             <div id="ultimosIngresos" class="recent-logins"></div>
           </div>
         </div>
-
-        <!-- Distribución de Roles -->
-        <div class="surface-card roles-card">
-          <div class="card-header">
-            <h3 class="card-title">
-              <i data-lucide="pie-chart" style="width:16px;height:16px;color:var(--cel-o)"></i> Distribución de Cuentas por Rol
-            </h3>
-          </div>
-          <div id="chartRoles" class="roles-distribution-content"></div>
-        </div>
       </section>
 
       <!-- ════════════════════════════════════════════════
@@ -371,16 +346,18 @@
       ════════════════════════════════════════════════ -->
       <section class="panel" id="panelLibros">
         <div class="panel-hero-header">
-          <div>
-            <h2 class="section-heading">Inventario de Libros</h2>
-            <p class="section-subheading">Administrá, publicá y editá títulos, portadas y documentos PDF del catálogo.</p>
+          <div class="panel-header-main">
+            <div class="panel-title-row">
+              <h2 class="section-heading" style="margin:0">Libros</h2>
+              <button class="sync-btn" id="btnSyncLibros" onclick="sincronizarTodo('libros')" title="Sincronizar catálogo con base de datos" aria-label="Sincronizar catálogo">
+                <i data-lucide="refresh-cw" class="sync-icon" style="width:17px;height:17px"></i>
+              </button>
+            </div>
+            <p class="section-subheading" style="margin-top:4px">Títulos, portadas y recursos PDF del catálogo.</p>
           </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <button class="btn btn-ghost" onclick="forzarSincronizacionLibros()" title="Sincronizar catálogo con CockroachDB">
-              <i data-lucide="refresh-cw" style="width:15px;height:15px"></i> Sincronizar
-            </button>
+          <div class="panel-header-actions desktop-only" style="align-self:center">
             <button class="btn btn-primary" onclick="abrirModalLibro(null)">
-              <i data-lucide="plus" style="width:15px;height:15px"></i> Agregar Nuevo Libro
+              <i data-lucide="plus" style="width:15px;height:15px"></i> Agregar Libro
             </button>
           </div>
         </div>
@@ -391,8 +368,13 @@
             <i data-lucide="search" class="search-icon" style="width:16px;height:16px"></i>
             <input type="text" class="search-input" id="buscarLibroAdmin" placeholder="Buscar por título, autor o materia..." oninput="renderTablaLibros()"/>
           </div>
-          <div class="select-wrap">
-            <select class="filter-select" id="filtroMatAdmin" onchange="renderTablaLibros()">
+          <button type="button" class="btn-filter-trigger" id="btnFiltrosLibros" onclick="abrirModalFiltrosLibros()" title="Filtros" aria-label="Abrir filtros de libros">
+            <i data-lucide="sliders-horizontal" style="width:15px;height:15px"></i>
+            <span class="filter-btn-text">Filtros</span>
+            <span class="filter-btn-badge" id="badgeFiltrosLibros" style="display:none">0</span>
+          </button>
+          <div class="select-wrap desktop-only">
+            <select class="filter-select" id="filtroMatAdmin" onchange="sincronizarSelectLibroADesktop()">
               <option value="">Todas las materias</option>
               <option>Matemática</option><option>Física</option><option>Química</option>
               <option>Biología</option><option>Historia</option><option>Geografía</option>
@@ -402,7 +384,10 @@
           </div>
         </div>
 
-        <!-- Tabla Estilizada de Alta Densidad -->
+        <!-- Barra de Filtros Activos (ocupa 0px si no hay filtro activo) -->
+        <div class="active-filter-bar" id="activeFilterBarLibros" style="display:none"></div>
+
+        <!-- Tabla Estilizada de Alta Densidad (Escritorio) -->
         <div class="data-table-container">
           <table class="data-table">
             <thead>
@@ -422,6 +407,9 @@
             <tbody id="tbodyLibros"></tbody>
           </table>
         </div>
+
+        <!-- Lista de Tarjetas Táctiles (Móvil) -->
+        <div class="mobile-cards-container" id="mobileCardsLibros"></div>
       </section>
 
       <!-- ════════════════════════════════════════════════
@@ -429,19 +417,14 @@
       ════════════════════════════════════════════════ -->
       <section class="panel" id="panelMasBuscados">
         <div class="panel-hero-header">
-          <div>
-            <h2 class="section-heading">Top 5 Libros Más Buscados</h2>
-            <p class="section-subheading">Calculado automáticamente en tiempo real según las aperturas y lecturas de la comunidad.</p>
-          </div>
-          <button class="btn btn-ghost btn-sm" onclick="cargarRankingAutomatico()">
-            <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar Métricas
-          </button>
-        </div>
-
-        <div class="info-callout">
-          <i data-lucide="sparkles" style="width:18px;height:18px;color:var(--am-o);flex-shrink:0"></i>
-          <div>
-            <strong>Sincronización Automática:</strong> Los 5 títulos con mayor cantidad de lecturas acumuladas se destacan inmediatamente en la portada de la página principal con la insignia <code>#N más buscado</code>.
+          <div class="panel-header-main">
+            <div class="panel-title-row">
+              <h2 class="section-heading" style="margin:0">Más Buscados</h2>
+              <button class="sync-btn" id="btnSyncRanking" onclick="sincronizarTodo('ranking')" title="Actualizar ranking de lecturas" aria-label="Actualizar ranking">
+                <i data-lucide="refresh-cw" class="sync-icon" style="width:17px;height:17px"></i>
+              </button>
+            </div>
+            <p class="section-subheading" style="margin-top:4px">Top 5 de lecturas acumuladas en tiempo real.</p>
           </div>
         </div>
 
@@ -453,31 +436,43 @@
       ════════════════════════════════════════════════ -->
       <section class="panel" id="panelUsuarios">
         <div class="panel-hero-header">
-          <div>
-            <h2 class="section-heading">Directorio de Usuarios</h2>
-            <p class="section-subheading">Control de accesos institucionales para estudiantes, preceptores, docentes y administradores.</p>
+          <div class="panel-header-main">
+            <div class="panel-title-row">
+              <h2 class="section-heading" style="margin:0">Usuarios</h2>
+              <button class="sync-btn" id="btnSyncUsuarios" onclick="sincronizarTodo('usuarios')" title="Sincronizar usuarios" aria-label="Sincronizar usuarios">
+                <i data-lucide="refresh-cw" class="sync-icon" style="width:17px;height:17px"></i>
+              </button>
+            </div>
+            <p class="section-subheading" style="margin-top:4px">Control de accesos para alumnos y docentes.</p>
           </div>
-          <button class="btn btn-primary" onclick="abrirModalUsuario(null)">
-            <i data-lucide="user-plus" style="width:15px;height:15px"></i> Registrar Usuario
-          </button>
+          <div class="panel-header-actions desktop-only" style="align-self:center">
+            <button class="btn btn-primary" onclick="abrirModalUsuario(null)">
+              <i data-lucide="user-plus" style="width:15px;height:15px"></i> Registrar Usuario
+            </button>
+          </div>
         </div>
 
         <div class="inventory-controls">
           <div class="search-input-wrap">
             <i data-lucide="search" class="search-icon" style="width:16px;height:16px"></i>
-            <input type="text" class="search-input" id="buscarUsuAdmin" placeholder="Buscar usuario por nombre o correo institucional..." oninput="renderTablaUsuarios()"/>
+            <input type="text" class="search-input" id="buscarUsuAdmin" placeholder="Buscar usuario por nombre o correo..." oninput="renderTablaUsuarios()"/>
           </div>
-          <div class="select-wrap">
-            <select class="filter-select" id="filtroRolAdmin" onchange="renderTablaUsuarios()">
+          <button type="button" class="btn-filter-trigger" id="btnFiltrosUsuarios" onclick="abrirModalFiltrosUsuarios()" title="Filtros" aria-label="Abrir filtros de usuarios">
+            <i data-lucide="sliders-horizontal" style="width:15px;height:15px"></i>
+            <span class="filter-btn-text">Filtros</span>
+            <span class="filter-btn-badge" id="badgeFiltrosUsuarios" style="display:none">0</span>
+          </button>
+          <div class="select-wrap desktop-only">
+            <select class="filter-select" id="filtroRolAdmin" onchange="sincronizarSelectUsuarioADesktop()">
               <option value="">Todos los roles</option>
-              <option value="admin">Administrador</option>
+              <option value="admin">admin</option>
               <option value="preceptor">Preceptor</option>
               <option value="profesor">Profesor</option>
-              <option value="alumno">Alumno</option>
+              <option value="alumno">alu</option>
             </select>
           </div>
-          <div class="select-wrap">
-            <select class="filter-select" id="filtroEstAdmin" onchange="renderTablaUsuarios()">
+          <div class="select-wrap desktop-only">
+            <select class="filter-select" id="filtroEstAdmin" onchange="sincronizarSelectUsuarioADesktop()">
               <option value="">Todos los estados</option>
               <option value="activo">Activo</option>
               <option value="restringido">Restringido</option>
@@ -485,6 +480,10 @@
           </div>
         </div>
 
+        <!-- Barra de Filtros Activos (ocupa 0px si no hay filtro activo) -->
+        <div class="active-filter-bar" id="activeFilterBarUsuarios" style="display:none"></div>
+
+        <!-- Tabla Estilizada de Alta Densidad (Escritorio) -->
         <div class="data-table-container">
           <table class="data-table">
             <thead>
@@ -500,6 +499,9 @@
             <tbody id="tbodyUsuarios"></tbody>
           </table>
         </div>
+
+        <!-- Lista de Tarjetas Táctiles (Móvil) -->
+        <div class="mobile-cards-container" id="mobileCardsUsuarios"></div>
       </section>
 
     </div><!-- /.content -->
@@ -682,23 +684,226 @@
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════
+     MODAL: FILTRO DE PERÍODO / VENTANA EMERGENTE
+════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modalPeriodo">
+  <div class="modal-dialog modal-dialog-sm">
+    <div class="modal-header">
+      <div class="modal-header-icon"><i data-lucide="calendar" style="width:18px;height:18px"></i></div>
+      <h3 class="modal-title">Rango de Fecha</h3>
+      <button class="modal-close-btn" onclick="cerrarModal('modalPeriodo')"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+    </div>
+
+    <div class="modal-form-body">
+      <p style="font-size:0.85rem;color:var(--txt-m);margin:0 0 12px">Seleccioná el período temporal para recalcular las métricas del resumen:</p>
+      
+      <div class="periodo-modal-options">
+        <button type="button" class="periodo-option-btn active" data-periodo="todo" onclick="seleccionarPeriodoModal('todo')">
+          <div class="option-left">
+            <i data-lucide="history" style="width:16px;height:16px"></i>
+            <div>
+              <strong>Histórico</strong>
+              <span>Todos los registros acumulados</span>
+            </div>
+          </div>
+          <i data-lucide="check" class="check-icon" style="width:16px;height:16px"></i>
+        </button>
+
+        <button type="button" class="periodo-option-btn" data-periodo="24h" onclick="seleccionarPeriodoModal('24h')">
+          <div class="option-left">
+            <i data-lucide="clock" style="width:16px;height:16px"></i>
+            <div>
+              <strong>24 Horas</strong>
+              <span>Actividad y lecturas del día</span>
+            </div>
+          </div>
+          <i data-lucide="check" class="check-icon" style="width:16px;height:16px"></i>
+        </button>
+
+        <button type="button" class="periodo-option-btn" data-periodo="semana" onclick="seleccionarPeriodoModal('semana')">
+          <div class="option-left">
+            <i data-lucide="calendar" style="width:16px;height:16px"></i>
+            <div>
+              <strong>Semana</strong>
+              <span>Últimos 7 días corridos</span>
+            </div>
+          </div>
+          <i data-lucide="check" class="check-icon" style="width:16px;height:16px"></i>
+        </button>
+
+        <button type="button" class="periodo-option-btn" data-periodo="mes" onclick="seleccionarPeriodoModal('mes')">
+          <div class="option-left">
+            <i data-lucide="calendar-days" style="width:16px;height:16px"></i>
+            <div>
+              <strong>Mes</strong>
+              <span>Últimos 30 días</span>
+            </div>
+          </div>
+          <i data-lucide="check" class="check-icon" style="width:16px;height:16px"></i>
+        </button>
+
+        <button type="button" class="periodo-option-btn" data-periodo="anio" onclick="seleccionarPeriodoModal('anio')">
+          <div class="option-left">
+            <i data-lucide="calendar-range" style="width:16px;height:16px"></i>
+            <div>
+              <strong>Año</strong>
+              <span>Ciclo lectivo anual</span>
+            </div>
+          </div>
+          <i data-lucide="check" class="check-icon" style="width:16px;height:16px"></i>
+        </button>
+
+        <button type="button" class="periodo-option-btn" data-periodo="custom" onclick="seleccionarPeriodoModal('custom')">
+          <div class="option-left">
+            <i data-lucide="sliders" style="width:16px;height:16px"></i>
+            <div>
+              <strong>Personalizado</strong>
+              <span>Elegir fecha inicial y final</span>
+            </div>
+          </div>
+          <i data-lucide="check" class="check-icon" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+
+      <!-- Fechas personalizadas -->
+      <div id="customDateWrapModal" style="display:none;margin-top:12px;background:var(--bg-alt);padding:14px;border-radius:14px;border:1px solid var(--borde)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="display:block;font-size:0.75rem;font-weight:700;color:var(--txt-m);margin-bottom:4px">Desde</label>
+            <input type="date" id="fechaDesde" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--borde);background:var(--inp);color:var(--txt);font-family:inherit" onchange="onDesdeChange()"/>
+          </div>
+          <div>
+            <label style="display:block;font-size:0.75rem;font-weight:700;color:var(--txt-m);margin-bottom:4px">Hasta</label>
+            <input type="date" id="fechaHasta" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--borde);background:var(--inp);color:var(--txt);font-family:inherit"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('modalPeriodo')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarFiltroPeriodoModal()">
+        <i data-lucide="check" style="width:15px;height:15px"></i> Aplicar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     MODAL: FILTROS DE LIBROS (VENTANA EMERGENTE)
+════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modalFiltrosLibros">
+  <div class="modal-dialog modal-dialog-sm">
+    <div class="modal-header">
+      <div class="modal-header-icon"><i data-lucide="sliders-horizontal" style="width:18px;height:18px"></i></div>
+      <h3 class="modal-title">Filtros de Libros</h3>
+      <button class="modal-close-btn" onclick="cerrarModal('modalFiltrosLibros')"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+    </div>
+
+    <div class="modal-form-body" style="max-height:70vh;overflow-y:auto;padding-right:4px">
+      <!-- Materia -->
+      <div class="filter-modal-section">
+        <label class="filter-modal-section-title">Materia o Área</label>
+        <div class="filter-pills-grid" id="modalPillsMaterias"></div>
+      </div>
+
+      <!-- Formato / Tipo -->
+      <div class="filter-modal-section">
+        <label class="filter-modal-section-title">Formato de Recurso</label>
+        <div class="filter-pills-grid" id="modalPillsTipos"></div>
+      </div>
+
+      <!-- Año de cursada -->
+      <div class="filter-modal-section">
+        <label class="filter-modal-section-title">Año de Cursada</label>
+        <div class="filter-pills-grid" id="modalPillsAnios"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="limpiarFiltrosLibrosModal()" style="color:var(--txt-m)">
+        <i data-lucide="rotate-ccw" style="width:13px;height:13px"></i> Restablecer
+      </button>
+      <button class="btn btn-primary" onclick="aplicarFiltrosLibrosModal()">
+        <i data-lucide="check" style="width:15px;height:15px"></i> Aplicar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     MODAL: FILTROS DE USUARIOS (VENTANA EMERGENTE)
+════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modalFiltrosUsuarios">
+  <div class="modal-dialog modal-dialog-sm">
+    <div class="modal-header">
+      <div class="modal-header-icon"><i data-lucide="sliders-horizontal" style="width:18px;height:18px"></i></div>
+      <h3 class="modal-title">Filtros de Usuarios</h3>
+      <button class="modal-close-btn" onclick="cerrarModal('modalFiltrosUsuarios')"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+    </div>
+
+    <div class="modal-form-body" style="max-height:70vh;overflow-y:auto;padding-right:4px">
+      <!-- Rol de usuario -->
+      <div class="filter-modal-section">
+        <label class="filter-modal-section-title">Rol Institucional</label>
+        <div class="filter-pills-grid" id="modalPillsRoles"></div>
+      </div>
+
+      <!-- Estado de la cuenta -->
+      <div class="filter-modal-section">
+        <label class="filter-modal-section-title">Estado de la Cuenta</label>
+        <div class="filter-pills-grid" id="modalPillsEstados"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="limpiarFiltrosUsuariosModal()" style="color:var(--txt-m)">
+        <i data-lucide="rotate-ccw" style="width:13px;height:13px"></i> Restablecer
+      </button>
+      <button class="btn btn-primary" onclick="aplicarFiltrosUsuariosModal()">
+        <i data-lucide="check" style="width:15px;height:15px"></i> Aplicar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── BOTÓN FLOTANTE CONTEXTUAL (MÓVIL) ── -->
+<button class="mobile-fab" id="mobileFab" onclick="handleMobileFabClick()" aria-label="Acción rápida">
+  <i data-lucide="download" style="width:18px;height:18px"></i>
+  <span id="mobileFabLabel">Exportar informe</span>
+</button>
+
+<!-- ── BARRA DE NAVEGACIÓN INFERIOR ESTILO APPLE (TABBAR MÓVIL) ── -->
+<nav class="mobile-tabbar" id="mobileTabBar" aria-label="Navegación móvil">
+  <button class="tab-item active" data-panel="panelResumen" onclick="cambiarPanelMobile('panelResumen', this)">
+    <i data-lucide="bar-chart-3" style="width:20px;height:20px"></i>
+    <span>Resumen</span>
+  </button>
+  <button class="tab-item" data-panel="panelLibros" onclick="cambiarPanelMobile('panelLibros', this)">
+    <i data-lucide="book-open" style="width:20px;height:20px"></i>
+    <span>Libros</span>
+  </button>
+  <button class="tab-item" data-panel="panelMasBuscados" onclick="cambiarPanelMobile('panelMasBuscados', this)">
+    <i data-lucide="flame" style="width:20px;height:20px"></i>
+    <span>Ranking</span>
+  </button>
+  <button class="tab-item" data-panel="panelUsuarios" onclick="cambiarPanelMobile('panelUsuarios', this)">
+    <i data-lucide="users" style="width:20px;height:20px"></i>
+    <span>Usuarios</span>
+  </button>
+  <a href="index.html" class="tab-item" style="color:var(--txt-m);text-decoration:none">
+    <i data-lucide="globe" style="width:20px;height:20px"></i>
+    <span>Web</span>
+  </a>
+</nav>
+
 <div class="toast" id="toast"></div>
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/api.js"></script>
 <script src="js/quick-nav.js" defer></script>
 <script>
-// ════════════════════════════════════════════════
-// ADMINISTRADORES AUTORIZADOS
-// ════════════════════════════════════════════════
-var ADMIN_EMAILS = [
-  "andresfeliperodriguezmora448@gmail.com",
-  "franco.parrucci.058@alu.tecnica29de6.edu.ar",
-  "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
-  "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
-];
-var ADMINS = [];
-
 // ── LIBROS BASE ──
 var LIBROS_BASE = [];
 
@@ -726,15 +931,36 @@ function setLibros(v){
 
 function getUsuarios(){
   if(Array.isArray(MEMORIA_USUARIOS) && MEMORIA_USUARIOS.length > 0) return MEMORIA_USUARIOS;
-  return LS_get("digi-admin-usuarios", []);
+  var cached = LS_get("digi-admin-usuarios", []);
+  if(Array.isArray(cached)){
+    return cached.filter(function(u){
+      var em = (u && u.email ? u.email : "").toLowerCase();
+      return em !== "andres.rodriguez.750@alu.tecnica29de6.edu.ar" && em !== "lucas.solohaga.031@alu.tecnica29de6.edu.ar";
+    });
+  }
+  return [];
 }
 function setUsuarios(v){
-  if(Array.isArray(v)) MEMORIA_USUARIOS = v;
-  LS_set("digi-admin-usuarios", v);
+  if(Array.isArray(v)){
+    var clean = v.filter(function(u){
+      var em = (u && u.email ? u.email : "").toLowerCase();
+      return em !== "andres.rodriguez.750@alu.tecnica29de6.edu.ar" && em !== "lucas.solohaga.031@alu.tecnica29de6.edu.ar";
+    });
+    MEMORIA_USUARIOS = clean;
+    LS_set("digi-admin-usuarios", clean);
+  }
 }
 
 function getRanking(){ return LS_get("digi-admin-ranking", [1,2,3,4,5,6,7,8,9,10,11,12]); }
 function setRanking(v){ LS_set("digi-admin-ranking", v); }
+
+function getStats(){ return LS_get("digi-stats", {
+  visitas: 0, librosAbiertos: {}, sesionesHoy: 0,
+  ingresosPorDia: [0,0,0,0,0,0,0],
+  ingresosPorAnio: {"1":0,"2":0,"3":0,"4":0,"5":0,"6":0},
+  ultimosIngresos: []
+}); }
+function setStats(v){ LS_set("digi-stats", v); }
 
 // Sincronización asíncrona y paralela con CockroachDB
 async function sincronizarConBackend(){
@@ -784,27 +1010,107 @@ async function sincronizarConBackend(){
   }
 }
 
-async function forzarSincronizacionLibros(){
-  toast("Sincronizando con base de datos...", "ok");
+// ════════════════════════════════════════════════
+// SINCRONIZACIÓN UNIFICADA DE MÓDULOS CON ANIMACIÓN 360°
+// ════════════════════════════════════════════════
+async function sincronizarTodo(seccion){
+  var btnMap = {
+    resumen: document.getElementById("btnSyncResumen"),
+    libros: document.getElementById("btnSyncLibros"),
+    ranking: document.getElementById("btnSyncRanking"),
+    usuarios: document.getElementById("btnSyncUsuarios")
+  };
+  var btn = btnMap[seccion] || null;
+  if(btn) btn.classList.add("is-syncing");
+
   try {
-    if(!window.API || !window.API.libros){
-      toast("Cliente API no disponible", "err");
-      return;
-    }
-    const libs = await API.libros.getAll();
-    if(Array.isArray(libs) && libs.length > 0){
-      MEMORIA_LIBROS = libs;
-      setLibros(libs);
-      renderTablaLibros(libs);
+    if(seccion === "resumen"){
       actualizarStats();
-      toast("Catálogo sincronizado: " + libs.length + " libros", "ok");
-    } else {
-      toast("No se encontraron libros en la base de datos", "err");
+      if(typeof sincronizarConBackend === "function") await sincronizarConBackend();
+      toast("Métricas actualizadas", "ok");
+    } else if(seccion === "libros"){
+      toast("Sincronizando catálogo con base de datos...", "ok");
+      if(!window.API || !window.API.libros){
+        toast("Cliente API no disponible", "err");
+        return;
+      }
+      const libs = await API.libros.getAll();
+      if(Array.isArray(libs) && libs.length > 0){
+        MEMORIA_LIBROS = libs;
+        setLibros(libs);
+        renderTablaLibros(libs);
+        actualizarStats();
+        toast("Catálogo sincronizado: " + libs.length + " libros", "ok");
+      } else {
+        toast("No se encontraron libros en la base de datos", "err");
+      }
+    } else if(seccion === "ranking"){
+      toast("Actualizando métricas de ranking...", "ok");
+      await cargarRankingAutomatico();
+      toast("Ranking actualizado", "ok");
+    } else if(seccion === "usuarios"){
+      toast("Sincronizando usuarios con base de datos...", "ok");
+      if(!window.API || !window.API.usuarios){
+        toast("Cliente API no disponible", "err");
+        return;
+      }
+      const usrs = await API.usuarios.getAll();
+      if(Array.isArray(usrs) && usrs.length > 0){
+        MEMORIA_USUARIOS = usrs;
+        setUsuarios(usrs);
+        renderTablaUsuarios();
+        actualizarStats();
+        toast("Directorio sincronizado: " + usrs.length + " usuarios", "ok");
+      }
     }
   } catch(e) {
     toast("Error de sincronización: " + (e.message || "Fallo de conexión"), "err");
+  } finally {
+    setTimeout(function(){
+      if(btn) btn.classList.remove("is-syncing");
+    }, 750);
   }
 }
+
+// Aliases para retrocompatibilidad
+function forzarSincronizacionLibros(){ return sincronizarTodo("libros"); }
+function refreshStats(){ return sincronizarTodo("resumen"); }
+window.sincronizarTodo = sincronizarTodo;
+window.forzarSincronizacionLibros = forzarSincronizacionLibros;
+window.refreshStats = refreshStats;
+
+// ════════════════════════════════════════════════
+// SWITCH PÍLDORA DE TEMA (CLARO / OSCURO)
+// ════════════════════════════════════════════════
+function toggleThemePill(){
+  var root = document.documentElement;
+  var isDark = root.classList.contains("dark");
+  var newDark = !isDark;
+  if(newDark){
+    root.classList.add("dark");
+    try { localStorage.setItem("digi", "dark"); } catch(e){}
+  } else {
+    root.classList.remove("dark");
+    try { localStorage.setItem("digi", "light"); } catch(e){}
+  }
+  actualizarPillThemeUI();
+  window.dispatchEvent(new Event("themechange"));
+}
+
+function actualizarPillThemeUI(){
+  var pill = document.getElementById("themeSwitchPill");
+  if(!pill) return;
+  var isDark = document.documentElement.classList.contains("dark");
+  if(isDark){
+    pill.classList.add("dark-mode");
+    pill.setAttribute("title", "Cambiar a modo claro");
+  } else {
+    pill.classList.remove("dark-mode");
+    pill.setAttribute("title", "Cambiar a modo oscuro");
+  }
+}
+
+actualizarPillThemeUI();
 
 // ════════════════════════════════════════════════
 // Tema manejado por Morphicons (js/icons.js)
@@ -835,8 +1141,7 @@ if (ptAdmin) {
     var ses = JSON.parse(localStorage.getItem("digi-sesion") || "null");
     if (ses && ses.email) {
       var rol = (ses.rol || "").toLowerCase();
-      var email = (ses.email || "").toLowerCase();
-      var esAdmin = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
+      var esAdmin = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
       if (esAdmin) {
         adminActual = ses;
         document.getElementById("loginScreen").style.display = "none";
@@ -932,13 +1237,18 @@ function initPanel(){
 }
 
 // ── ESTADÍSTICAS ──
-function getStats(){ return LS_get("digi-stats", {
-  visitas: 0, librosAbiertos: {}, sesionesHoy: 0,
-  ingresosPorDia: [0,0,0,0,0,0,0],
-  ingresosPorAnio: {"1":0,"2":0,"3":0,"4":0,"5":0,"6":0},
-  ultimosIngresos: []
-}); }
-function setStats(v){ LS_set("digi-stats", v); }
+function getCleanCover(imgUrl){
+  if(!imgUrl || typeof imgUrl !== "string") return "img/test.jpg";
+  if(imgUrl.startsWith("file:") || imgUrl.includes("test.jpg")) return "img/test.jpg";
+  return imgUrl;
+}
+
+function refreshStats(){
+  actualizarStats();
+  if(typeof sincronizarConBackend === "function") sincronizarConBackend();
+  toast("Métricas actualizadas", "ok");
+}
+window.refreshStats = refreshStats;
 
 function actualizarStats(){
   var libros   = getLibros();
@@ -1034,6 +1344,7 @@ function renderTopLibros(stats, libros){
   arr.sort(function(a,b){ return b.count-a.count; });
   arr = arr.slice(0,5);
   var wrap = document.getElementById("topLibros");
+  if(!wrap) return;
   if(!arr.length){ wrap.innerHTML='<p style="color:var(--txt-m);font-size:.88rem">Sin datos aún.</p>'; return; }
   var h = "";
   for(var i=0;i<arr.length;i++){
@@ -1078,6 +1389,7 @@ function renderChartRoles(usuarios){
   var labels = {admin:"Administradores", preceptor:"Preceptores", profesor:"Profesores", alumno:"Alumnos"};
   var iconNames = {admin:"shield", preceptor:"clipboard-check", profesor:"user-check", alumno:"graduation-cap"};
   var wrap = document.getElementById("chartRoles");
+  if(!wrap) return;
   wrap.innerHTML = "";
   for(var r in roles){
     var pct = Math.round((roles[r]/total)*100);
@@ -1101,8 +1413,8 @@ function resetearStats(){
 // PANEL NAV
 // ════════════════════════════════════════════════
 var PANEL_TITLES = {
-  panelResumen:"Resumen", panelLibros:"Gestionar libros",
-  panelMasBuscados:"Más buscados", panelUsuarios:"Cuentas de usuario"
+  panelResumen:"Resumen", panelLibros:"Libros",
+  panelMasBuscados:"Más Buscados", panelUsuarios:"Usuarios"
 };
 
 function cambiarPanel(el){
@@ -1110,8 +1422,10 @@ function cambiarPanel(el){
   el.classList.add("active");
   var id = el.getAttribute("data-panel");
   document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("active"); });
-  document.getElementById(id).classList.add("active");
-  document.getElementById("topbarTitle").textContent = PANEL_TITLES[id]||"";
+  var target = document.getElementById(id);
+  if(target) target.classList.add("active");
+  var topTitle = document.getElementById("topbarTitle");
+  if(topTitle) topTitle.textContent = PANEL_TITLES[id]||"";
   if(id === "panelMasBuscados") cargarRankingAutomatico();
   if(id === "panelResumen") actualizarStats();
   if(id === "panelLibros") {
@@ -1122,8 +1436,90 @@ function cambiarPanel(el){
     renderTablaUsuarios();
     sincronizarConBackend();
   }
+  // Sincronizar estado con TabBar móvil y botón flotante
+  document.querySelectorAll(".mobile-tabbar .tab-item").forEach(function(ti){
+    if(ti.getAttribute("data-panel") === id){
+      ti.classList.add("active");
+    } else {
+      ti.classList.remove("active");
+    }
+  });
+  actualizarMobileFab(id);
+
   if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
-  if(window.innerWidth <= 768) toggleSidebar();
+  if(window.innerWidth <= 768 && document.getElementById("sidebar") && document.getElementById("sidebar").classList.contains("open")){
+    toggleSidebar();
+  }
+}
+
+function cambiarPanelMobile(id, btn){
+  var navItem = document.querySelector('.sidebar-nav .nav-item[data-panel="'+id+'"]');
+  if(navItem){
+    cambiarPanel(navItem);
+  } else {
+    document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("active"); });
+    var target = document.getElementById(id);
+    if(target) target.classList.add("active");
+    var topTitle = document.getElementById("topbarTitle");
+    if(topTitle) topTitle.textContent = PANEL_TITLES[id]||"";
+    if(id === "panelMasBuscados") cargarRankingAutomatico();
+    if(id === "panelResumen") actualizarStats();
+    if(id === "panelLibros") { renderTablaLibros(); sincronizarConBackend(); }
+    if(id === "panelUsuarios") { renderTablaUsuarios(); sincronizarConBackend(); }
+    if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+  }
+  document.querySelectorAll(".mobile-tabbar .tab-item").forEach(function(ti){ ti.classList.remove("active"); });
+  if(btn) btn.classList.add("active");
+  actualizarMobileFab(id);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function actualizarMobileFab(panelId){
+  var fab = document.getElementById("mobileFab");
+  if(!fab) return;
+  var rol = (adminActual ? (adminActual.rol||"admin") : "admin").toLowerCase();
+  if(!panelId){
+    var activePanel = document.querySelector(".panel.active");
+    panelId = activePanel ? activePanel.id : "panelResumen";
+  }
+
+  if(panelId === "panelResumen"){
+    fab.style.display = "flex";
+    fab.innerHTML = '<i data-lucide="download" style="width:18px;height:18px"></i><span>Exportar informe</span>';
+  } else if(panelId === "panelLibros"){
+    if(rol === "alumno"){
+      fab.style.display = "none";
+    } else {
+      fab.style.display = "flex";
+      fab.innerHTML = '<i data-lucide="plus" style="width:18px;height:18px"></i><span>Agregar Libro</span>';
+    }
+  } else if(panelId === "panelUsuarios"){
+    if(rol === "profesor" || rol === "alumno"){
+      fab.style.display = "none";
+    } else {
+      fab.style.display = "flex";
+      fab.innerHTML = '<i data-lucide="user-plus" style="width:18px;height:18px"></i><span>Nuevo Usuario</span>';
+    }
+  } else if(panelId === "panelMasBuscados"){
+    fab.style.display = "none";
+  } else {
+    fab.style.display = "none";
+  }
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+function handleMobileFabClick(){
+  var activePanel = document.querySelector(".panel.active");
+  var panelId = activePanel ? activePanel.id : "panelResumen";
+  if(panelId === "panelResumen"){
+    descargarReporte();
+  } else if(panelId === "panelLibros"){
+    abrirModalLibro(null);
+  } else if(panelId === "panelUsuarios"){
+    abrirModalUsuario(null);
+  } else if(panelId === "panelMasBuscados"){
+    sincronizarTodo("ranking");
+  }
 }
 
 function toggleSidebar(){
@@ -1163,17 +1559,21 @@ function libroPerteneceCursos(libro, cursos){
 function renderTablaLibros(librosParam){
   var rol   = (adminActual ? (adminActual.rol||"admin") : "admin").toLowerCase();
   var email = (adminActual ? (adminActual.email||"") : "").toLowerCase();
-  var esSuperAdmin = rol === "admin" || rol === "administrador" || ADMIN_EMAILS.indexOf(email) >= 0;
+  var esSuperAdmin = rol === "admin" || rol === "administrador";
   var cursos = adminActual ? (adminActual.cursosACargo||[]) : [];
   var q   = norm(document.getElementById("buscarLibroAdmin") ? document.getElementById("buscarLibroAdmin").value : "");
-  var mat = document.getElementById("filtroMatAdmin") ? document.getElementById("filtroMatAdmin").value : "";
+  var mat = (window.filtroLibros && window.filtroLibros.mat) || (document.getElementById("filtroMatAdmin") ? document.getElementById("filtroMatAdmin").value : "");
+  var tipo = (window.filtroLibros && window.filtroLibros.tipo) || "";
+  var anio = (window.filtroLibros && window.filtroLibros.anio) || "";
   var todosLibros = (Array.isArray(librosParam) && librosParam.length > 0) ? librosParam : getLibros();
 
-  // Filtrar según rol
+  // Filtrar según rol y filtros activos
   var libros = todosLibros.filter(function(l){
     var mq = !q || norm(l.t).indexOf(q)>=0 || norm(l.a).indexOf(q)>=0;
     var mm = !mat || l.mat===mat;
-    if(!mq || !mm) return false;
+    var mt = !tipo || (l.tipo && norm(l.tipo) === norm(tipo));
+    var ma = !anio || (typeof libroTieneAnio === "function" ? libroTieneAnio(l, anio) : (l.anios && String(l.anios).indexOf(String(anio))>=0));
+    if(!mq || !mm || !mt || !ma) return false;
     if(esSuperAdmin) return true;
     if(rol === "preceptor") return libroPerteneceCursos(l, cursos);
     if(rol === "profesor"){
@@ -1205,7 +1605,8 @@ function renderTablaLibros(librosParam){
   for(var i=0;i<libros.length;i++){
     try {
       var l = libros[i];
-      var imgH = l.img ? '<img class="tbl-img" src="'+l.img+'" alt="" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=\\\'tbl-img-placeholder\\\'>📖</div>\'"/>' :
+      var cleanCover = (l.img && !l.img.startsWith("file:")) ? getCleanCover(l.img) : (l.img && l.img.includes("test.jpg") ? "img/test.jpg" : "");
+      var imgH = cleanCover ? '<img class="tbl-img" src="'+cleanCover+'" alt="" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=\\\'tbl-img-placeholder\\\'>📖</div>\'"/>' :
                  '<div class="tbl-img-placeholder">'+(l.e||"📚")+'</div>';
       var aniosArr = Array.isArray(l.anios) ? l.anios : [];
       var aniosStr = aniosArr.length > 0 ? aniosArr.join(", ") : "Gral.";
@@ -1253,6 +1654,182 @@ function renderTablaLibros(librosParam){
   }
   var tbody = document.getElementById("tbodyLibros");
   if(tbody) tbody.innerHTML = h || '<tr><td colspan="10" style="text-align:center;color:var(--txt-m);padding:32px">Sin resultados para tu rol</td></tr>';
+
+  // Renderizar Tarjetas Móviles (Mobile-First)
+  var cardsHtml = "";
+  for(var ci=0; ci<libros.length; ci++){
+    try {
+      var lb = libros[ci];
+      var aniosArrC = Array.isArray(lb.anios) ? lb.anios : [];
+      var aniosStrC = aniosArrC.length > 0 ? aniosArrC.join(", ")+"° Año" : "General";
+      var pEdit = true;
+      var pElim = true;
+      if(!esSuperAdmin && rol === "profesor"){
+        pEdit = !!(lb.subioPor && norm(lb.subioPor)===norm(email));
+        pElim = pEdit;
+      }
+      var coverSrc = getCleanCover(lb.img);
+      cardsHtml += '<div class="mobile-book-card" onclick="editarLibro(\''+lb.id+'\')">';
+      cardsHtml += '  <img class="book-card-cover" src="'+coverSrc+'" alt="Portada" onerror="this.onerror=null;this.src=\'img/test.jpg\'"/>';
+      cardsHtml += '  <div class="book-card-info">';
+      cardsHtml += '    <span class="book-card-tag">'+(lb.mat||"General")+'</span>';
+      cardsHtml += '    <h3 class="book-card-title">'+(lb.t||"Sin título")+'</h3>';
+      cardsHtml += '    <p class="book-card-author">'+(lb.a||"Autor no especificado")+'</p>';
+      cardsHtml += '    <div class="book-card-meta">';
+      cardsHtml += '      <span><i data-lucide="layers" style="width:12px;height:12px;vertical-align:-2px"></i> '+aniosStrC+'</span>';
+      cardsHtml += '      <span>• '+(lb.pdf ? '<span style="color:var(--verde);font-weight:700">PDF listo</span>' : '<span style="color:var(--txt-m)">Sin PDF</span>')+'</span>';
+      cardsHtml += '    </div>';
+      cardsHtml += '  </div>';
+      cardsHtml += '  <div class="book-card-actions" onclick="event.stopPropagation()">';
+      if(pEdit) cardsHtml += '    <button class="action-btn-circle" title="Editar" onclick="editarLibro(\''+lb.id+'\')">'+DigiIcons.get("pencil",{size:14})+'</button>';
+      if(pElim) cardsHtml += '    <button class="action-btn-circle danger" title="Eliminar" onclick="confirmarEliminarLibro(\''+lb.id+'\')">'+DigiIcons.get("trash-2",{size:14})+'</button>';
+      cardsHtml += '  </div>';
+      cardsHtml += '</div>';
+    } catch(cErr){
+      console.warn("Error renderizando card de libro móvil:", cErr);
+    }
+  }
+  var cardsWrap = document.getElementById("mobileCardsLibros");
+  if(cardsWrap){
+    cardsWrap.innerHTML = cardsHtml || '<div style="text-align:center;padding:30px;color:var(--txt-m);background:var(--bg-card);border:1px solid var(--borde);border-radius:16px"><p style="margin:0;font-weight:600">No se encontraron libros</p></div>';
+  }
+
+  // Actualizar indicador de filtros activos
+  actualizarBarraFiltrosLibros(mat, tipo, anio);
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+// ── FILTROS POPUP: LIBROS ──
+var filtroLibros = { mat: "", tipo: "", anio: "" };
+var filtroLibrosDraft = { mat: "", tipo: "", anio: "" };
+
+function actualizarBarraFiltrosLibros(mat, tipo, anio){
+  var btn = document.getElementById("btnFiltrosLibros");
+  var badge = document.getElementById("badgeFiltrosLibros");
+  var bar = document.getElementById("activeFilterBarLibros");
+  var activeCount = (mat ? 1 : 0) + (tipo ? 1 : 0) + (anio ? 1 : 0);
+
+  if(badge){
+    badge.style.display = activeCount > 0 ? "inline-flex" : "none";
+    badge.textContent = activeCount;
+  }
+  if(btn){
+    if(activeCount > 0) btn.classList.add("active");
+    else btn.classList.remove("active");
+  }
+
+  if(bar){
+    if(activeCount > 0){
+      var h = "";
+      if(mat) h += '<span class="active-filter-chip">Materia: '+mat+' <span class="chip-remove" onclick="removerFiltroLibro(\'mat\')">&times;</span></span>';
+      if(tipo) h += '<span class="active-filter-chip">Tipo: '+tipo+' <span class="chip-remove" onclick="removerFiltroLibro(\'tipo\')">&times;</span></span>';
+      if(anio) h += '<span class="active-filter-chip">'+anio+'° Año <span class="chip-remove" onclick="removerFiltroLibro(\'anio\')">&times;</span></span>';
+      h += '<button type="button" class="btn-clear-all-filters" onclick="limpiarFiltrosLibrosModal()">Limpiar todo</button>';
+      bar.innerHTML = h;
+      bar.style.display = "flex";
+    } else {
+      bar.innerHTML = "";
+      bar.style.display = "none";
+    }
+  }
+}
+
+function abrirModalFiltrosLibros(){
+  filtroLibrosDraft = { mat: filtroLibros.mat||"", tipo: filtroLibros.tipo||"", anio: filtroLibros.anio||"" };
+  renderModalPillsLibros();
+  abrirModal('modalFiltrosLibros');
+}
+
+function renderModalPillsLibros(){
+  var todos = getLibros();
+  // 1. Materias
+  var materias = [
+    "Todas", "Matemática", "Física", "Química", "Biología", 
+    "Historia", "Geografía", "Lengua y Literatura", "Inglés", 
+    "Informática", "Ciencias Naturales"
+  ];
+  var counts = { "Todas": todos.length };
+  for(var i=0; i<todos.length; i++){
+    var m = todos[i].mat || "General";
+    counts[m] = (counts[m]||0) + 1;
+  }
+  var hMat = "";
+  for(var j=0; j<materias.length; j++){
+    var mName = materias[j];
+    var isTodas = mName === "Todas";
+    var isActive = isTodas ? (!filtroLibrosDraft.mat) : (filtroLibrosDraft.mat === mName);
+    var count = isTodas ? todos.length : (counts[mName] || 0);
+    hMat += '<button type="button" class="filter-pill-btn '+(isActive?'active':'')+'" onclick="seleccionarPillLibro(\'mat\', \''+(isTodas?'':mName)+'\')">'+mName+' <span class="pill-count">('+count+')</span></button>';
+  }
+  var wrapMat = document.getElementById("modalPillsMaterias");
+  if(wrapMat) wrapMat.innerHTML = hMat;
+
+  // 2. Tipos
+  var tipos = ["Todos", "Libro", "Manual", "Revista", "Simulador", "Artículo", "Guía"];
+  var hTipo = "";
+  for(var k=0; k<tipos.length; k++){
+    var tName = tipos[k];
+    var isTodosT = tName === "Todos";
+    var isActiveT = isTodosT ? (!filtroLibrosDraft.tipo) : (norm(filtroLibrosDraft.tipo) === norm(tName));
+    hTipo += '<button type="button" class="filter-pill-btn '+(isActiveT?'active':'')+'" onclick="seleccionarPillLibro(\'tipo\', \''+(isTodosT?'':tName)+'\')">'+tName+'</button>';
+  }
+  var wrapTipo = document.getElementById("modalPillsTipos");
+  if(wrapTipo) wrapTipo.innerHTML = hTipo;
+
+  // 3. Años
+  var anios = ["Todos", "1", "2", "3", "4", "5", "6"];
+  var hAnio = "";
+  for(var a=0; a<anios.length; a++){
+    var anVal = anios[a];
+    var isTodosA = anVal === "Todos";
+    var isActiveA = isTodosA ? (!filtroLibrosDraft.anio) : (filtroLibrosDraft.anio === anVal);
+    var labelA = isTodosA ? "Todos" : anVal + "° Año";
+    hAnio += '<button type="button" class="filter-pill-btn '+(isActiveA?'active':'')+'" onclick="seleccionarPillLibro(\'anio\', \''+(isTodosA?'':anVal)+'\')">'+labelA+'</button>';
+  }
+  var wrapAnio = document.getElementById("modalPillsAnios");
+  if(wrapAnio) wrapAnio.innerHTML = hAnio;
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+function seleccionarPillLibro(tipo, val){
+  filtroLibrosDraft[tipo] = val;
+  renderModalPillsLibros();
+}
+
+function aplicarFiltrosLibrosModal(){
+  filtroLibros.mat = filtroLibrosDraft.mat || "";
+  filtroLibros.tipo = filtroLibrosDraft.tipo || "";
+  filtroLibros.anio = filtroLibrosDraft.anio || "";
+  var selMat = document.getElementById("filtroMatAdmin");
+  if(selMat) selMat.value = filtroLibros.mat || "";
+  cerrarModal('modalFiltrosLibros');
+  renderTablaLibros();
+}
+
+function limpiarFiltrosLibrosModal(){
+  filtroLibrosDraft = { mat: "", tipo: "", anio: "" };
+  filtroLibros = { mat: "", tipo: "", anio: "" };
+  var selMat = document.getElementById("filtroMatAdmin");
+  if(selMat) selMat.value = "";
+  cerrarModal('modalFiltrosLibros');
+  renderTablaLibros();
+}
+
+function removerFiltroLibro(campo){
+  if(campo in filtroLibros){
+    filtroLibros[campo] = "";
+    if(campo === "mat"){
+      var selMat = document.getElementById("filtroMatAdmin");
+      if(selMat) selMat.value = "";
+    }
+    renderTablaLibros();
+  }
+}
+
+function sincronizarSelectLibroADesktop(){
+  var selMat = document.getElementById("filtroMatAdmin");
+  filtroLibros.mat = selMat ? selMat.value : "";
+  renderTablaLibros();
 }
 
 function abrirModalLibro(id){
@@ -1480,7 +2057,7 @@ function renderRanking(){
       titulo: l.t,
       autor: l.a,
       materia: l.mat || l.l || "General",
-      portada_url: l.img || "",
+      portada_url: getCleanCover(l.img),
       veces_abierto: totalVeces
     });
   }
@@ -1507,24 +2084,26 @@ function renderRanking(){
     var item = ranking[i];
     var pos = i + 1;
     var veces = item.veces_abierto || 0;
-    var vecesTexto = veces + " aperturas";
+    var badgeHtml = '<span class="rank-badge">' + DigiIcons.get("flame", {size:13, color:"var(--cel-o)"}) + ' <span>' + veces + '</span><span class="desktop-only" style="margin-left:3px"> lecturas</span></span>';
 
-    h += '<div class="rank-row" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-radius:12px;border:1px solid var(--borde);margin-bottom:12px;background:var(--bg-card);box-shadow:0 2px 8px rgba(0,0,0,.03)">';
-    h += '  <div style="display:flex;align-items:center;gap:14px">';
-    h += '    <span style="font-weight:900;color:var(--cel-o);background:var(--cel-c);border:1px solid var(--borde);padding:6px 14px;border-radius:8px;font-size:1rem;min-width:42px;text-align:center">#' + pos + '</span>';
-    h += '    <div>';
-    h += '      <p style="font-weight:700;font-size:1rem;color:var(--txt);margin-bottom:2px">' + (item.titulo || "Sin título") + '</p>';
-    h += '      <p style="font-size:.82rem;color:var(--txt-m)">' + (item.autor || "Autor no especificado") + ' • <span style="color:var(--cel-o);font-weight:600">' + (item.materia || "General") + '</span></p>';
+    h += '<div class="rank-card">';
+    h += '  <div class="rank-card-main">';
+    h += '    <span class="rank-pos">#' + pos + '</span>';
+    h += '    <img src="' + item.portada_url + '" class="rank-cover" alt="" onerror="this.src=\'img/test.jpg\'">';
+    h += '    <div class="rank-info">';
+    h += '      <p class="rank-title" title="' + (item.titulo || "") + '">' + (item.titulo || "Sin título") + '</p>';
+    h += '      <p class="rank-meta">' + (item.autor || "Autor no especificado") + ' • <span class="rank-materia">' + (item.materia || "General") + '</span></p>';
     h += '    </div>';
     h += '  </div>';
-    h += '  <div style="display:flex;align-items:center;gap:12px">';
-    h += '    <span class="badge" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;padding:6px 14px;border-radius:20px;background:rgba(46,127,179,.1);color:var(--cel-o);border:1px solid var(--borde)">' + DigiIcons.get("flame", {size:14, color:"var(--cel-o)"}) + ' ' + vecesTexto + '</span>';
-    h += '    <a href="libro.html?id=' + item.libro_id + '" target="_blank" class="btn btn-ghost btn-sm" title="Ver en visor"><i data-lucide="external-link" style="width:14px;height:14px"></i></a>';
+    h += '  <div class="rank-card-actions">';
+    h += '    ' + badgeHtml;
+    h += '    <a href="libro.html?id=' + item.libro_id + '" target="_blank" class="action-btn-circle" title="Ver en visor"><i data-lucide="external-link" style="width:13px;height:13px"></i></a>';
     h += '  </div>';
     h += '</div>';
   }
 
   rkEl.innerHTML = h;
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
 }
 
 // ════════════════════════════════════════════════
@@ -1544,16 +2123,16 @@ function renderTablaUsuarios(){
   var rolAdmin = adminActual ? (adminActual.rol||"admin") : "admin";
   var cursos   = adminActual ? (adminActual.cursosACargo||[]) : [];
   var q    = norm(document.getElementById("buscarUsuAdmin").value);
-  var rolF = document.getElementById("filtroRolAdmin").value;
-  var est  = document.getElementById("filtroEstAdmin").value;
+  var rolF = (window.filtroUsuarios && window.filtroUsuarios.rol !== undefined) ? window.filtroUsuarios.rol : (document.getElementById("filtroRolAdmin") ? document.getElementById("filtroRolAdmin").value : "");
+  var est  = (window.filtroUsuarios && window.filtroUsuarios.estado !== undefined) ? window.filtroUsuarios.estado : (document.getElementById("filtroEstAdmin") ? document.getElementById("filtroEstAdmin").value : "");
   var todosUsuarios = getUsuarios();
 
   var usuarios = [];
   for(var ti=0; ti<todosUsuarios.length; ti++){
     var u = todosUsuarios[ti];
     var mq = !q   || norm(u.nombre+" "+u.apellido).indexOf(q)>=0 || norm(u.email).indexOf(q)>=0;
-    var mr = !rolF || u.rol===rolF;
-    var me = !est  || u.estado===est;
+    var mr = !rolF || (u.rol||"").toLowerCase() === rolF.toLowerCase();
+    var me = !est  || (u.estado||"").toLowerCase() === est.toLowerCase();
     if(!mq || !mr || !me) continue;
     if(rolAdmin === "preceptor" || rolAdmin === "profesor"){
       if(!usuarioPerteneceACursos(u, cursos)) continue;
@@ -1588,10 +2167,187 @@ function renderTablaUsuarios(){
     h += '</div></td>';
     h += '</tr>';
   }
-  document.getElementById("tbodyUsuarios").innerHTML = h || '<tr><td colspan="6" style="text-align:center;color:var(--txt-m);padding:32px">Sin usuarios en tus cursos</td></tr>';
+  var tbodyU = document.getElementById("tbodyUsuarios");
+  if(tbodyU) tbodyU.innerHTML = h || '<tr><td colspan="6" style="text-align:center;color:var(--txt-m);padding:32px">Sin usuarios en tus cursos</td></tr>';
+
+  // Renderizar Tarjetas Móviles (Mobile-First)
+  var uCardsHtml = "";
+  for(var ui=0; ui<usuarios.length; ui++){
+    try {
+      var usr = usuarios[ui];
+      var uIdx = usr._idx !== undefined ? usr._idx : ui;
+      var uAnioDiv = (usr.anio||usr.div) ? (usr.anio||"—")+"° ("+(usr.div||"—")+")" : "General";
+      var initials = ((usr.nombre ? usr.nombre[0] : "") + (usr.apellido ? usr.apellido[0] : "")).toUpperCase() || "U";
+      var pEditU = rolAdmin !== "profesor";
+      var pRestU = rolAdmin !== "profesor";
+      var pElimU = rolAdmin !== "profesor";
+
+      var rolNorm = (usr.rol || "alumno").toLowerCase();
+      var isAd = rolNorm === "admin" || rolNorm === "administrador";
+      var isAlu = rolNorm === "alumno";
+      var badgeClass = isAd ? "badge-rojo badge-rojo-bold" : (isAlu ? "badge-cel badge-alu" : (ROLE_BADGE[usr.rol]||"badge-gray"));
+      var badgeLabel = isAd ? "admin" : (isAlu ? "alu" : (ROLE_LABEL[usr.rol]||usr.rol));
+      var avatarClass = isAd ? "admin" : rolNorm;
+
+      uCardsHtml += '<div class="mobile-user-card" onclick="editarUsuario('+uIdx+')">';
+      uCardsHtml += '  <div class="user-card-avatar '+avatarClass+'">'+initials+'</div>';
+      uCardsHtml += '  <div class="book-card-info">';
+      uCardsHtml += '    <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">';
+      uCardsHtml += '      <h3 class="book-card-title">'+usr.nombre+' '+usr.apellido+'</h3>';
+      uCardsHtml += '      <span class="badge '+badgeClass+'">'+badgeLabel+'</span>';
+      uCardsHtml += '    </div>';
+      uCardsHtml += '    <p class="book-card-author" style="font-family:var(--font-mono);font-size:.75rem;margin:0 0 3px">'+usr.email+'</p>';
+      uCardsHtml += '    <div class="book-card-meta">';
+      uCardsHtml += '      <span><i data-lucide="layers" style="width:12px;height:12px;vertical-align:-2px"></i> '+uAnioDiv+'</span>';
+      uCardsHtml += '      <span>• '+(usr.estado==="activo" ? '<span style="color:var(--verde);font-weight:700">Activo</span>' : '<span style="color:var(--rojo);font-weight:700">Restringido</span>')+'</span>';
+      uCardsHtml += '    </div>';
+      uCardsHtml += '  </div>';
+      uCardsHtml += '  <div class="book-card-actions" onclick="event.stopPropagation()">';
+      if(pEditU) uCardsHtml += '    <button class="action-btn-circle" title="Editar" onclick="editarUsuario('+uIdx+')">'+DigiIcons.get("pencil",{size:14})+'</button>';
+      if(pRestU) uCardsHtml += '    <button class="action-btn-circle '+(usr.estado==="activo"?"":"danger")+'" title="'+(usr.estado==="activo"?"Restringir":"Activar")+'" onclick="toggleEstadoUsuario('+uIdx+')">'+(usr.estado==="activo"?DigiIcons.get("lock",{size:14}):DigiIcons.get("unlock",{size:14}))+'</button>';
+      if(pElimU) uCardsHtml += '    <button class="action-btn-circle danger" title="Eliminar" onclick="confirmarEliminarUsuario('+uIdx+')">'+DigiIcons.get("trash-2",{size:14})+'</button>';
+      uCardsHtml += '  </div>';
+      uCardsHtml += '</div>';
+    } catch(uErr){
+      console.warn("Error renderizando card de usuario móvil:", uErr);
+    }
+  }
+  var uCardsWrap = document.getElementById("mobileCardsUsuarios");
+  if(uCardsWrap){
+    uCardsWrap.innerHTML = uCardsHtml || '<div style="text-align:center;padding:30px;color:var(--txt-m);background:var(--bg-card);border:1px solid var(--borde);border-radius:16px"><p style="margin:0;font-weight:600">Sin usuarios en tus cursos</p></div>';
+  }
+
+  // Actualizar indicador de filtros activos de usuarios
+  actualizarBarraFiltrosUsuarios(rolF, est);
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
   actualizarStats();
 }
 
+// ── FILTROS POPUP: USUARIOS ──
+var filtroUsuarios = { rol: "", estado: "" };
+var filtroUsuariosDraft = { rol: "", estado: "" };
+
+function actualizarBarraFiltrosUsuarios(rolF, est){
+  var btn = document.getElementById("btnFiltrosUsuarios");
+  var badge = document.getElementById("badgeFiltrosUsuarios");
+  var bar = document.getElementById("activeFilterBarUsuarios");
+  var activeCount = (rolF ? 1 : 0) + (est ? 1 : 0);
+
+  if(badge){
+    badge.style.display = activeCount > 0 ? "inline-flex" : "none";
+    badge.textContent = activeCount;
+  }
+  if(btn){
+    if(activeCount > 0) btn.classList.add("active");
+    else btn.classList.remove("active");
+  }
+
+  if(bar){
+    if(activeCount > 0){
+      var h = "";
+      var ROLE_NAME = { admin: "admin", preceptor: "Preceptor", profesor: "Profesor", alumno: "alu" };
+      if(rolF) h += '<span class="active-filter-chip">Rol: '+(ROLE_NAME[rolF]||rolF)+' <span class="chip-remove" onclick="removerFiltroUsuario(\'rol\')">&times;</span></span>';
+      if(est) h += '<span class="active-filter-chip">Estado: '+(est==="activo"?"Activo":"Restringido")+' <span class="chip-remove" onclick="removerFiltroUsuario(\'estado\')">&times;</span></span>';
+      h += '<button type="button" class="btn-clear-all-filters" onclick="limpiarFiltrosUsuariosModal()">Limpiar todo</button>';
+      bar.innerHTML = h;
+      bar.style.display = "flex";
+    } else {
+      bar.innerHTML = "";
+      bar.style.display = "none";
+    }
+  }
+}
+
+function abrirModalFiltrosUsuarios(){
+  filtroUsuariosDraft = { rol: filtroUsuarios.rol||"", estado: filtroUsuarios.estado||"" };
+  renderModalPillsUsuarios();
+  abrirModal('modalFiltrosUsuarios');
+}
+
+function renderModalPillsUsuarios(){
+  var todos = getUsuarios();
+  var roles = [
+    { key: "", label: "Todos" },
+    { key: "admin", label: "admin", cls: "pill-admin" },
+    { key: "preceptor", label: "Preceptores" },
+    { key: "profesor", label: "Profesores" },
+    { key: "alumno", label: "alu", cls: "pill-alu" }
+  ];
+  var counts = { "": todos.length };
+  for(var i=0; i<todos.length; i++){
+    var r = (todos[i].rol || "alumno").toLowerCase();
+    counts[r] = (counts[r]||0) + 1;
+  }
+  var hRol = "";
+  for(var j=0; j<roles.length; j++){
+    var ro = roles[j];
+    var isActive = (filtroUsuariosDraft.rol === ro.key) || (!filtroUsuariosDraft.rol && !ro.key);
+    var count = counts[ro.key] || 0;
+    var extraCls = ro.cls ? " " + ro.cls : "";
+    hRol += '<button type="button" class="filter-pill-btn' + extraCls + ' '+(isActive?'active':'')+'" onclick="seleccionarPillUsuario(\'rol\', \''+ro.key+'\')">'+ro.label+' <span class="pill-count">('+count+')</span></button>';
+  }
+  var wrapRol = document.getElementById("modalPillsRoles");
+  if(wrapRol) wrapRol.innerHTML = hRol;
+
+  var estados = [
+    { key: "", label: "Todos" },
+    { key: "activo", label: "Activo" },
+    { key: "restringido", label: "Restringido" }
+  ];
+  var hEst = "";
+  for(var k=0; k<estados.length; k++){
+    var es = estados[k];
+    var isActiveE = (filtroUsuariosDraft.estado === es.key) || (!filtroUsuariosDraft.estado && !es.key);
+    hEst += '<button type="button" class="filter-pill-btn '+(isActiveE?'active':'')+'" onclick="seleccionarPillUsuario(\'estado\', \''+es.key+'\')">'+es.label+'</button>';
+  }
+  var wrapEst = document.getElementById("modalPillsEstados");
+  if(wrapEst) wrapEst.innerHTML = hEst;
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+function seleccionarPillUsuario(tipo, val){
+  filtroUsuariosDraft[tipo] = val;
+  renderModalPillsUsuarios();
+}
+
+function aplicarFiltrosUsuariosModal(){
+  filtroUsuarios.rol = filtroUsuariosDraft.rol || "";
+  filtroUsuarios.estado = filtroUsuariosDraft.estado || "";
+  var selRol = document.getElementById("filtroRolAdmin");
+  if(selRol) selRol.value = filtroUsuarios.rol || "";
+  var selEst = document.getElementById("filtroEstAdmin");
+  if(selEst) selEst.value = filtroUsuarios.estado || "";
+  cerrarModal('modalFiltrosUsuarios');
+  renderTablaUsuarios();
+}
+
+function limpiarFiltrosUsuariosModal(){
+  filtroUsuariosDraft = { rol: "", estado: "" };
+  filtroUsuarios = { rol: "", estado: "" };
+  var selRol = document.getElementById("filtroRolAdmin");
+  if(selRol) selRol.value = "";
+  var selEst = document.getElementById("filtroEstAdmin");
+  if(selEst) selEst.value = "";
+  cerrarModal('modalFiltrosUsuarios');
+  renderTablaUsuarios();
+}
+
+function removerFiltroUsuario(campo){
+  if(campo in filtroUsuarios){
+    filtroUsuarios[campo] = "";
+    var sel = document.getElementById(campo === "rol" ? "filtroRolAdmin" : "filtroEstAdmin");
+    if(sel) sel.value = "";
+    renderTablaUsuarios();
+  }
+}
+
+function sincronizarSelectUsuarioADesktop(){
+  var selRol = document.getElementById("filtroRolAdmin");
+  var selEst = document.getElementById("filtroEstAdmin");
+  filtroUsuarios.rol = selRol ? selRol.value : "";
+  filtroUsuarios.estado = selEst ? selEst.value : "";
+  renderTablaUsuarios();
+}
 
 function abrirModalUsuario(idx){
   usuarioEditando = idx;
@@ -1682,11 +2438,15 @@ async function toggleEstadoUsuario(idx){
   var u = usuarios[idx];
   var nuevoEstado = u.estado==="activo" ? "restringido" : "activo";
   u.estado = nuevoEstado;
-  if(window.API && window.API.usuarios && u.id){
+  if(window.API && window.API.usuarios && (u.id || u.email)){
     try {
-      await API.usuarios.setEstado(u.id, nuevoEstado);
+      var idTarget = u.id || u.email;
+      await API.usuarios.setEstado(idTarget, nuevoEstado);
     } catch(e){
       console.warn("Error al actualizar estado en BD:", e.message);
+      if(u.email && u.id && String(idTarget) === String(u.id)){
+        try { await API.usuarios.setEstado(u.email, nuevoEstado); } catch(e2){}
+      }
     }
   }
   setUsuarios(usuarios);
@@ -1700,11 +2460,15 @@ function confirmarEliminarUsuario(idx){
   var u = usuarios[idx];
   if(!u) return;
   abrirConfirm(DigiIcons.get("trash-2",{size:36,color:"var(--rojo)"}),"Eliminar usuario","¿Estás seguro de que deseas eliminar la cuenta de "+u.nombre+" "+u.apellido+"?", async function(){
-    if(window.API && window.API.usuarios && u.id){
+    if(window.API && window.API.usuarios && (u.id || u.email)){
       try {
-        await API.usuarios.delete(u.id);
+        var idTarget = u.id || u.email;
+        await API.usuarios.delete(idTarget);
       } catch(e){
         console.warn("Error al eliminar usuario en BD:", e.message);
+        if(u.email && u.id && String(idTarget) === String(u.id)){
+          try { await API.usuarios.delete(u.email); } catch(e2){}
+        }
       }
     }
     var usuarios2 = getUsuarios();
@@ -1720,11 +2484,17 @@ function confirmarEliminarUsuario(idx){
 // MODALES
 // ════════════════════════════════════════════════
 function abrirModal(id){
-  document.getElementById(id).classList.add("open");
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.classList.add("open");
+  el.classList.add("active");
   document.body.style.overflow="hidden";
 }
 function cerrarModal(id){
-  document.getElementById(id).classList.remove("open");
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.classList.remove("open");
+  el.classList.remove("active");
   document.body.style.overflow="";
 }
 document.querySelectorAll(".modal-overlay").forEach(function(m){
@@ -1732,7 +2502,10 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){
 });
 document.addEventListener("keydown",function(e){
   if(e.key==="Escape"){
-    document.querySelectorAll(".modal-overlay.open,.confirm-overlay.open").forEach(function(m){ m.classList.remove("open"); });
+    document.querySelectorAll(".modal-overlay.open, .modal-overlay.active, .confirm-overlay.open").forEach(function(m){
+      m.classList.remove("open");
+      m.classList.remove("active");
+    });
     document.body.style.overflow="";
   }
 });
@@ -1745,11 +2518,21 @@ function abrirConfirm(icon, title, msg, cb){
   document.getElementById("confirmTitle").textContent = title;
   document.getElementById("confirmMsg").textContent   = msg;
   confirmCallback = cb;
-  document.getElementById("confirmOverlay").classList.add("open");
+  var el = document.getElementById("confirmOverlay");
+  if(el){
+    el.classList.add("open");
+    el.classList.add("active");
+  }
+  document.body.style.overflow="hidden";
 }
 function cerrarConfirm(){
-  document.getElementById("confirmOverlay").classList.remove("open");
+  var el = document.getElementById("confirmOverlay");
+  if(el){
+    el.classList.remove("open");
+    el.classList.remove("active");
+  }
   confirmCallback = null;
+  document.body.style.overflow="";
 }
 document.getElementById("confirmBtn").onclick = function(){
   if(confirmCallback) confirmCallback();
@@ -1904,16 +2687,51 @@ function descargarReporte(){
   toast("Reporte descargado correctamente","ok");
 }
 
-// ── FILTRO DE PERÍODO ──
+// ── FILTRO DE PERÍODO (VENTANA EMERGENTE) ──
 var periodoActual = "todo";
+var periodoModalTemporal = "todo";
+
+function abrirModalFiltroPeriodo(){
+  periodoModalTemporal = periodoActual || "todo";
+  actualizarVisualPeriodoModal(periodoModalTemporal);
+  abrirModal("modalPeriodo");
+}
+
+function actualizarVisualPeriodoModal(p){
+  document.querySelectorAll(".periodo-option-btn").forEach(function(b){
+    if(b.getAttribute("data-periodo") === p){
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
+    }
+  });
+  var customWrap = document.getElementById("customDateWrapModal");
+  if(customWrap){
+    customWrap.style.display = (p === "custom") ? "block" : "none";
+  }
+}
+
+function seleccionarPeriodoModal(p){
+  periodoModalTemporal = p;
+  actualizarVisualPeriodoModal(p);
+}
+
+function confirmarFiltroPeriodoModal(){
+  periodoActual = periodoModalTemporal;
+  cerrarModal("modalPeriodo");
+  aplicarFiltro();
+}
+
+function resetPeriodoFiltro(){
+  periodoActual = "todo";
+  periodoModalTemporal = "todo";
+  actualizarVisualPeriodoModal("todo");
+  aplicarFiltro();
+}
 
 function setPeriodo(btn, periodo){
-  document.querySelectorAll(".periodo-pill, .periodo-btn").forEach(function(b){ b.classList.remove("active"); });
-  btn.classList.add("active");
   periodoActual = periodo;
-  var wrap = document.getElementById("customDateWrap");
-  wrap.style.display = periodo === "custom" ? "flex" : "none";
-  if(periodo !== "custom") aplicarFiltro();
+  aplicarFiltro();
 }
 
 function getPeriodoRange(){
@@ -1928,8 +2746,8 @@ function getPeriodoRange(){
   } else if(periodoActual === "anio"){
     desde = new Date(ahora.getTime() - 365*24*60*60*1000);
   } else if(periodoActual === "custom"){
-    var dv = document.getElementById("fechaDesde").value;
-    var hv = document.getElementById("fechaHasta").value;
+    var dv = document.getElementById("fechaDesde") ? document.getElementById("fechaDesde").value : "";
+    var hv = document.getElementById("fechaHasta") ? document.getElementById("fechaHasta").value : "";
     desde = dv ? new Date(dv) : null;
     var hasta = hv ? new Date(hv+"T23:59:59") : ahora;
     return {desde: desde, hasta: hasta};
@@ -1938,19 +2756,17 @@ function getPeriodoRange(){
 }
 
 function onDesdeChange(){
-  var dv = document.getElementById("fechaDesde").value;
+  var dv = document.getElementById("fechaDesde") ? document.getElementById("fechaDesde").value : "";
   if(dv){
-    // Preselect fechaHasta = desde + 1 day
     var d = new Date(dv);
     d.setDate(d.getDate() + 1);
     var yyyy = d.getFullYear();
     var mm   = String(d.getMonth()+1).padStart(2,"0");
     var dd   = String(d.getDate()).padStart(2,"0");
-    document.getElementById("fechaHasta").value = yyyy+"-"+mm+"-"+dd;
-    // Open the hasta picker
-    try{ document.getElementById("fechaHasta").showPicker(); }catch(e){}
+    var hastaInput = document.getElementById("fechaHasta");
+    if(hastaInput) hastaInput.value = yyyy+"-"+mm+"-"+dd;
+    try{ hastaInput.showPicker(); }catch(e){}
   }
-  aplicarFiltro();
 }
 
 function parseFechaIngreso(fechaStr){
@@ -1964,49 +2780,70 @@ function parseFechaIngreso(fechaStr){
   }catch(e){ return null; }
 }
 
-function aplicarFiltro(){
+async function aplicarFiltro(){
   var range    = getPeriodoRange();
   var stats    = getStats();
   var usuarios = getUsuarios();
   var label    = document.getElementById("periodoLabel");
   var hasFilter = range.desde !== null;
 
-  // ── Filtrar ingresos ──
+  // ── Actualizar labels e indicadores ──
+  var shortLabels = {todo:"Histórico","24h":"24 Horas",semana:"Semana",mes:"Mes",anio:"Año",custom:"Personalizado"};
+  var longLabels  = {todo:"Histórico","24h":"Últimas 24 horas",semana:"Última semana",mes:"Último mes",anio:"Último año",custom:"Personalizado"};
+  
+  if(label){
+    if(periodoActual === "custom"){
+      var dv = document.getElementById("fechaDesde") ? document.getElementById("fechaDesde").value : "";
+      var hv = document.getElementById("fechaHasta") ? document.getElementById("fechaHasta").value : "";
+      label.textContent = "Filtrado: " + (dv ? dv.split("-").reverse().join("/") : "inicio") +
+        " → " + (hv ? hv.split("-").reverse().join("/") : "hoy");
+    } else {
+      label.textContent = "Filtrado: " + (longLabels[periodoActual] || periodoActual);
+    }
+  }
+
+  var btnLbl = document.getElementById("periodoBtnLabel");
+  if(btnLbl){
+    btnLbl.textContent = (shortLabels[periodoActual] || periodoActual);
+  }
+
+  var ind = document.getElementById("periodoActiveIndicator");
+  if(ind){
+    ind.style.display = (periodoActual === "todo") ? "none" : "inline-flex";
+  }
+
+  // ── 1. Obtener datos reales filtrados del backend CockroachDB ──
+  if(window.API && window.API.stats){
+    try {
+      var dvStr = (periodoActual === "custom" && document.getElementById("fechaDesde")) ? document.getElementById("fechaDesde").value : "";
+      var hvStr = (periodoActual === "custom" && document.getElementById("fechaHasta")) ? document.getElementById("fechaHasta").value : "";
+      var stRes = await API.stats.get(periodoActual, dvStr, hvStr);
+      if(stRes && stRes.resumen){
+        var statVisEl = document.getElementById("statVisitas");
+        var statLibAbEl = document.getElementById("statLibrosAbiertos");
+        if(statVisEl && typeof stRes.resumen.visitas === "number") statVisEl.textContent = stRes.resumen.visitas;
+        if(statLibAbEl && typeof stRes.resumen.librosAbiertos === "number") statLibAbEl.textContent = stRes.resumen.librosAbiertos;
+        if(Array.isArray(stRes.ingresosPorDia)) renderChartDias(stRes);
+        if(stRes.ingresosPorAnio) renderChartAnios(stRes);
+        if(Array.isArray(stRes.ultimosIngresos)) renderUltimosIngresos(stRes);
+        if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+        return;
+      }
+    } catch(err){
+      console.warn("Fallo en telemetría backend filtrada:", err.message);
+    }
+  }
+
+  // ── Fallback local si backend offline ──
   var allIngresos = stats.ultimosIngresos || [];
   var ingresosFiltrados = hasFilter ? allIngresos.filter(function(ing){
     var d = parseFechaIngreso(ing.fecha);
     return d && d >= range.desde && d <= range.hasta;
   }) : allIngresos;
 
-  // ── Filtrar usuarios por fecha de creación ──
-  // Solo mostrar usuarios cuya cuenta existía dentro del rango
-  // (usamos fecha de creación si existe, si no mostramos todos en modo "todo")
-  var usuariosFiltrados = usuarios;
-  if(hasFilter){
-    usuariosFiltrados = usuarios.filter(function(u){
-      if(!u.fechaCreacion) return true; // sin fecha = anterior al sistema, incluir
-      var d = new Date(u.fechaCreacion);
-      return d <= range.hasta; // creado antes o durante el período
-    });
-  }
-
-  // ── Actualizar label ──
-  var labels = {todo:"Todos los datos históricos","24h":"Últimas 24 horas",
-    semana:"Última semana",mes:"Último mes",anio:"Último año"};
-  if(periodoActual === "custom"){
-    var dv = document.getElementById("fechaDesde").value;
-    var hv = document.getElementById("fechaHasta").value;
-    label.textContent = (dv ? dv.split("-").reverse().join("/") : "inicio") +
-      " → " + (hv ? hv.split("-").reverse().join("/") : "hoy");
-  } else {
-    label.textContent = labels[periodoActual]||"";
-  }
-
-  // ── Re-render con datos filtrados ──
   var statsTemp = JSON.parse(JSON.stringify(stats));
   statsTemp.ultimosIngresos = ingresosFiltrados;
 
-  // Si hay filtro y no hay ingresos, forzar vacío en los gráficos de días y años
   if(hasFilter && ingresosFiltrados.length === 0){
     statsTemp.ingresosPorDia  = [0,0,0,0,0,0,0];
     statsTemp.ingresosPorAnio = {"1":0,"2":0,"3":0,"4":0,"5":0,"6":0};
@@ -2015,22 +2852,7 @@ function aplicarFiltro(){
   renderChartDias(statsTemp);
   renderChartAnios(statsTemp);
   renderUltimosIngresos(statsTemp);
-  renderChartRoles(usuariosFiltrados);
-
-  // Nota sobre libros sin timestamp
-  var topEl = document.getElementById("topLibros");
-  if(topEl){
-    var nota = topEl.querySelector(".filter-nota");
-    if(hasFilter && !nota){
-      nota = document.createElement("p");
-      nota.className = "filter-nota";
-      nota.style.cssText = "font-size:.75rem;color:var(--txt-m);font-style:italic;margin-top:8px";
-      nota.innerHTML = `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${window.DigiIcons?DigiIcons["alert"]:""}</span> Los libros más abiertos se muestran en totales (sin filtro de fecha).`;
-      topEl.appendChild(nota);
-    } else if(!hasFilter && nota){
-      nota.remove();
-    }
-  }
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
 }
 
 function refreshStats(){
@@ -2132,8 +2954,7 @@ function setCursosPreceptor(cursos){
 
 function aplicarRestriccionesPorRol(rol){
   var normRol = (rol || "").toLowerCase();
-  var email = (adminActual ? (adminActual.email || "") : "").toLowerCase();
-  var esSuperAdmin = normRol === "admin" || normRol === "administrador" || ADMIN_EMAILS.indexOf(email) >= 0;
+  var esSuperAdmin = normRol === "admin" || normRol === "administrador";
   if(esSuperAdmin) return;
   var esRestringido = (rol === "preceptor" || rol === "profesor");
   // Ocultar Resumen y Más buscados en sidebar solo para preceptor/profesor
@@ -2395,6 +3216,12 @@ document.addEventListener("click", function(e){
 // Disparar sincronización inmediata con CockroachDB en segundo plano
 if(typeof sincronizarConBackend === "function"){
   sincronizarConBackend();
+}
+
+// Inicializar FAB móvil con el panel activo por defecto (Resumen)
+if(typeof actualizarMobileFab === "function"){
+  var curActive = document.querySelector(".panel.active");
+  actualizarMobileFab(curActive ? curActive.id : "panelResumen");
 }
 </script>
 </body>

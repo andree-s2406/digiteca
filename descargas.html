@@ -217,7 +217,7 @@ async function cargarDescargas(){
   var h = '<div class="desc-grid">';
   for(var i=0; i<lista.length; i++){
     var l = lista[i];
-    var imgSrc = l.img && l.img!=="" ? l.img : "";
+    var imgSrc = (l.img && !l.img.startsWith("file:")) ? l.img : ((l.img && l.img.includes("test.jpg")) ? "img/test.jpg" : "");
     h += '<div class="desc-card" data-id="'+l.id+'">';
     if(imgSrc){
       h += '<img class="desc-card-img" src="'+imgSrc+'" alt="'+l.t+'" loading="lazy"/>';
@@ -305,17 +305,10 @@ cargarDescargas();
 
 // Panel de control — visible para admin, preceptor y profesor
 (function(){
-  var ADMIN_EMAILS = [
-    "andresfeliperodriguezmora448@gmail.com",
-    "franco.parrucci.058@alu.tecnica29de6.edu.ar",
-    "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
-    "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
-  ];
   try{
     var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
-    var email  = (sesion.email||"").trim().toLowerCase();
     var rol    = (sesion.rol||"").trim().toLowerCase();
-    var tieneAcceso = rol === "admin" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
+    var tieneAcceso = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
     if(tieneAcceso){
       var link = document.createElement("a");
       link.href = "admin.html";

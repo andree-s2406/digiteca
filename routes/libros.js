@@ -40,6 +40,11 @@ function mapLibroRow(row, isDetail = false) {
     pdfVal = 'archivo:cargado';
   }
 
+  let portadaVal = row.portada_url || '';
+  if (typeof portadaVal === 'string' && (portadaVal.startsWith('file:') || portadaVal.includes('test.jpg'))) {
+    portadaVal = 'img/test.jpg';
+  }
+
   return {
     id: row.id,
     t: row.titulo,
@@ -51,8 +56,8 @@ function mapLibroRow(row, isDetail = false) {
     tipo: row.tipo || 'Libro',
     anios: Array.isArray(row.anios) ? row.anios : (typeof row.anios === 'string' ? JSON.parse(row.anios || '[]') : []),
     divisiones: Array.isArray(row.divisiones) ? row.divisiones : (typeof row.divisiones === 'string' ? JSON.parse(row.divisiones || '[]') : []),
-    img: row.portada_url || '',
-    portada_url: row.portada_url || '',
+    img: portadaVal,
+    portada_url: portadaVal,
     pdf: pdfVal,
     pdf_url: pdfVal,
     hasPdf: !!(row.pdf_url && row.pdf_url.length > 0) || row.tiene_pdf === true,

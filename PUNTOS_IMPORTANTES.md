@@ -88,3 +88,12 @@ Este documento recopila de forma permanente las directrices, restricciones de ne
   * **Prohibido:** No renderizar el logo como un cuadrado o rectángulo con bordes ligeramente redondeados (`border-radius: 10px / 16px`) ni permitir transparencias que generen fondos oscuros alrededor del escudo.
 
 ---
+
+## 🛡️ 9. Prohibición Absoluta de Correos y Credenciales Hardcodeados en el Código
+* **Regla de Oro de Seguridad:**
+  * **Está estrictamente prohibido incluir correos electrónicos, contraseñas, tokens o listas de administradores hardcodeadas** dentro de los archivos HTML, JavaScript o bases de datos de prueba (ej. `ADMIN_EMAILS = [...]` o contraseñas por defecto tipo `"1234"`).
+* **Control de Acceso Basado Exclusivamente en Roles (RBAC):**
+  * La autorización para acceder al panel de administración o realizar operaciones privilegiadas debe evaluarse **únicamente a través del rol del usuario** (`rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor"`) proveniente de la sesión autenticada contra la base de datos CockroachDB.
+  * Nunca otorgar privilegios comparando contra cadenas de texto con correos específicos (`ADMIN_EMAILS.indexOf(email) >= 0`).
+  * En interfaces o prototipos, usar únicamente placeholders o etiquetas genéricas (`usuario@correo.com`, `—`).
+

@@ -290,16 +290,9 @@ initInicioAPI();
 // Filtrar libros por division especifica del usuario logueado
 (function(){
   try{
-    var ADMIN_EMAILS = [
-      "andresfeliperodriguezmora448@gmail.com",
-      "franco.parrucci.058@alu.tecnica29de6.edu.ar",
-      "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
-      "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
-    ];
     var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
     var rol    = (sesion.rol || "").trim().toLowerCase();
-    var email  = (sesion.email || "").trim().toLowerCase();
-    if(rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0){
+    if(rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor"){
       return;
     }
     var anio   = sesion.anio || "";
@@ -321,8 +314,9 @@ initInicioAPI();
 
 
 function getImg(l){
-  if(l.img && l.img!=="") return l.img;
-  return "https://placehold.co/720x920/A8D8EE/2E7FB3?text="+encodeURIComponent(l.t.split(" ").slice(0,3).join("+"));
+  if(l.img && !l.img.startsWith("file:")) return l.img;
+  if(l.img && l.img.includes("test.jpg")) return "img/test.jpg";
+  return "https://placehold.co/720x920/A8D8EE/2E7FB3?text="+encodeURIComponent((l.t||"Libro").split(" ").slice(0,3).join("+"));
 }
 
 // Tema manejado por Morphicons (js/icons.js)
@@ -480,17 +474,10 @@ document.getElementById("hamburger").onclick=function(){document.getElementById(
 
 // Panel de control — visible para admin, preceptor y profesor
 (function(){
-  var ADMIN_EMAILS = [
-    "andresfeliperodriguezmora448@gmail.com",
-    "franco.parrucci.058@alu.tecnica29de6.edu.ar",
-    "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
-    "lucas.solohaga.031@alu.tecnica29de6.edu.ar"
-  ];
   try{
     var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
-    var email  = (sesion.email||"").trim().toLowerCase();
     var rol    = (sesion.rol||"").trim().toLowerCase();
-    var tieneAcceso = rol === "admin" || rol === "preceptor" || rol === "profesor" || ADMIN_EMAILS.indexOf(email) >= 0;
+    var tieneAcceso = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
     if(tieneAcceso){
       var link = document.createElement("a");
       link.href = "admin.html";

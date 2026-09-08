@@ -6,7 +6,7 @@ const { query } = require('../db/connection');
 router.get('/', async (req, res) => {
   try {
     const result = await query(
-      `SELECT id, email, nombre, apellido, rol, anio, estado, avatar, creado_en 
+      `SELECT id::text AS id, email, nombre, apellido, rol, anio, estado, avatar, creado_en 
        FROM usuarios 
        ORDER BY id ASC;`
     );
@@ -128,8 +128,8 @@ router.put('/perfil', async (req, res) => {
 // PUT /api/usuarios/:id - Actualizar usuario desde panel admin
 router.put('/:id', async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
+    const rawId = String(req.params.id || '').trim();
+    if (!rawId) {
       return res.status(400).json({ error: 'ID de usuario inválido' });
     }
 
@@ -145,8 +145,8 @@ router.put('/:id', async (req, res) => {
          rol = COALESCE($5, rol),
          anio = COALESCE($6, anio),
          estado = COALESCE($7, estado)
-       WHERE id = $8
-       RETURNING id, email, nombre, apellido, rol, anio, estado, avatar;`,
+       WHERE id::text = $8 OR LOWER(email) = LOWER($8)
+       RETURNING id::text AS id, email, nombre, apellido, rol, anio, estado, avatar;`,
       [
         email ? email.trim().toLowerCase() : null,
         finalPwd || null,
@@ -155,7 +155,7 @@ router.put('/:id', async (req, res) => {
         rol || null,
         anio || null,
         estado || null,
-        id
+        rawId
       ]
     );
 
@@ -173,7 +173,7 @@ router.put('/:id', async (req, res) => {
 // PATCH /api/usuarios/:id/estado - Cambiar estado (activo / restringido)
 router.patch('/:id/estado', async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const rawId = String(req.params.id || '').trim();
     const { estado } = req.body;
 
     if (!estado || !['activo', 'restringido'].includes(estado)) {
@@ -181,8 +181,8 @@ router.patch('/:id/estado', async (req, res) => {
     }
 
     const result = await query(
-      `UPDATE usuarios SET estado = $1 WHERE id::text = $2::text RETURNING id, email, estado;`,
-      [estado, String(id)]
+      `UPDATE usuarios SET estado = $1 WHERE id::text = $2 OR LOWER(email) = LOWER($2) RETURNING id::text AS id, email, estado;`,
+      [estado, rawId]
     );
 
     if (result.rows.length === 0) {
@@ -199,17 +199,20 @@ router.patch('/:id/estado', async (req, res) => {
 // DELETE /api/usuarios/:id - Eliminar usuario
 router.delete('/:id', async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
+    const rawId = String(req.params.id || '').trim();
+    if (!rawId) {
       return res.status(400).json({ error: 'ID de usuario inválido' });
     }
 
-    const result = await query(`DELETE FROM usuarios WHERE id::text = $1::text RETURNING id;`, [String(id)]);
+    const result = await query(
+      `DELETE FROM usuarios WHERE id::text = $1 OR LOWER(email) = LOWER($1) RETURNING id::text AS id;`,
+      [rawId]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    res.json({ message: 'Usuario eliminado exitosamente', id });
+    res.json({ message: 'Usuario eliminado exitosamente', id: result.rows[0].id });
   } catch (err) {
     console.error('Error en DELETE /api/usuarios/:id:', err);
     res.status(500).json({ error: 'Error al eliminar usuario' });

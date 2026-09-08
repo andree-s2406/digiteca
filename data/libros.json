@@ -40,8 +40,8 @@
       6
     ],
     "divisiones": [],
-    "img": "file:///C:/Users/franc/OneDrive/Desktop/DigiTeca-PaginaWEB-main/img/test.jpg",
-    "portada_url": "file:///C:/Users/franc/OneDrive/Desktop/DigiTeca-PaginaWEB-main/img/test.jpg",
+    "img": "img/test.jpg",
+    "portada_url": "img/test.jpg",
     "pdf": "libros/libro_2.pdf",
     "pdf_url": "libros/libro_2.pdf",
     "hasPdf": true,

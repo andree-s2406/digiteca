@@ -2,35 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { pool, query } = require('./connection');
 
-const DEFAULT_ADMINS = [
-  {
-    email: "franco.parrucci.058@alu.tecnica29de6.edu.ar",
-    password: "1234",
-    nombre: "Franco",
-    apellido: "Parrucci",
-    rol: "admin",
-    anio: "Otro",
-    estado: "activo"
-  },
-  {
-    email: "andres.rodriguez.750@alu.tecnica29de6.edu.ar",
-    password: "1234",
-    nombre: "Andrés",
-    apellido: "Rodríguez",
-    rol: "admin",
-    anio: "Otro",
-    estado: "activo"
-  },
-  {
-    email: "lucas.solohaga.031@alu.tecnica29de6.edu.ar",
-    password: "1234",
-    nombre: "Lucas",
-    apellido: "Solohaga",
-    rol: "admin",
-    anio: "Otro",
-    estado: "activo"
-  }
-];
+const DEFAULT_ADMINS = [];
 
 const DEFAULT_LIBROS = [];
 
