@@ -289,9 +289,9 @@ html.dark .meta-badge.am {
 
 /* ── VISOR PDF ── */
 .visor-section {
-  max-width: 1000px;
+  max-width: 1060px;
   margin: 0 auto;
-  padding: 48px 40px 80px;
+  padding: 48px 32px 80px;
 }
 
 .visor-header {

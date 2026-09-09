@@ -477,6 +477,21 @@ async function cargarPDF(l){
   }
 }
 
+function calcularAnchoOptimo(container){
+  var cWidth = (container && container.clientWidth) ? container.clientWidth : window.innerWidth;
+  var isMobile = window.innerWidth <= 768;
+  var isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.body.classList.contains("pdf-fullscreen-active"));
+  
+  if(isFullscreen){
+    return Math.max(300, Math.min(cWidth - 24, 1150));
+  }
+  var paddingH = isMobile ? 12 : 24;
+  var maxW = isMobile ? (window.innerWidth - paddingH) : 980;
+  return Math.max(280, Math.min(cWidth - paddingH, maxW));
+}
+
+var currentTargetWidth = 0;
+
 // Renderizador fluido de páginas continuas
 async function renderPdfContinuous(source){
   var container = document.getElementById("pdfContainer");
@@ -531,11 +546,8 @@ async function renderPdfContinuous(source){
     var unscaledVp = firstPage.getViewport({ scale: 1.0 });
     var aspect = unscaledVp.height / unscaledVp.width;
 
-    var cWidth = container.clientWidth || window.innerWidth;
-    var isMobile = window.innerWidth <= 768;
-    var paddingH = isMobile ? 12 : 32;
-    var maxW = isMobile ? (window.innerWidth - paddingH) : 860;
-    var targetWidth = Math.max(260, Math.min(cWidth - paddingH, maxW));
+    var targetWidth = calcularAnchoOptimo(container);
+    currentTargetWidth = targetWidth;
     var targetHeight = Math.round(targetWidth * aspect);
 
     // Crear contenedores con dimensiones precisas para scroll continuo sin saltos
@@ -546,6 +558,7 @@ async function renderPdfContinuous(source){
       pageWrap.dataset.pageNum = p;
       pageWrap.style.width = targetWidth + "px";
       pageWrap.style.minHeight = targetHeight + "px";
+      pageWrap.style.height = targetHeight + "px";
 
       var ph = document.createElement("div");
       ph.className = "pdf-page-loading";
@@ -560,7 +573,7 @@ async function renderPdfContinuous(source){
       entries.forEach(function(entry){
         if(entry.isIntersecting){
           var pNum = parseInt(entry.target.dataset.pageNum, 10);
-          renderSinglePage(pNum, targetWidth);
+          renderSinglePage(pNum, currentTargetWidth || targetWidth);
         }
       });
     }, {
@@ -596,25 +609,27 @@ async function renderSinglePage(pageNum, targetWidth){
   try {
     var page = await currentPdfDoc.getPage(pageNum);
     var unscaledVp = page.getViewport({ scale: 1.0 });
-    var scale = targetWidth / unscaledVp.width;
+    var tWidth = targetWidth || currentTargetWidth || 800;
+    var scale = tWidth / unscaledVp.width;
 
     var dpr = window.devicePixelRatio || 1;
-    var outputScale = Math.min(dpr, 2.0); // Máximo 2x para optimizar consumo de RAM en móviles
+    var outputScale = Math.min(dpr, 2.0); // Máximo 2x para nitidez y rendimiento
 
     var viewport = page.getViewport({ scale: scale * outputScale });
 
     var pageWrap = document.getElementById("pdf-page-wrap-" + pageNum);
     if(!pageWrap) return;
 
-    var actualH = Math.round(targetWidth * (unscaledVp.height / unscaledVp.width));
+    var actualH = Math.round(tWidth * (unscaledVp.height / unscaledVp.width));
     pageWrap.style.minHeight = actualH + "px";
     pageWrap.style.height = actualH + "px";
+    pageWrap.style.width = tWidth + "px";
 
     var canvas = document.createElement("canvas");
     canvas.className = "pdf-canvas";
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
-    canvas.style.width = targetWidth + "px";
+    canvas.style.width = tWidth + "px";
     canvas.style.height = actualH + "px";
 
     var ctx = canvas.getContext("2d", { alpha: false });
@@ -634,32 +649,46 @@ async function renderSinglePage(pageNum, targetWidth){
   }
 }
 
-// Ajuste dinámico de escala ante cambio de orientación en celular o resize
+// Ajuste dinámico de escala ante cambio de resolución o cambio móvil/PC
 var resizePdfTimeout = null;
-function ajustarEscalaPdf(){
+async function ajustarEscalaPdf(){
   clearTimeout(resizePdfTimeout);
-  resizePdfTimeout = setTimeout(function(){
+  resizePdfTimeout = setTimeout(async function(){
     if(!currentPdfDoc) return;
     var container = document.getElementById("pdfContainer");
-    if(!container || container.style.display === "none") return;
+    var pagesFlow = document.getElementById("pdfPages");
+    if(!container || container.style.display === "none" || !pagesFlow) return;
 
-    var cWidth = container.clientWidth || window.innerWidth;
-    var isMobile = window.innerWidth <= 768;
-    var paddingH = isMobile ? 12 : 32;
-    var maxW = isMobile ? (window.innerWidth - paddingH) : 860;
-    var newTargetWidth = Math.max(260, Math.min(cWidth - paddingH, maxW));
+    var newTargetWidth = calcularAnchoOptimo(container);
+    if(Math.abs(newTargetWidth - currentTargetWidth) < 10) return;
+    currentTargetWidth = newTargetWidth;
+
+    var firstPage = await currentPdfDoc.getPage(1);
+    var unscaledVp = firstPage.getViewport({ scale: 1.0 });
+    var aspect = unscaledVp.height / unscaledVp.width;
+    var newTargetHeight = Math.round(newTargetWidth * aspect);
 
     renderedPages = {};
     renderingPages = {};
 
-    var allWraps = document.querySelectorAll(".pdf-page-item");
+    var allWraps = pagesFlow.querySelectorAll(".pdf-page-item");
     allWraps.forEach(function(wrap){
       var pNum = parseInt(wrap.dataset.pageNum, 10);
       wrap.style.width = newTargetWidth + "px";
+      wrap.style.minHeight = newTargetHeight + "px";
+      wrap.style.height = newTargetHeight + "px";
+      wrap.innerHTML = '<div class="pdf-page-loading"><span class="pdf-page-num-tag">' + pNum + ' / ' + currentPdfDoc.numPages + '</span><div class="pdf-pulse-box"></div></div>';
     });
 
+    if(pdfPageObserver) {
+      allWraps.forEach(function(el){
+        pdfPageObserver.unobserve(el);
+        pdfPageObserver.observe(el);
+      });
+    }
+
     renderSinglePage(1, newTargetWidth);
-  }, 200);
+  }, 100);
 }
 window.addEventListener("resize", ajustarEscalaPdf);
 
