@@ -1,17 +1,46 @@
 /**
- * DigiTeca Modern Animations & Design Enhancements
- * Micro-interacciones suaves, efectos de elevación y diseño visual premium
+ * DigiTeca Modern Motion & High-End Design System
+ * Curvas de aceleración elásticas (Emil Kowalski), físicas de Apple y aceleración GPU a 60fps
  */
 
-/* ── ANIMACIONES DE ENTRADA (FADE IN UP) ── */
-@keyframes fadeInUp {
-  from {
+/* ── BARRA DE PROGRESO DE LECTURA SUPERIOR (READING PROGRESS BAR) ── */
+.reading-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3.5px;
+  width: 0%;
+  background: linear-gradient(90deg, var(--cel-o), var(--cel), #38bdf8);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+  z-index: 10000;
+  pointer-events: none;
+  transition: width 0.12s linear;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ── EFECTOS DE ENTRADA Y FÍSICAS FLUIDAS ── */
+@keyframes fadeInUpSmooth {
+  0% {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(20px) scale(0.98);
   }
-  to {
+  100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes scaleInPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  70% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -20,7 +49,7 @@
     box-shadow: 0 0 15px rgba(46, 127, 179, 0.2);
   }
   50% {
-    box-shadow: 0 0 25px rgba(46, 127, 179, 0.45);
+    box-shadow: 0 0 28px rgba(56, 189, 248, 0.45);
   }
 }
 
@@ -29,72 +58,123 @@
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-4px);
+    transform: translateY(-5px);
   }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
-/* ── TARJETAS Y COMPONENTES ELEVADOS ── */
-.libro-card, .res-card, .desc-card, .sec-card, .stat-card, .catalogo-card, .serv-card {
-  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
-  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, border-color 0.28s ease !important;
+/* ── SKELETON SHIMMER MODERNO ── */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--bg-alt) 25%, var(--borde) 50%, var(--bg-alt) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s infinite ease-in-out;
+  border-radius: 8px;
+}
+
+/* ── TARJETAS Y COMPONENTES CON PERSPECTIVA Y ELEVACIÓN SUAVE ── */
+.libro-card, .res-card, .desc-card, .sec-card, .stat-card, .catalogo-card, .serv-card, .rank-card {
+  transition: transform 0.32s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+              box-shadow 0.32s ease,
+              border-color 0.25s ease !important;
   will-change: transform, box-shadow;
+  perspective: 1000px;
 }
 
 .libro-card:hover, .catalogo-card:hover, .desc-card:hover, .serv-card:hover {
-  transform: translateY(-5px) !important;
-  box-shadow: 0 14px 30px -6px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--cel-o, #2E7FB3) !important;
+  transform: translateY(-6px) scale(1.01) !important;
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--cel-o) !important;
 }
 
-/* ── BOTONES CON FEEDBACK HÁPTICO VISUAL ── */
-.btn-p, .btn-primary, .btn-save, .btn-unlock, .btn-login, .btn-buscar, .chip, .nav-item {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  position: relative;
-  overflow: hidden;
+html.dark .libro-card:hover,
+html.dark .catalogo-card:hover,
+html.dark .desc-card:hover,
+html.dark .serv-card:hover {
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.6), 0 0 18px rgba(56, 189, 248, 0.25) !important;
 }
 
-.btn-p:hover, .btn-primary:hover, .btn-save:hover, .btn-login:hover {
+/* ── 3D TILT & SPECULAR GLARE (BRILLO INTERACTIVO) ── */
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.15s ease-out, box-shadow 0.25s ease;
+}
+
+.glare-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 5;
+}
+
+.tilt-card:hover .glare-overlay {
+  opacity: 1;
+}
+
+/* ── BOTONES Y ELEMENTOS CLICABLES (MICRO-INTERACCIONES DE EMIL KOWALSKI) ── */
+.btn-p, .btn-primary, .btn-save, .btn-unlock, .btn-login, .btn-buscar, .btn-leer, .btn-guardar, .chip, .nav-item, .filter-chip, .tab-item {
+  transition: transform 0.22s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+              background 0.2s ease,
+              box-shadow 0.25s ease,
+              color 0.2s ease !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-p:hover, .btn-primary:hover, .btn-save:hover, .btn-login:hover, .btn-leer:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(46, 127, 179, 0.35) !important;
+  box-shadow: 0 8px 24px rgba(46, 127, 179, 0.4) !important;
 }
 
-.btn-p:active, .btn-primary:active, .btn-save:active, .btn-login:active {
-  transform: translateY(1px) scale(0.98);
+/* Presión física táctil (:active) */
+.btn-p:active, .btn-primary:active, .btn-save:active, .btn-login:active, .btn-leer:active, .btn-guardar:active, .chip:active, .filter-chip:active {
+  transform: scale(0.96) !important;
 }
 
-/* ── ICONOS SVG INTEGRADOS ── */
+/* ── ICONOS INTERACTIVOS ── */
 .digi-svg-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   vertical-align: middle;
-  transition: transform 0.25s ease, stroke 0.25s ease;
-  line-height: 1;
+  transition: transform 0.28s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
 }
 
-.digi-svg-icon svg {
-  display: block;
+.libro-card:hover .digi-svg-icon,
+.catalogo-card:hover .digi-svg-icon,
+.serv-card:hover .digi-svg-icon {
+  transform: scale(1.12) rotate(-4deg);
 }
 
-.libro-card:hover .digi-svg-icon, .catalogo-card:hover .digi-svg-icon, .serv-card:hover .digi-svg-icon {
-  transform: scale(1.1) rotate(-3deg);
+/* ── ENTRADA EN CASCADA ESCALONADA (STAGGERED REVEALS) ── */
+.stagger-item {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.5s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              transform 0.5s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
-/* ── BADGES Y TAGS CON ESTILO ── */
-.libro-rank {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.stagger-item.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── CONTADOR NUMÉRICO CON POP SUTIL ── */
+.stat-counter-animate {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.3s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
 }
 
 /* ── SCROLLBAR ELEGANTE ── */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
@@ -110,14 +190,15 @@
   background: var(--cel-o, #2E7FB3);
 }
 
-/* ── MODALES FLUIDOS ── */
-.modal-overlay.open .modal-box,
-.modal-overlay.open .modal {
-  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* ── GLASSOVERLAY NAVBAR ── */
-nav, .navbar {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* ── ACCESIBILIDAD (PREFERS-REDUCED-MOTION) ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reading-progress-bar, .tilt-card, .glare-overlay {
+    display: none !important;
+  }
 }

@@ -109,9 +109,8 @@
   <p>Explorá toda nuestra colección de libros digitales, revistas, videos y simuladores educativos.</p>
   <div class="hero-stats">
     <div><span class="h-stat-num" id="statTotal">0</span><span class="h-stat-lbl">Recursos totales</span></div>
-    
-    <div><span class="h-stat-num">5</span><span class="h-stat-lbl">Materias</span></div>
-    <div><span class="h-stat-num">24/7</span><span class="h-stat-lbl">Acceso libre</span></div>
+    <div><span class="h-stat-num" id="statMaterias">5</span><span class="h-stat-lbl">Materias</span></div>
+    <div><span class="h-stat-num" id="statAcceso">24/7</span><span class="h-stat-lbl">Acceso libre</span></div>
   </div>
 </div>
 
@@ -236,6 +235,7 @@
 
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/motion.js"></script>
 <script src="js/api.js"></script>
 <script src="js/quick-nav.js" defer></script>
 <script>
@@ -248,6 +248,39 @@ try {
   }
 } catch(e) {}
 
+function actualizarHeroStats(){
+  var statEl = document.getElementById("statTotal");
+  var statMatEl = document.getElementById("statMaterias");
+  var statAccEl = document.getElementById("statAcceso");
+
+  // 1. Recursos totales (único con animación de conteo numérico)
+  var totalRecursos = (Array.isArray(LIBROS) ? LIBROS.length : 0);
+  if(statEl){
+    if(window.DigiMotion && typeof DigiMotion.animateNumber === "function"){
+      DigiMotion.animateNumber(statEl, totalRecursos, 1200);
+    } else {
+      statEl.textContent = totalRecursos;
+    }
+  }
+
+  // 2. Materias activas (estático, sin animación)
+  var allMats = [];
+  if(Array.isArray(LIBROS)){
+    for(var j = 0; j < LIBROS.length; j++){
+      if(LIBROS[j].mat && allMats.indexOf(LIBROS[j].mat) < 0) allMats.push(LIBROS[j].mat);
+    }
+  }
+  var totalMats = allMats.length || 5;
+  if(statMatEl){
+    statMatEl.textContent = totalMats;
+  }
+
+  // 3. Acceso libre (24/7) (estático, sin animación)
+  if(statAccEl){
+    statAccEl.textContent = "24/7";
+  }
+}
+
 // Carga asíncrona en segundo plano para actualizar y sincronizar silenciosamente (SWR)
 async function cargarLibrosAPI(){
   try {
@@ -257,8 +290,7 @@ async function cargarLibrosAPI(){
         LIBROS = librosDB;
         filtrarPorDivisionUsuario();
         filtrados = LIBROS.slice();
-        var statEl = document.getElementById("statTotal");
-        if(statEl) statEl.textContent = LIBROS.length;
+        actualizarHeroStats();
         buildSidebar();
         aplicar();
 
@@ -442,21 +474,21 @@ function renderChips(){
   if(filtAnio){
     var c = document.createElement("button");
     c.className = "af-chip";
-    c.innerHTML = `<span class="digi-svg-icon" style="width:12px;height:12px;margin-right:4px">${DigiIcons["calendar"]}</span> ` + anioLabel(filtAnio) + ` <span class="digi-svg-icon" style="width:10px;height:10px;margin-left:4px">${DigiIcons["close"]}</span>`;
+    c.innerHTML = (window.DigiIcons && typeof DigiIcons.get === "function" ? DigiIcons.get("calendar", {size:12, style:"margin-right:4px"}) : "") + anioLabel(filtAnio) + (window.DigiIcons && typeof DigiIcons.get === "function" ? DigiIcons.get("x", {size:10, style:"margin-left:4px"}) : "");
     c.onclick = function(){ filtAnio = ""; buildSidebar(); aplicar(); };
     box.appendChild(c);
   }
   if(filtMat){
     var c2 = document.createElement("button");
     c2.className = "af-chip";
-    c2.innerHTML = `<span class="digi-svg-icon" style="width:12px;height:12px;margin-right:4px">${DigiIcons["libro"]}</span> ` + filtMat + ` <span class="digi-svg-icon" style="width:10px;height:10px;margin-left:4px">${DigiIcons["close"]}</span>`;
+    c2.innerHTML = (window.DigiIcons && typeof DigiIcons.get === "function" ? DigiIcons.get("book", {size:12, style:"margin-right:4px"}) : "") + filtMat + (window.DigiIcons && typeof DigiIcons.get === "function" ? DigiIcons.get("x", {size:10, style:"margin-left:4px"}) : "");
     c2.onclick = function(){ filtMat = ""; buildSidebar(); aplicar(); };
     box.appendChild(c2);
   }
   if(filtQ){
     var c3 = document.createElement("button");
     c3.className = "af-chip";
-    c3.innerHTML = `<span class="digi-svg-icon" style="width:12px;height:12px;margin-right:4px">${DigiIcons["search"]}</span> ` + filtQ + ` <span class="digi-svg-icon" style="width:10px;height:10px;margin-left:4px">${DigiIcons["close"]}</span>`;
+    c3.innerHTML = (window.DigiIcons && typeof DigiIcons.get === "function" ? DigiIcons.get("search", {size:12, style:"margin-right:4px"}) : "") + filtQ + (window.DigiIcons && typeof DigiIcons.get === "function" ? DigiIcons.get("x", {size:10, style:"margin-left:4px"}) : "");
     c3.onclick = function(){
       filtQ = "";
       document.getElementById("searchInput").value = "";
@@ -517,7 +549,7 @@ function render(lista, pag){
     var rank = lista.indexOf(l) + 1;
     var aniosArr = Array.isArray(l.anios) ? l.anios : [];
     var al   = aniosArr.length > 0 ? aniosArr[0] + "°" : "Otros";
-    h += '<div class="libro-card" onclick="abrirModal(\'' + l.id + '\')">';
+    h += '<div class="libro-card" data-id="' + l.id + '" onclick="abrirModal(\'' + l.id + '\')">';
     
     var cImg = (l.img && !l.img.startsWith("file:")) ? l.img : ((l.img && l.img.includes("test.jpg")) ? "img/test.jpg" : ('https://placehold.co/720x920/A8D8EE/2E7FB3?text='+encodeURIComponent(l.t.split(' ').slice(0,3).join('+'))));
     h += '<img class="libro-emoji" src="' + cImg + '" alt="' + l.t + '" loading="lazy"/>';
@@ -530,6 +562,10 @@ function render(lista, pag){
     h += '</div>';
   }
   grid.innerHTML = h;
+
+  if(window.DigiMotion && typeof DigiMotion.initTiltCards === "function"){
+    DigiMotion.initTiltCards(".libro-card");
+  }
 
   /* paginación */
   var totalPags = Math.ceil(total / POR_PAG);
@@ -547,6 +583,7 @@ function render(lista, pag){
 }
 
 /* ── INIT ── */
+actualizarHeroStats();
 buildSidebar();
 aplicar();
 
@@ -574,7 +611,9 @@ document.getElementById("sortSel").onchange = aplicar;
 document.getElementById("sidebarToggle").onclick = function(){
   var sb = document.getElementById("sidebar");
   sb.classList.toggle("open");
-  this.innerHTML = sb.classList.contains("open") ? `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${DigiIcons["close"]}</span> Cerrar filtros` : `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${DigiIcons["menu"]}</span> Filtrar por clasificación`;
+  var icClose = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("x", {size:14, style:"margin-right:6px"}) : "";
+  var icMenu = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("menu", {size:14, style:"margin-right:6px"}) : "";
+  this.innerHTML = sb.classList.contains("open") ? (icClose + " Cerrar filtros") : (icMenu + " Filtrar por clasificación");
 };
 
 /* ── MODAL ── */
@@ -592,9 +631,10 @@ function abrirModal(id){
   document.getElementById("mTitle").textContent = l.t || "";
   document.getElementById("mAutor").textContent = "Autor/a: " + (l.a || "No especificado");
   document.getElementById("mDesc").textContent  = l.x || "Sin descripción disponible.";
+  var icCal = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("calendar", {size:12, style:"margin-right:4px"}) : "";
   document.getElementById("mTags").innerHTML =
     '<span class="tag">' + (l.mat || "General") + '</span>' +
-    `<span class="tag anio"><span class="digi-svg-icon" style="width:12px;height:12px;margin-right:3px">${DigiIcons["calendar"]}</span> ` + aniosStr + `</span>` +
+    '<span class="tag anio">' + icCal + ' ' + aniosStr + '</span>' +
     '<span class="tag">' + (l.tipo || "Libro") + '</span>';
   document.getElementById("modalAcceder").href = "libro.html?id=" + encodeURIComponent(l.id);
   document.getElementById("modalOverlay").classList.add("open");

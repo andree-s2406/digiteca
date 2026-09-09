@@ -214,7 +214,17 @@
     });
   };
 
-  global.DigiIcons = DigiIcons;
+  // Soporte de acceso directo como diccionario DigiIcons["calendar"] o DigiIcons.calendar
+  var DigiIconsProxy = typeof Proxy !== "undefined" ? new Proxy(DigiIcons, {
+    get: function(target, prop, receiver) {
+      if (prop in target || typeof prop !== "string" || prop === "then" || prop === "toJSON" || prop === "constructor" || prop === "prototype") {
+        return Reflect.get(target, prop, receiver);
+      }
+      return target.get(prop);
+    }
+  }) : DigiIcons;
+
+  global.DigiIcons = DigiIconsProxy;
 
   
   // ── MANEJADOR DE USUARIO ESTILO YOUTUBE (PALETA ALEATORIA E INICIAL REAL) ──

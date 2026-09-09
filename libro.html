@@ -196,6 +196,7 @@
 
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/motion.js"></script>
 <script src="js/api.js"></script>
 <script src="js/quick-nav.js" defer></script>
 <script>
@@ -385,6 +386,10 @@ function renderDetalleLibro(l){
       if(gb){ gb.classList.add("guardado"); gb.textContent="Guardado en mi cuenta"; }
     }
   }catch(e){}
+
+  if(window.DigiMotion && typeof DigiMotion.initTiltCards === "function"){
+    DigiMotion.initTiltCards("#coverWrap");
+  }
 
   // Cargar visor PDF
   cargarPDF(l);
@@ -588,6 +593,10 @@ async function renderPdfContinuous(source){
 
     // Renderizar primera página inmediatamente
     renderSinglePage(1, targetWidth);
+
+    if(window.DigiMotion && typeof DigiMotion.initReadingProgress === "function"){
+      DigiMotion.initReadingProgress("#pdfContainer");
+    }
 
   } catch(err) {
     console.warn("Fallo en render nativo PDF.js, usando visor de respaldo:", err);

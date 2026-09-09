@@ -161,6 +161,7 @@
 
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/motion.js"></script>
 <script src="js/api.js"></script>
 <script>
 // Tema manejado por Morphicons (js/icons.js)
@@ -237,6 +238,10 @@ async function cargarDescargas(){
   }
   h += '</div>';
   grid.innerHTML = h;
+
+  if(window.DigiMotion && typeof DigiMotion.initTiltCards === "function"){
+    DigiMotion.initTiltCards(".desc-card");
+  }
 
   /* Click en card → ir al libro */
   grid.querySelectorAll(".desc-card").forEach(function(card){

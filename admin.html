@@ -79,7 +79,8 @@
     flex-shrink: 0 !important;
   }
 </style>
-<script src="https://unpkg.com/lucide@latest"></script>
+<script src="js/lucide.min.js"></script>
+<script src="js/pdf.min.js"></script>
 </head>
 <body>
 
@@ -210,8 +211,10 @@
           <i data-lucide="globe" style="width:14px;height:14px"></i>
           <span>Portal Público</span>
         </a>
-        <!-- Switch Píldora Sol / Luna idéntico a la imagen -->
-        <div class="theme-switch-pill" id="themeSwitchPill" onclick="toggleThemePill()" role="button" tabindex="0" title="Cambiar tema" aria-label="Cambiar tema claro u oscuro">
+        <!-- Botón de Tema Circular con Morphicons para PC (idéntico al resto de las páginas) -->
+        <button class="theme-btn desktop-only" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
+        <!-- Switch Píldora animado exclusivo para Celular -->
+        <div class="theme-switch-pill mobile-only" id="themeSwitchPill" onclick="toggleThemePill()" role="button" tabindex="0" title="Cambiar tema" aria-label="Cambiar tema claro u oscuro">
           <span class="pill-icon-wrap pill-sun"><i data-lucide="sun" style="width:13px;height:13px"></i></span>
           <span class="pill-icon-wrap pill-moon"><i data-lucide="moon" style="width:13px;height:13px"></i></span>
           <div class="pill-slider-thumb">
@@ -219,6 +222,10 @@
             <i data-lucide="moon" class="thumb-icon-moon" style="width:13px;height:13px"></i>
           </div>
         </div>
+        <!-- Botón Salir / Cerrar Sesión en Topbar (Móvil) -->
+        <button class="topbar-logout-btn mobile-only" onclick="cerrarSesion()" title="Cerrar sesión" aria-label="Cerrar sesión">
+          <i data-lucide="log-out" style="width:15px;height:15px"></i>
+        </button>
       </div>
     </header>
 
@@ -574,8 +581,31 @@
       </div>
 
       <div class="form-group">
-        <label for="lImg">Enlace de Imagen de Portada (Opcional)</label>
-        <input type="text" id="lImg" placeholder="https://... o ruta relativa de portada"/>
+        <label>Imagen de Portada <span class="label-hint">(Opcional · Si no se indica, se genera desde la 1ª pág. del PDF)</span></label>
+        <div class="cover-upload-container">
+          <label for="lImgFile" id="imgDropZone" class="img-drop-target" onclick="var fi=document.getElementById('lImgFile');if(fi)fi.value=''" ondragover="event.preventDefault();this.classList.add('drag-active')" ondragleave="this.classList.remove('drag-active')" ondrop="handleImgDrop(event)">
+            <div class="drop-icon"><i data-lucide="image" style="width:24px;height:24px"></i></div>
+            <p class="drop-text"><strong>Arrastrá una imagen de portada aquí</strong> o hacé clic para examinar</p>
+            <span class="drop-subtext">JPG, PNG o WEBP (Formato recomendado: 720 × 920 px)</span>
+            <input type="file" id="lImgFile" accept="image/*" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" onchange="handleImgFile(this)"/>
+          </label>
+          <div class="cover-preview-wrapper" id="coverPreviewWrap" style="display:none">
+            <div class="cover-preview-thumb-box">
+              <img id="coverPreviewImg" src="" alt="Vista previa de portada"/>
+            </div>
+            <div class="cover-preview-info">
+              <span id="coverPreviewBadge" class="cover-badge-tag">Portada personalizada</span>
+              <p id="coverPreviewFilename" class="cover-preview-filename">portada.jpg</p>
+              <button type="button" class="btn-remove-cover" onclick="quitarPortadaSeleccionada()">
+                <i data-lucide="trash-2" style="width:13px;height:13px"></i> Quitar imagen
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="url-input-wrap" style="margin-top:8px">
+          <span>O ingresar enlace URL:</span>
+          <input type="text" id="lImg" placeholder="https://... o ruta relativa de portada" oninput="actualizarImgPreview()"/>
+        </div>
       </div>
 
       <div class="form-group">
@@ -901,6 +931,7 @@
 <div class="toast" id="toast"></div>
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/motion.js"></script>
 <script src="js/api.js"></script>
 <script src="js/quick-nav.js" defer></script>
 <script>
@@ -1080,7 +1111,7 @@ window.forzarSincronizacionLibros = forzarSincronizacionLibros;
 window.refreshStats = refreshStats;
 
 // ════════════════════════════════════════════════
-// SWITCH PÍLDORA DE TEMA (CLARO / OSCURO)
+// SWITCH PÍLDORA DE TEMA (CLARO / OSCURO - MÓVIL Y PC)
 // ════════════════════════════════════════════════
 function toggleThemePill(){
   var root = document.documentElement;
@@ -1094,6 +1125,15 @@ function toggleThemePill(){
     try { localStorage.setItem("digi", "light"); } catch(e){}
   }
   actualizarPillThemeUI();
+  
+  // Sincronizar también con el botón Morphicons de PC si existe
+  var btn = document.getElementById("themeBtn");
+  if(btn){
+    var path = btn.querySelector(".theme-morph-path");
+    var SUN_PATH = 'M 12 8 a 4 4 0 1 0 0.001 0 Z M 12 2 v 2 M 12 20 v 2 M 4.93 4.93 l 1.41 1.41 M 17.66 17.66 l 1.41 1.41 M 2 12 h 2 M 20 12 h 2 M 6.34 17.66 l -1.41 1.41 M 19.07 4.93 l -1.41 1.41';
+    var MOON_PATH = 'M 12 3 a 6 6 0 0 0 9 9 9 9 0 1 1 -9 -9 Z';
+    if(path) path.setAttribute("d", newDark ? SUN_PATH : MOON_PATH);
+  }
   window.dispatchEvent(new Event("themechange"));
 }
 
@@ -1111,9 +1151,10 @@ function actualizarPillThemeUI(){
 }
 
 actualizarPillThemeUI();
+window.addEventListener("themechange", actualizarPillThemeUI);
 
 // ════════════════════════════════════════════════
-// Tema manejado por Morphicons (js/icons.js)
+// Tema manejado por Morphicons (js/icons.js) para PC
 if(typeof setupThemeToggle==="function") setupThemeToggle();
 
 // ════════════════════════════════════════════════
@@ -1261,10 +1302,10 @@ function actualizarStats(){
   var descargados = 0;
   try{ var d=JSON.parse(localStorage.getItem("digi-descargas")||"[]"); descargados=d.length; }catch(e){}
 
-  var elLibros = document.getElementById("statLibros"); if(elLibros) elLibros.textContent = libros.length;
-  var elUsuarios = document.getElementById("statUsuarios"); if(elUsuarios) elUsuarios.textContent = usuarios.length;
-  var elActivos = document.getElementById("statActivos"); if(elActivos) elActivos.textContent = activos;
-  var elVisitas = document.getElementById("statVisitas"); if(elVisitas) elVisitas.textContent = stats.visitas||0;
+  var elLibros = document.getElementById("statLibros"); 
+  var elUsuarios = document.getElementById("statUsuarios"); 
+  var elActivos = document.getElementById("statActivos"); 
+  var elVisitas = document.getElementById("statVisitas"); 
 
   // Libros abiertos (suma total)
   var totalAbiertos = 0;
@@ -1274,7 +1315,21 @@ function actualizarStats(){
     var librosAb = stats.librosAbiertos||{};
     for(var k in librosAb) totalAbiertos += (librosAb[k]||0);
   }
-  var elAbiertos = document.getElementById("statLibrosAbiertos"); if(elAbiertos) elAbiertos.textContent = totalAbiertos;
+  var elAbiertos = document.getElementById("statLibrosAbiertos"); 
+
+  if(window.DigiMotion && typeof DigiMotion.animateNumber === "function"){
+    if(elLibros) DigiMotion.animateNumber(elLibros, libros.length, 900);
+    if(elUsuarios) DigiMotion.animateNumber(elUsuarios, usuarios.length, 900);
+    if(elActivos) DigiMotion.animateNumber(elActivos, activos, 900);
+    if(elVisitas) DigiMotion.animateNumber(elVisitas, stats.visitas||0, 900);
+    if(elAbiertos) DigiMotion.animateNumber(elAbiertos, totalAbiertos, 900);
+  } else {
+    if(elLibros) elLibros.textContent = libros.length;
+    if(elUsuarios) elUsuarios.textContent = usuarios.length;
+    if(elActivos) elActivos.textContent = activos;
+    if(elVisitas) elVisitas.textContent = stats.visitas||0;
+    if(elAbiertos) elAbiertos.textContent = totalAbiertos;
+  }
 
   renderChartDias(stats);
   renderChartAnios(stats);
@@ -1292,19 +1347,28 @@ function renderChartDias(stats){
   var lbls = document.getElementById("chartDiasLabels");
   wrap.innerHTML = ""; lbls.innerHTML = "";
   for(var i=0;i<7;i++){
-    var pct = Math.round((datos[i]/max)*100);
-    var bar = document.createElement("div");
-    bar.style.cssText = "flex:1;background:"+(i===hoy?"var(--cel-o)":"var(--cel-c)")+";border-radius:6px 6px 0 0;height:"+Math.max(pct,4)+"%;transition:height .4s;position:relative;cursor:default";
-    bar.title = dias[i]+": "+datos[i]+" ingresos";
-    var num = document.createElement("div");
-    num.style.cssText = "position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:.7rem;font-weight:700;color:var(--txt-m);white-space:nowrap";
-    num.textContent = datos[i]||"";
-    bar.appendChild(num);
-    wrap.appendChild(bar);
-    var lbl = document.createElement("div");
-    lbl.style.cssText = "flex:1;text-align:center;font-size:.7rem;color:"+(i===hoy?"var(--cel-o)":"var(--txt-m)")+";font-weight:"+(i===hoy?"700":"400");
-    lbl.textContent = dias[i];
-    lbls.appendChild(lbl);
+    (function(idx){
+      var pct = Math.round((datos[idx]/max)*100);
+      var bar = document.createElement("div");
+      bar.style.cssText = "flex:1;background:"+(idx===hoy?"var(--cel-o)":"var(--cel-c)")+";border-radius:6px 6px 0 0;height:4%;transition:height 0.6s cubic-bezier(0.16, 1, 0.3, 1);position:relative;cursor:default";
+      bar.title = dias[idx]+": "+datos[idx]+" ingresos";
+      var num = document.createElement("div");
+      num.style.cssText = "position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:.7rem;font-weight:700;color:var(--txt-m);white-space:nowrap";
+      num.textContent = datos[idx]||"";
+      bar.appendChild(num);
+      wrap.appendChild(bar);
+      
+      requestAnimationFrame(function(){
+        setTimeout(function(){
+          bar.style.height = Math.max(pct, 4) + "%";
+        }, idx * 50);
+      });
+
+      var lbl = document.createElement("div");
+      lbl.style.cssText = "flex:1;text-align:center;font-size:.7rem;color:"+(idx===hoy?"var(--cel-o)":"var(--txt-m)")+";font-weight:"+(idx===hoy?"700":"400");
+      lbl.textContent = dias[idx];
+      lbls.appendChild(lbl);
+    })(i);
   }
 }
 
@@ -1836,15 +1900,27 @@ function abrirModalLibro(id){
   libroEditando = id !== null && id !== undefined ? String(id) : null;
   var titulo = libroEditando === null ? "Agregar libro" : "Editar libro";
   document.getElementById("modalLibroTitle").textContent = titulo;
-  // Limpiar
+  
+  // Limpiar campos
   ["lTitulo","lAutor","lDesc","lImg","lPdf","lAnios"].forEach(function(f){ document.getElementById(f).value=""; });
   var lDiv=document.getElementById("libroDiv"); if(lDiv) lDiv.innerHTML="";
-  // Reset PDF field
+  
+  // Reset estados temporales
+  window._pendingPdfFile = null;
+  window._pendingImgFile = null;
   window._pdfDataUrl = null;
+  window._imgDataUrl = null;
+  window._autoCoverDataUrl = null;
+
   var pdfFile = document.getElementById("lPdfFile"); if(pdfFile) pdfFile.value="";
   var pdfLbl  = document.getElementById("pdfPreviewLabel"); if(pdfLbl){ pdfLbl.style.display="none"; pdfLbl.textContent=""; }
   var pdfDZ = document.getElementById("pdfDropZone");
   if(pdfDZ){ pdfDZ.style.borderColor="var(--borde)"; pdfDZ.style.background="var(--bg-alt)"; }
+
+  var imgFile = document.getElementById("lImgFile"); if(imgFile) imgFile.value="";
+  var coverWrap = document.getElementById("coverPreviewWrap"); if(coverWrap) coverWrap.style.display="none";
+  var imgDZ = document.getElementById("imgDropZone"); if(imgDZ) imgDZ.style.display="flex";
+
   document.getElementById("lMat").value = "";
   document.getElementById("lTipo").value = "Libro";
 
@@ -1857,14 +1933,29 @@ function abrirModalLibro(id){
       document.getElementById("lAutor").value  = l.a;
       document.getElementById("lDesc").value   = l.x;
       document.getElementById("lImg").value    = l.img||"";
+
+      if(l.img && l.img.trim() !== ""){
+        mostrarCoverPreview(l.img, "Portada asignada", l.img.substring(0, 45));
+      }
+
       var pdfVal = (l.pdf && !l.pdf.startsWith("data:")) ? l.pdf : (l.pdf ? "(PDF cargado)" : "");
       document.getElementById("lPdf").value = l.pdf||"";
       window._pdfDataUrl = l.pdf&&l.pdf.startsWith("data:") ? l.pdf : null;
       var pdfLbl = document.getElementById("pdfPreviewLabel");
       var pdfDZ  = document.getElementById("pdfDropZone");
       if(l.pdf && l.pdf !== ""){
-        if(pdfLbl){ pdfLbl.style.display="block"; pdfLbl.innerHTML = l.pdf.startsWith("data:") ? `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${DigiIcons["check"]}</span> PDF cargado (archivo)` : `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${DigiIcons["globe"]}</span> ` + l.pdf.substring(0,60)+(l.pdf.length>60?"...":""); }
+        if(pdfLbl){
+          pdfLbl.style.display="block";
+          var icCheck = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("check", {size:14, style:"margin-right:4px"}) : "";
+          var icGlobe = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("globe", {size:14, style:"margin-right:4px"}) : "";
+          pdfLbl.innerHTML = l.pdf.startsWith("data:") ? (icCheck + " PDF cargado (archivo)") : (icGlobe + " " + l.pdf.substring(0,60)+(l.pdf.length>60?"...":""));
+        }
         if(pdfDZ){ pdfDZ.style.borderColor="var(--verde)"; pdfDZ.style.background="var(--verde-c)"; }
+        
+        // Si no tiene imagen previa, intentar auto-generar la portada desde la página 1 del PDF
+        if(!l.img || l.img.trim() === ""){
+          autoGenerarPortadaDesdePdf(l.pdf);
+        }
       }
       document.getElementById("lMat").value    = l.mat||"";
       document.getElementById("lTipo").value   = l.tipo||"Libro";
@@ -1887,7 +1978,24 @@ async function guardarLibro(){
   var pdfRaw = document.getElementById("lPdf").value.trim();
   var pdf = pdfRaw;
 
-  // Si se seleccionó un archivo local, subirlo directamente al disco del servidor (/libros/)
+  // 1. Procesamiento de imagen de portada (Subida a disco / Enlace / Auto-generación)
+  if (window._pendingImgFile && window.API && window.API.upload) {
+    try {
+      toast("Subiendo imagen de portada al servidor...", "info");
+      var imgUploadRes = await API.upload.portada(window._pendingImgFile);
+      if (imgUploadRes && imgUploadRes.url) {
+        img = imgUploadRes.url;
+        window._pendingImgFile = null;
+      }
+    } catch(iErr) {
+      console.warn("Subida de portada a disco falló:", iErr.message);
+      if (window._imgDataUrl) img = window._imgDataUrl;
+    }
+  } else if (window._imgDataUrl && (!img || img === "")) {
+    img = window._imgDataUrl;
+  }
+
+  // 2. Procesamiento de archivo PDF
   if (window._pendingPdfFile && window.API && window.API.upload) {
     try {
       toast("Subiendo archivo PDF al servidor...", "info");
@@ -1903,6 +2011,34 @@ async function guardarLibro(){
   } else if (pdfRaw.startsWith("archivo:") && window._pdfDataUrl) {
     pdf = window._pdfDataUrl;
   }
+
+  // 3. Si NO se especificó portada pero hay PDF, tomar la página 1 del PDF como portada
+  if ((!img || img === "") && (pdf || window._pdfDataUrl || window._autoCoverDataUrl)) {
+    try {
+      var autoCoverDataUrl = window._autoCoverDataUrl || await extraerPortadaDePdf(pdf || window._pdfDataUrl);
+      if (autoCoverDataUrl) {
+        var coverBlob = dataURLtoBlob(autoCoverDataUrl);
+        if (coverBlob && window.API && window.API.upload) {
+          try {
+            var coverFile = new File([coverBlob], "portada_auto_" + Date.now() + ".jpg", { type: "image/jpeg" });
+            var autoUploadRes = await API.upload.portada(coverFile);
+            if (autoUploadRes && autoUploadRes.url) {
+              img = autoUploadRes.url;
+            } else {
+              img = autoCoverDataUrl;
+            }
+          } catch(e) {
+            img = autoCoverDataUrl;
+          }
+        } else {
+          img = autoCoverDataUrl;
+        }
+      }
+    } catch(covErr) {
+      console.warn("Extracción de portada automática falló:", covErr.message);
+    }
+  }
+
   var aniosRaw = document.getElementById("lAnios").value.trim();
 
   if(!t||!a||!mat){ toast("Completá título, autor y materia","err"); return; }
@@ -2489,6 +2625,7 @@ function abrirModal(id){
   el.classList.add("open");
   el.classList.add("active");
   document.body.style.overflow="hidden";
+  if(window.lucide && typeof lucide.createIcons === "function") lucide.createIcons();
 }
 function cerrarModal(id){
   var el = document.getElementById(id);
@@ -3033,6 +3170,150 @@ function setLibroDivs(divs){
   }
 }
 
+// Variables globales para archivos y portadas temporales
+window._pendingPdfFile = null;
+window._pendingImgFile = null;
+window._pdfDataUrl = null;
+window._imgDataUrl = null;
+window._autoCoverDataUrl = null;
+
+// Convertir Data URL a Blob de forma segura
+function dataURLtoBlob(dataurl) {
+  try {
+    var parts = dataurl.split(',');
+    var mime = parts[0].match(/:(.*?);/)[1] || 'image/jpeg';
+    var bstr = atob(parts[1]);
+    var n = bstr.length;
+    var u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch(e) {
+    return null;
+  }
+}
+
+// ── EXTRAER PORTADA DESDE PÁGINA 1 DEL PDF CON PDF.JS ──
+async function extraerPortadaDePdf(fileOrUrl){
+  if(!fileOrUrl) return null;
+  try {
+    if(!window.pdfjsLib) return null;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+
+    var loadingTask;
+    if(fileOrUrl instanceof File || fileOrUrl instanceof Blob){
+      var arrayBuf = await fileOrUrl.arrayBuffer();
+      loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
+    } else if(typeof fileOrUrl === "string" && fileOrUrl.startsWith("data:")){
+      var blob = dataURLtoBlob(fileOrUrl);
+      if(!blob) return null;
+      var arrayBuf = await blob.arrayBuffer();
+      loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
+    } else if(typeof fileOrUrl === "string"){
+      loadingTask = pdfjsLib.getDocument(fileOrUrl);
+    } else {
+      return null;
+    }
+
+    var pdfDoc = await loadingTask.promise;
+    var page = await pdfDoc.getPage(1);
+    var unscaledVp = page.getViewport({ scale: 1.0 });
+    var targetW = 600;
+    var scale = targetW / unscaledVp.width;
+    var viewport = page.getViewport({ scale: scale });
+
+    var canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    var ctx = canvas.getContext("2d");
+    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+    return canvas.toDataURL("image/jpeg", 0.88);
+  } catch(e) {
+    console.warn("No se pudo extraer portada del PDF:", e.message);
+    return null;
+  }
+}
+
+// Auto-generar portada desde PDF silenciosamente
+async function autoGenerarPortadaDesdePdf(source){
+  try {
+    var coverDataUrl = await extraerPortadaDePdf(source);
+    if(coverDataUrl){
+      window._autoCoverDataUrl = coverDataUrl;
+      var curManualImg = document.getElementById("lImg").value.trim();
+      if(!window._pendingImgFile && !curManualImg && !window._imgDataUrl){
+        mostrarCoverPreview(coverDataUrl, "📄 Auto: Página 1 del PDF", "Generada desde el archivo PDF");
+      }
+    }
+  } catch(e){}
+}
+
+// ── MANEJO DE IMAGEN DE PORTADA ──
+function mostrarCoverPreview(src, badgeText, filenameText){
+  var wrap = document.getElementById("coverPreviewWrap");
+  var drop = document.getElementById("imgDropZone");
+  var imgEl = document.getElementById("coverPreviewImg");
+  var badge = document.getElementById("coverPreviewBadge");
+  var fname = document.getElementById("coverPreviewFilename");
+  if(imgEl) imgEl.src = src;
+  if(badge) badge.textContent = badgeText || "Portada seleccionada";
+  if(fname) fname.textContent = filenameText || "portada.jpg";
+  if(wrap) wrap.style.display = "flex";
+  if(drop) drop.style.display = "none";
+}
+
+function handleImgFile(input){
+  if(!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  window._pendingImgFile = file;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    window._imgDataUrl = e.target.result;
+    mostrarCoverPreview(e.target.result, "Imagen seleccionada", file.name + " (" + (file.size/(1024*1024)).toFixed(1) + " MB)");
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleImgDrop(e){
+  e.preventDefault();
+  var dz = document.getElementById("imgDropZone");
+  if(dz) dz.classList.remove("drag-active");
+  var file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith("image/")){
+    document.getElementById("lImgFile").files = e.dataTransfer.files;
+    handleImgFile(document.getElementById("lImgFile"));
+  }
+}
+
+function actualizarImgPreview(){
+  var val = document.getElementById("lImg").value.trim();
+  if(val){
+    window._pendingImgFile = null;
+    window._imgDataUrl = null;
+    mostrarCoverPreview(val, "Enlace URL", val.substring(0, 45) + (val.length > 45 ? "..." : ""));
+  } else {
+    quitarPortadaSeleccionada();
+  }
+}
+
+function quitarPortadaSeleccionada(){
+  window._pendingImgFile = null;
+  window._imgDataUrl = null;
+  document.getElementById("lImg").value = "";
+  var imgInput = document.getElementById("lImgFile");
+  if(imgInput) imgInput.value = "";
+
+  if(window._autoCoverDataUrl){
+    mostrarCoverPreview(window._autoCoverDataUrl, "📄 Auto: Página 1 del PDF", "Generada desde el archivo PDF");
+  } else {
+    var wrap = document.getElementById("coverPreviewWrap");
+    var drop = document.getElementById("imgDropZone");
+    if(wrap) wrap.style.display = "none";
+    if(drop) drop.style.display = "flex";
+  }
+}
+
 // ── MANEJO PDF ──
 function handlePdfFile(input){
   if(!input.files||!input.files[0]) return;
@@ -3042,9 +3323,17 @@ function handlePdfFile(input){
   var dz  = document.getElementById("pdfDropZone");
   document.getElementById("lPdf").value = "archivo:" + file.name;
   var mb = (file.size / (1024 * 1024)).toFixed(1);
-  if(lbl){ lbl.style.display="block"; lbl.innerHTML = `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${DigiIcons["check"]}</span> Archivo listo para subir: ` + file.name + ' (' + mb + ' MB)'; }
-  if(dz){ dz.style.borderColor="var(--verde)"; dz.style.background="var(--verde-c)";
-    dz.innerHTML = '<div style="font-size:1.5rem"><i data-lucide="file-text" style="width:14px;height:14px"></i></div><p style="font-size:.88rem;font-weight:700;color:var(--verde)">'+file.name+' ('+mb+' MB)</p><p style="font-size:.75rem;color:var(--txt-m)">Se guardará en el disco del servidor · Hacé clic para cambiar</p>'; }
+  if(lbl){
+    lbl.style.display="block";
+    var icChk = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("check", {size:14, style:"margin-right:4px"}) : "";
+    lbl.innerHTML = icChk + ' Archivo listo para subir: ' + file.name + ' (' + mb + ' MB)';
+  }
+  if(dz){
+    dz.style.borderColor="var(--verde)"; dz.style.background="var(--verde-c)";
+    dz.innerHTML = '<div style="font-size:1.5rem"><i data-lucide="file-text" style="width:14px;height:14px"></i></div><p style="font-size:.88rem;font-weight:700;color:var(--verde)">'+file.name+' ('+mb+' MB)</p><p style="font-size:.75rem;color:var(--txt-m)">Se guardará en el disco del servidor · Hacé clic para cambiar</p>';
+  }
+  // Auto-extraer página 1 como portada si no hay portada manual
+  autoGenerarPortadaDesdePdf(file);
 }
 
 function handlePdfDrop(e){
@@ -3065,7 +3354,11 @@ function actualizarPdfPreview(){
   if(!lbl) return;
   if(val && !val.startsWith("archivo:")){
     lbl.style.display = "block";
-    lbl.innerHTML = `<span class="digi-svg-icon" style="width:14px;height:14px;margin-right:4px">${DigiIcons["globe"]}</span> URL: ` + val.substring(0,60) + (val.length>60?"...":"");
+    var icGlb = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("globe", {size:14, style:"margin-right:4px"}) : "";
+    lbl.innerHTML = icGlb + ' URL: ' + val.substring(0,60) + (val.length>60?"...":"");
+    if(val.toLowerCase().endsWith(".pdf") || val.indexOf("drive.google.com") < 0){
+      autoGenerarPortadaDesdePdf(val);
+    }
   } else if(!val){
     lbl.style.display = "none";
   }
