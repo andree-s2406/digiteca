@@ -839,9 +839,119 @@ footer {
   .hamburger {
     display: flex;
   }
+  /* Footer compacto en 2 columnas para celular */
+  footer {
+    padding: 30px 16px 20px;
+  }
   .foot-inner {
-    grid-template-columns: 1fr;
-    gap: 24px;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 14px;
+  }
+  .foot-brand {
+    grid-column: 1 / -1;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .foot-logo-img {
+    width: 42px;
+    height: 42px;
+  }
+  .foot-school {
+    font-size: 0.82rem;
+    line-height: 1.3;
+  }
+  .foot-desc {
+    font-size: 0.76rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .foot-col h5 {
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .foot-col a,
+  .foot-col p {
+    font-size: 0.78rem;
+    margin-bottom: 6px;
+    line-height: 1.35;
+  }
+  .foot-col:last-child {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 12px;
+    margin-top: 2px;
+  }
+  .foot-col:last-child h5 {
+    grid-column: 1 / -1;
+    margin-bottom: 4px;
+  }
+  .foot-bottom {
+    margin-top: 20px;
+    padding-top: 14px;
+    justify-content: center;
+    text-align: center;
+  }
+  .foot-bottom p,
+  .foot-copy {
+    font-size: 0.70rem;
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  /* Libros en celular: de a dos por fila, más compactos y mejor proporcionados */
+  .cat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .libro-card {
+    border-radius: 12px;
+  }
+  .libro-rank {
+    font-size: 0.54rem;
+    padding: 2px 5px;
+    top: 5px;
+    right: 5px;
+    border-radius: 6px;
+    gap: 2px;
+  }
+  .libro-rank svg,
+  .libro-rank i {
+    width: 10px !important;
+    height: 10px !important;
+  }
+  .libro-body {
+    padding: 6px 8px 10px;
+  }
+  .libro-cat-tag {
+    font-size: 0.58rem;
+    padding: 1px 6px;
+    border-radius: 6px;
+    letter-spacing: 0.03em;
+    margin-bottom: 3px;
+  }
+  .libro-title {
+    font-size: 0.80rem;
+    line-height: 1.22;
+    margin-bottom: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .libro-autor {
+    font-size: 0.68rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 

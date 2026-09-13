@@ -240,10 +240,57 @@ html.dark .desc-hero {
     padding: 88px 20px 36px;
   }
   .desc-main {
-    padding: 32px 16px 60px;
+    padding: 24px 12px 50px;
   }
   .desc-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .desc-card {
+    border-radius: 12px;
+  }
+  .desc-card-body {
+    padding: 8px 8px 10px;
+  }
+  .desc-card-mat {
+    font-size: 0.58rem;
+    padding: 2px 6px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+  }
+  .desc-card-title {
+    font-size: 0.80rem;
+    line-height: 1.22;
+    margin-bottom: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .desc-card-autor {
+    font-size: 0.70rem;
+    line-height: 1.2;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .desc-card-fecha {
+    font-size: 0.65rem;
+  }
+  .desc-card-actions {
+    margin-top: 8px !important;
+  }
+  .btn-card-read {
+    padding: 6px 8px !important;
+    font-size: 0.74rem !important;
+    border-radius: 6px !important;
+  }
+  .desc-card-del {
+    width: 24px;
+    height: 24px;
+    opacity: 0.85;
+    top: 6px;
+    right: 6px;
   }
 }

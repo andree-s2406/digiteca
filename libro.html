@@ -363,18 +363,60 @@ function renderDetalleLibro(l){
   }
   document.getElementById("coverTitlePH").textContent  = l.t || "";
   document.getElementById("coverAuthorPH").textContent = l.a || "";
-  var cleanCover = (l.img && !l.img.startsWith("file:")) ? l.img : ((l.img && l.img.includes("test.jpg")) ? "img/test.jpg" : "");
-  if(cleanCover && cleanCover !== ""){
-    var img = document.getElementById("coverImg");
-    img.src = cleanCover; img.alt = l.t || "";
-    function mostrarCover(){
+  var cleanCover = (l.img && !l.img.startsWith("file:") && !l.img.startsWith("img/portada_auto_")) ? l.img : ((l.img && l.img.includes("test.jpg")) ? "img/test.jpg" : "");
+  var img = document.getElementById("coverImg");
+
+  function mostrarCover(){
+    if(img){
       img.classList.add("loaded");
-      document.getElementById("coverEmoji").style.display   = "none";
-      document.getElementById("coverTitlePH").style.display = "none";
-      document.getElementById("coverAuthorPH").style.display= "none";
+      img.style.display = "block";
     }
-    if(img.complete && img.naturalWidth>0) mostrarCover();
-    else { img.onload=mostrarCover; img.onerror=function(){img.style.display="none";}; }
+    var em = document.getElementById("coverEmoji"); if(em) em.style.display = "none";
+    var ct = document.getElementById("coverTitlePH"); if(ct) ct.style.display = "none";
+    var ca = document.getElementById("coverAuthorPH"); if(ca) ca.style.display = "none";
+  }
+
+  async function intentarAutoCoverPdf(){
+    if (l && l.pdf && !l.pdf.startsWith("archivo:") && window.pdfjsLib) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+        var loadingTask = pdfjsLib.getDocument(l.pdf);
+        var pdfDoc = await loadingTask.promise;
+        var page = await pdfDoc.getPage(1);
+        var unscaledVp = page.getViewport({ scale: 1.0 });
+        var scale = 500 / unscaledVp.width;
+        var viewport = page.getViewport({ scale: scale });
+        var canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        var ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+        var autoUrl = canvas.toDataURL("image/jpeg", 0.82);
+        if (img) {
+          img.src = autoUrl;
+          mostrarCover();
+        }
+        return;
+      } catch(e) {}
+    }
+    if(img) img.style.display = "none";
+  }
+
+  if(img){
+    img.alt = l.t || "";
+    if(cleanCover && cleanCover !== ""){
+      img.src = cleanCover;
+      if(img.complete && img.naturalWidth > 0) {
+        mostrarCover();
+      } else {
+        img.onload = mostrarCover;
+        img.onerror = intentarAutoCoverPdf;
+      }
+    } else {
+      intentarAutoCoverPdf();
+    }
   }
 
   // Estado guardado

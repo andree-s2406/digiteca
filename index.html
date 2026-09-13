@@ -258,8 +258,9 @@ async function initInicioAPI(){
       if (window.API.stats) API.stats.registrarVisita().catch(function(){});
       if (window.API.libros) {
         const libs = await API.libros.getAll();
-        if (Array.isArray(libs)) {
+        if (Array.isArray(libs) && libs.length > 0) {
           LIBROS = libs;
+          try { localStorage.setItem("digi-admin-libros", JSON.stringify(libs)); } catch(e){}
         }
       }
       if (window.API.ranking) {
@@ -315,7 +316,7 @@ initInicioAPI();
 
 
 function getImg(l){
-  if(l.img && !l.img.startsWith("file:")) return l.img;
+  if(l.img && !l.img.startsWith("file:") && !l.img.startsWith("img/portada_auto_")) return l.img;
   if(l.img && l.img.includes("test.jpg")) return "img/test.jpg";
   return "https://placehold.co/720x920/A8D8EE/2E7FB3?text="+encodeURIComponent((l.t||"Libro").split(" ").slice(0,3).join("+"));
 }
@@ -385,7 +386,7 @@ function renderCatalogo(){
     var badgeTexto = "#" + pos + " más buscado";
 
     h += '<div class="libro-card" onclick="window.location.href=\'libro.html?id=' + encodeURIComponent(l.id) + '\'" style="cursor:pointer">';
-    h += '<img class="libro-img" src="' + getImg(l) + '" alt="' + (l.t||"") + '" loading="lazy"/>';
+    h += '<img class="libro-img" src="' + getImg(l) + '" alt="' + (l.t||"") + '" loading="lazy" onerror="this.onerror=null;this.src=\'img/test.jpg\'"/>';
     if(pos > 0) {
       h += '<span class="libro-rank">' + DigiIcons.get("flame", {size:14, color:"#e85d04"}) + ' ' + badgeTexto + '</span>';
     }

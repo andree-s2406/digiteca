@@ -235,6 +235,7 @@
 
 <script src="js/morphicons.global.js"></script><script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/pdf.min.js"></script>
 <script src="js/motion.js"></script>
 <script src="js/api.js"></script>
 <script src="js/quick-nav.js" defer></script>
@@ -522,6 +523,49 @@ function aplicar(){
   render(lista, 1);
 }
 
+/* ── GESTIÓN Y FALLBACK DE PORTADAS (AUTOGENERACIÓN DINÁMICA) ── */
+window.fallbackCover = async function(imgEl, libroId) {
+  if (!imgEl) return;
+  imgEl.onerror = null;
+
+  var l = null;
+  if (Array.isArray(LIBROS)) {
+    for (var i = 0; i < LIBROS.length; i++) {
+      if (String(LIBROS[i].id) === String(libroId)) { l = LIBROS[i]; break; }
+    }
+  }
+
+  // 1. Si el libro tiene PDF disponible, extraer la página 1 en vivo con PDF.js en el cliente
+  if (l && l.pdf && !l.pdf.startsWith("archivo:") && window.pdfjsLib) {
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+      var loadingTask = pdfjsLib.getDocument(l.pdf);
+      var pdfDoc = await loadingTask.promise;
+      var page = await pdfDoc.getPage(1);
+      var unscaledVp = page.getViewport({ scale: 1.0 });
+      var scale = 400 / unscaledVp.width;
+      var viewport = page.getViewport({ scale: scale });
+      var canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      var ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      var autoUrl = canvas.toDataURL("image/jpeg", 0.82);
+      imgEl.src = autoUrl;
+      l.img = autoUrl;
+      l.portada_url = autoUrl;
+      return;
+    } catch(errPdf) {
+      console.warn("Fallo extracción dinámica de PDF:", errPdf.message);
+    }
+  }
+
+  // 2. Fallback seguro que garantiza que nunca se vea el icono de imagen rota
+  imgEl.src = "img/test.jpg";
+};
+
 /* ── RENDER ── */
 function render(lista, pag){
   filtrados  = lista;
@@ -552,7 +596,7 @@ function render(lista, pag){
     h += '<div class="libro-card" data-id="' + l.id + '" onclick="abrirModal(\'' + l.id + '\')">';
     
     var cImg = (l.img && !l.img.startsWith("file:")) ? l.img : ((l.img && l.img.includes("test.jpg")) ? "img/test.jpg" : ('https://placehold.co/720x920/A8D8EE/2E7FB3?text='+encodeURIComponent(l.t.split(' ').slice(0,3).join('+'))));
-    h += '<img class="libro-emoji" src="' + cImg + '" alt="' + l.t + '" loading="lazy"/>';
+    h += '<img class="libro-emoji" src="' + cImg + '" alt="' + l.t + '" loading="lazy" onerror="fallbackCover(this, \'' + l.id + '\')"/>';
     h += '<div class="libro-badges">';
     h += '<span class="libro-cat-tag">' + l.mat + '</span>';
     h += '<span class="libro-anio-tag">' + al + '</span>';
@@ -626,8 +670,10 @@ function abrirModal(id){
   var aniosList = Array.isArray(l.anios) ? l.anios : [];
   var aniosStr = aniosList.length > 0 ? aniosList.map(function(a){ return a + "° Año"; }).join(", ") : "General";
   var src = (l.img && !l.img.startsWith("file:")) ? l.img : ((l.img && l.img.includes("test.jpg")) ? "img/test.jpg" : ("https://placehold.co/720x920/A8D8EE/2E7FB3?text=" + encodeURIComponent((l.t||"Libro").split(" ").slice(0,3).join("+"))));
-  document.getElementById("mEmoji").src = src;
-  document.getElementById("mEmoji").alt = l.t || "";
+  var mImgEl = document.getElementById("mEmoji");
+  mImgEl.onerror = function(){ fallbackCover(this, l.id); };
+  mImgEl.src = src;
+  mImgEl.alt = l.t || "";
   document.getElementById("mTitle").textContent = l.t || "";
   document.getElementById("mAutor").textContent = "Autor/a: " + (l.a || "No especificado");
   document.getElementById("mDesc").textContent  = l.x || "Sin descripción disponible.";

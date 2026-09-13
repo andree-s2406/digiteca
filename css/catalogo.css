@@ -121,6 +121,12 @@ html.dark .cat-hero {
   padding: 40px 40px 80px;
 }
 
+.cat-content {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
 /* ── SIDEBAR DE FILTROS ── */
 .sidebar {
   width: 236px;
@@ -574,8 +580,80 @@ html.dark .libro-anio-tag {
     flex: 1;
     max-width: 200px;
   }
-  .cat-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+  .cat-layout {
+    padding: 16px 12px 60px;
   }
+  .cat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .libro-card {
+    border-radius: 12px;
+    padding-bottom: 8px;
+  }
+  .libro-card .libro-emoji {
+    border-radius: 12px 12px 0 0;
+    margin: 0 0 6px;
+    aspect-ratio: 720 / 920;
+  }
+  .libro-card .libro-badges {
+    padding: 0 6px;
+    gap: 3px;
+    margin-bottom: 4px;
+    justify-content: flex-start;
+  }
+  .libro-cat-tag,
+  .libro-anio-tag {
+    font-size: 0.58rem;
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+  .libro-card .libro-title {
+    font-size: 0.80rem;
+    line-height: 1.22;
+    padding: 0 6px;
+    margin-bottom: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .libro-card .libro-autor {
+    font-size: 0.68rem;
+    line-height: 1.2;
+    padding: 0 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .paginacion {
+    gap: 6px;
+    margin-top: 24px;
+  }
+  .pag-btn {
+    min-width: 32px;
+    height: 32px;
+    font-size: 0.82rem;
+    padding: 0 8px;
+  }
+}
+
+/* Estructura pulida general de tarjeta de catálogo */
+.libro-card {
+  padding-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.libro-card .libro-emoji {
+  border-radius: 18px 18px 0 0;
+  margin: 0 0 10px;
+}
+.libro-card .libro-badges {
+  padding: 0 10px;
+}
+.libro-card .libro-title {
+  padding: 0 12px;
+}
+.libro-card .libro-autor {
+  padding: 0 12px;
 }
