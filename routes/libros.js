@@ -8,6 +8,8 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const LIBROS_JSON = path.join(DATA_DIR, 'libros.json');
 
 const bookDetailCache = new Map();
+const pdfBufferCache = new Map(); // id -> { buffer, title, length, time }
+const PDF_CACHE_MAX_ENTRIES = 8;
 let cachedLibros = loadLocalBackup();
 let lastCacheTime = cachedLibros ? Date.now() : 0;
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos en RAM
@@ -32,6 +34,7 @@ function invalidateCache() {
   cachedLibros = null;
   lastCacheTime = 0;
   bookDetailCache.clear();
+  pdfBufferCache.clear();
 }
 
 // Helper para convertir el formato de la BD al formato frontend esperado
@@ -177,16 +180,31 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// GET /api/libros/:id/pdf - Transmisión en streaming de PDF con soporte CORS nativo
+// GET /api/libros/:id/pdf - Transmisión en streaming de PDF con soporte CORS nativo y caché en RAM
 router.get('/:id/pdf', async (req, res) => {
   try {
     const rawId = req.params.id;
-    const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [String(rawId)]);
+    const cacheKey = String(rawId);
+    const now = Date.now();
+
+    // Cache hit en RAM (0 ms)
+    const cached = pdfBufferCache.get(cacheKey);
+    if (cached && (now - cached.time < 30 * 60 * 1000)) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(cached.title || 'libro')}.pdf"`);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      if (cached.length) res.setHeader('Content-Length', cached.length);
+      return res.send(cached.buffer);
+    }
+
+    const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [cacheKey]);
     if (result.rows.length === 0 || !result.rows[0].pdf_url) {
       return res.status(404).send('PDF no disponible');
     }
 
     const pdfUrl = result.rows[0].pdf_url;
+    const titulo = result.rows[0].titulo || 'libro';
+
     if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
       const upstream = await fetch(pdfUrl, { redirect: 'follow' });
       if (!upstream.ok) {
@@ -194,14 +212,28 @@ router.get('/:id/pdf', async (req, res) => {
       }
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(result.rows[0].titulo || 'libro')}.pdf"`);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
       res.setHeader('Access-Control-Allow-Origin', '*');
       
       const contentLength = upstream.headers.get('content-length');
       if (contentLength) res.setHeader('Content-Length', contentLength);
 
       const arrayBuf = await upstream.arrayBuffer();
-      return res.send(Buffer.from(arrayBuf));
+      const buf = Buffer.from(arrayBuf);
+
+      // Guardar en caché LRU básica
+      if (pdfBufferCache.size >= PDF_CACHE_MAX_ENTRIES) {
+        const oldestKey = pdfBufferCache.keys().next().value;
+        pdfBufferCache.delete(oldestKey);
+      }
+      pdfBufferCache.set(cacheKey, {
+        buffer: buf,
+        title: titulo,
+        length: contentLength,
+        time: now
+      });
+
+      return res.send(buf);
     } else {
       const localPath = path.join(__dirname, '..', pdfUrl.replace(/^\//, ''));
       if (fs.existsSync(localPath)) {

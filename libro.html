@@ -294,7 +294,7 @@ async function cargarLibro(){
   // Si tenemos datos en caché, renderizar al instante sin esperar la red
   if(l){
     libroActual = l;
-    renderDetalleLibro(l);
+    renderDetalleLibro(l, true);
   }
 
   // 2. SINCRONIZACIÓN EN SEGUNDO PLANO CON LA API (SWR)
@@ -302,8 +302,9 @@ async function cargarLibro(){
     try {
       var fresh = await API.libros.getById(idParam);
       if(fresh && fresh.id){
+        var pdfCambio = !l || !l.pdf || (fresh.pdf && fresh.pdf !== l.pdf);
         libroActual = fresh;
-        renderDetalleLibro(fresh);
+        renderDetalleLibro(fresh, pdfCambio);
       }
     } catch(e){
       console.warn("API getById:", e.message);
@@ -314,7 +315,7 @@ async function cargarLibro(){
       if(all && all.length > 0){
         l = all[0];
         libroActual = l;
-        renderDetalleLibro(l);
+        renderDetalleLibro(l, true);
       }
     } catch(e){}
   }
@@ -340,7 +341,8 @@ async function cargarLibro(){
   } catch(e){}
 }
 
-function renderDetalleLibro(l){
+function renderDetalleLibro(l, recargarVisor){
+  if(recargarVisor === undefined) recargarVisor = true;
   // Breadcrumb
   document.getElementById("breadcrumb").innerHTML =
     '<a href="catalogo.html">Catálogo</a><span>›</span>' +
@@ -445,7 +447,9 @@ function renderDetalleLibro(l){
   }
 
   // Cargar visor PDF
-  cargarPDF(l);
+  if(recargarVisor){
+    cargarPDF(l);
+  }
 }
 
 // Iniciar carga del libro
@@ -466,6 +470,9 @@ function dataURLtoBlob(dataurl) {
 
 var currentBlobUrl = null;
 var currentPdfDoc = null;
+var currentLoadingTask = null;
+var currentlyLoadedPdfKey = null;
+var pdfRenderGeneration = 0;
 var pdfPageObserver = null;
 var renderingPages = {};
 var renderedPages = {};
@@ -480,18 +487,26 @@ async function cargarPDF(l){
   var frame     = document.getElementById("pdfFrame");
   var noDisp    = document.getElementById("pdfNoDisp");
   var container = document.getElementById("pdfContainer");
-
-  var scrubber = document.getElementById("pdfScrubberTrack");
-  if(scrubber) scrubber.style.display = "none";
+  var scrubber  = document.getElementById("pdfScrubberTrack");
 
   if(!l || !l.pdf || l.pdf.trim() === ""){
+    currentlyLoadedPdfKey = null;
     if(noDisp) noDisp.style.display = "flex";
-    if(frame) frame.style.display = "none";
+    if(frame) { frame.style.display = "none"; frame.src = "about:blank"; }
     if(container) container.style.display = "none";
+    if(scrubber) scrubber.style.display = "none";
     return;
   }
 
   var url = l.pdf.trim();
+  var streamUrl = (url.indexOf("github.com") >= 0 && l && l.id) ? ("/api/libros/" + l.id + "/pdf") : url;
+  var pdfKey = (l.id || "") + "::" + streamUrl;
+
+  // Si este PDF ya fue cargado o se está cargando activamente, no duplicar la carga
+  if(currentlyLoadedPdfKey === pdfKey && (currentPdfDoc || currentLoadingTask)){
+    return;
+  }
+  currentlyLoadedPdfKey = pdfKey;
 
   // Limpiar blob URL anterior si existía
   if(currentBlobUrl){
@@ -502,7 +517,8 @@ async function cargarPDF(l){
   // 1. Archivo sin procesar
   if(url.startsWith("archivo:")){
     if(container) container.style.display = "none";
-    if(frame) frame.style.display = "none";
+    if(frame) { frame.style.display = "none"; frame.src = "about:blank"; }
+    if(scrubber) scrubber.style.display = "none";
     if(noDisp){
       noDisp.style.display = "flex";
       noDisp.innerHTML = '<div class="pdf-nd-icon" style="color:var(--cel-o)"><i data-lucide="file-text" style="width:64px;height:64px"></i></div><h3>Archivo no procesado</h3><p>El PDF debe ser subido arrastrando el archivo en el panel de administración.</p>';
@@ -516,6 +532,7 @@ async function cargarPDF(l){
     url = url.replace(/\/(view|edit)[^]*$/, "/preview");
     if(noDisp) noDisp.style.display = "none";
     if(container) container.style.display = "none";
+    if(scrubber) scrubber.style.display = "none";
     if(frame){
       frame.style.display = "block";
       frame.src = url;
@@ -525,7 +542,6 @@ async function cargarPDF(l){
 
   // 3. Renderizado continuo nativo con PDF.js (Móvil y Escritorio)
   if(window.pdfjsLib){
-    var streamUrl = (url.indexOf("github.com") >= 0 && l && l.id) ? ("/api/libros/" + l.id + "/pdf") : url;
     renderPdfContinuous(streamUrl);
     return;
   }
@@ -533,6 +549,7 @@ async function cargarPDF(l){
   // Fallback tradicional en iframe si PDF.js no estuviese disponible
   if(noDisp) noDisp.style.display = "none";
   if(container) container.style.display = "none";
+  if(scrubber) scrubber.style.display = "none";
   if(frame){
     frame.style.display = "block";
     frame.src = url;
@@ -554,16 +571,25 @@ function calcularAnchoOptimo(container){
 
 var currentTargetWidth = 0;
 
-// Renderizador fluido de páginas continuas
+// Renderizador fluido de páginas continuas con protección total contra ejecuciones duplicadas
 async function renderPdfContinuous(source){
+  var thisGen = ++pdfRenderGeneration;
+
   var container = document.getElementById("pdfContainer");
   var pagesFlow = document.getElementById("pdfPages");
   var loadingEl = document.getElementById("pdfLoading");
   var frame     = document.getElementById("pdfFrame");
   var noDisp    = document.getElementById("pdfNoDisp");
+  var scrubber  = document.getElementById("pdfScrubberTrack");
 
+  // Exclusión estricta: ocultar y limpiar iframe para que jamás aparezca un segundo visor
+  if(frame){
+    frame.style.display = "none";
+    frame.src = "about:blank";
+  }
   if(noDisp) noDisp.style.display = "none";
-  if(frame) frame.style.display = "none";
+  if(scrubber) scrubber.style.display = "none";
+
   if(container) container.style.display = "flex";
   if(loadingEl) loadingEl.style.display = "flex";
   if(pagesFlow){
@@ -571,6 +597,11 @@ async function renderPdfContinuous(source){
     pagesFlow.style.display = "none";
   }
 
+  // Desconectar observadores y cancelar tareas anteriores
+  if(currentLoadingTask){
+    try { currentLoadingTask.destroy(); }catch(e){}
+    currentLoadingTask = null;
+  }
   if(currentPdfDoc){
     try { await currentPdfDoc.destroy(); }catch(e){}
     currentPdfDoc = null;
@@ -587,24 +618,42 @@ async function renderPdfContinuous(source){
     if(typeof source === "string" && (source.startsWith("data:application/pdf") || source.startsWith("data:application/octet-stream") || source.startsWith("data:binary/octet-stream"))){
       var blob = dataURLtoBlob(source);
       var arrayBuf = await blob.arrayBuffer();
+      if(thisGen !== pdfRenderGeneration) return;
       loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
     } else if(typeof source === "string" && (!source.startsWith("http://") && !source.startsWith("https://") || source.indexOf(window.location.host) >= 0)){
       var res = await fetch(source);
+      if(thisGen !== pdfRenderGeneration) return;
       if(!res.ok) throw new Error("HTTP " + res.status);
       var arrayBuf = await res.arrayBuffer();
+      if(thisGen !== pdfRenderGeneration) return;
       loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
     } else {
       loadingTask = pdfjsLib.getDocument(source);
     }
 
-    currentPdfDoc = await loadingTask.promise;
+    currentLoadingTask = loadingTask;
+    var pdfDoc = await loadingTask.promise;
+    if(thisGen !== pdfRenderGeneration) return;
+    currentPdfDoc = pdfDoc;
+    currentLoadingTask = null;
+
     var numPages = currentPdfDoc.numPages;
 
     if(loadingEl) loadingEl.style.display = "none";
-    if(pagesFlow) pagesFlow.style.display = "flex";
+    if(pagesFlow){
+      pagesFlow.innerHTML = "";
+      pagesFlow.style.display = "flex";
+    }
+
+    // Asegurar que el frame alternativo permanezca completamente apagado
+    if(frame){
+      frame.style.display = "none";
+      frame.src = "about:blank";
+    }
 
     // Obtener aspecto de la primera página
     var firstPage = await currentPdfDoc.getPage(1);
+    if(thisGen !== pdfRenderGeneration) return;
     var unscaledVp = firstPage.getViewport({ scale: 1.0 });
     var aspect = unscaledVp.height / unscaledVp.width;
 
@@ -768,9 +817,12 @@ async function renderPdfContinuous(source){
     }
 
   } catch(err) {
+    if(thisGen !== pdfRenderGeneration) return;
+
     console.warn("Fallo en render nativo PDF.js:", err);
     if(loadingEl) loadingEl.style.display = "none";
     if(container) container.style.display = "none";
+    if(pagesFlow) pagesFlow.innerHTML = "";
     
     var isNotFound = (err && (String(err).includes("404") || String(err).includes("Failed to fetch") || String(err).includes("Missing PDF")));
     if(isNotFound || !source || source.startsWith("/libros/libro_")){
@@ -779,7 +831,7 @@ async function renderPdfContinuous(source){
         noDisp.innerHTML = '<div class="pdf-nd-icon" style="color:var(--cel-o)"><i data-lucide="file-text" style="width:64px;height:64px"></i></div><h3>PDF no disponible</h3><p>El archivo de este ejemplar aún no fue vinculado o fue retirado temporalmente.</p>';
         if(window.lucide && lucide.createIcons) lucide.createIcons();
       }
-      if(frame) frame.style.display = "none";
+      if(frame) { frame.style.display = "none"; frame.src = "about:blank"; }
       return;
     }
 
@@ -797,7 +849,16 @@ async function renderSinglePage(pageNum, targetWidth){
   renderingPages[pageNum] = true;
 
   try {
-    var page = await currentPdfDoc.getPage(pageNum);
+    var doc = currentPdfDoc;
+    if(!doc) {
+      delete renderingPages[pageNum];
+      return;
+    }
+    var page = await doc.getPage(pageNum);
+    if(!currentPdfDoc || currentPdfDoc !== doc) {
+      delete renderingPages[pageNum];
+      return;
+    }
     var unscaledVp = page.getViewport({ scale: 1.0 });
     var tWidth = targetWidth || currentTargetWidth || 800;
     var scale = tWidth / unscaledVp.width;
