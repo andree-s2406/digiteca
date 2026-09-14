@@ -385,6 +385,8 @@
 <script src="js/icons.js"></script>
 <script src="js/motion.js"></script>
 <script src="js/api.js"></script>
+<script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/quick-nav.js" defer></script>
 <script>
 // ── ESTADO LOCAL (simula backend) ──
@@ -396,28 +398,20 @@ function cargarSesion(){
   try{
     var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
     if(sesion && sesion.email){
-      var usuarios = JSON.parse(localStorage.getItem("digi-admin-usuarios")||"[]");
-      var u = null;
-      for(var i=0;i<usuarios.length;i++){
-        if((usuarios[i].email||"").toLowerCase() === sesion.email.toLowerCase()){
-          u = usuarios[i];
-          break;
-        }
-      }
-      if(u){
-        DATOS.nombre   = u.nombre   || "";
-        DATOS.apellido = u.apellido || "";
-        DATOS.correo   = u.email    || "";
-        DATOS.anio     = u.anio     || "";
-        DATOS.division = u.div      || "";
-        DATOS.pwd      = u.pwd      || "";
-        DATOS.avatar   = u.avatar   || "";
-        return;
-      }
       DATOS.correo   = sesion.email  || "";
-      DATOS.nombre   = sesion.nombre ? sesion.nombre.split(" ")[0] : "";
-      DATOS.apellido = sesion.nombre ? sesion.nombre.split(" ").slice(1).join(" ") : "";
-      DATOS.pwd      = "1234";
+      DATOS.nombre   = sesion.nombre ? (sesion.nombre.includes(" ") ? sesion.nombre.split(" ")[0] : sesion.nombre) : "";
+      DATOS.apellido = sesion.apellido || (sesion.nombre && sesion.nombre.includes(" ") ? sesion.nombre.split(" ").slice(1).join(" ") : "");
+      DATOS.anio     = sesion.anio     || "";
+      DATOS.division = sesion.div || sesion.division || "";
+      DATOS.avatar   = sesion.avatar   || "";
+      DATOS.pwd      = sesion.pwd || sesion.password || "";
+      // Si la sesión no tiene avatar, buscar en digi-cuenta (guardado localmente)
+      if(!DATOS.avatar){
+        try {
+          var cuentaLocal = JSON.parse(localStorage.getItem("digi-cuenta") || "{}");
+          if(cuentaLocal.avatar) DATOS.avatar = cuentaLocal.avatar;
+        } catch(e2){}
+      }
     } else {
       var saved = JSON.parse(localStorage.getItem("digi-cuenta")||"{}");
       if(saved && saved.correo) DATOS = saved;
@@ -426,19 +420,96 @@ function cargarSesion(){
 }
 cargarSesion();
 
+// Revalidar en segundo plano con el servidor (CockroachDB) para asegurar datos frescos
+async function revalidarPerfilConServidor(){
+  try {
+    if(window.API && window.API.usuarios && typeof API.usuarios.getMe === 'function'){
+      var fresh = await API.usuarios.getMe();
+      if(fresh && fresh.email){
+        DATOS.nombre   = fresh.nombre   || "";
+        DATOS.apellido = fresh.apellido || "";
+        DATOS.correo   = fresh.email    || "";
+        DATOS.anio     = fresh.anio     || "";
+        DATOS.division = fresh.div      || "";
+        // Solo actualizar avatar si el servidor realmente tiene uno.
+        // Si la foto era muy grande (base64 de celular) puede que no se haya guardado
+        // en la BD → en ese caso conservamos lo que hay en localStorage local.
+        if(fresh.avatar){
+          DATOS.avatar = fresh.avatar;
+        } else {
+          try {
+            var cuentaLocal = JSON.parse(localStorage.getItem("digi-cuenta") || "{}");
+            if(cuentaLocal.avatar) DATOS.avatar = cuentaLocal.avatar;
+          } catch(e2){}
+        }
+
+        var sesion = JSON.parse(localStorage.getItem("digi-sesion") || "{}");
+        var updated = Object.assign({}, sesion, fresh);
+        // No pisar el avatar en sesión si el servidor no tiene uno pero localmente sí hay
+        if(!fresh.avatar && DATOS.avatar) updated.avatar = DATOS.avatar;
+        localStorage.setItem("digi-sesion", JSON.stringify(updated));
+
+        if(typeof poblarUI === 'function') poblarUI();
+        console.log("[MiCuenta] Perfil sincronizado y actualizado con el servidor.");
+      }
+    }
+  } catch(err){
+    console.log("[MiCuenta] Revalidación de perfil offline o local:", err.message);
+  }
+}
+setTimeout(revalidarPerfilConServidor, 100);
+
+// Escuchar actualizaciones de usuario en tiempo real desde Pusher / otros dispositivos
+window.addEventListener('digi:usuarios-updated', function(e){
+  console.log("[MiCuenta] Cambio de usuario detectado vía Sync:", e.detail);
+  var sesion = JSON.parse(localStorage.getItem("digi-sesion") || "{}");
+  if(!e.detail || !e.detail.email || (sesion.email && e.detail.email.toLowerCase() === sesion.email.toLowerCase())){
+    revalidarPerfilConServidor();
+  }
+});
+
+// Comprime un data URL base64 a max 200x200px y calidad JPEG 80% para ahorrar espacio en la BD
+function comprimirAvatarParaServidor(src, callback) {
+  if (!src || !src.startsWith("data:")) { callback(src); return; }
+  // Si ya es pequeño (< 50KB) no hace falta comprimir
+  if (src.length < 50000) { callback(src); return; }
+  try {
+    var img = new Image();
+    img.onload = function() {
+      var MAX = 200;
+      var w = img.width, h = img.height;
+      var scale = Math.min(MAX / w, MAX / h, 1);
+      var canvas = document.createElement("canvas");
+      canvas.width  = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      callback(canvas.toDataURL("image/jpeg", 0.80));
+    };
+    img.onerror = function(){ callback(src); };
+    img.src = src;
+  } catch(e){ callback(src); }
+}
+
 async function guardarLocal() {
   try {
     localStorage.setItem("digi-cuenta", JSON.stringify(DATOS));
     if (window.API && window.API.usuarios) {
-      await API.usuarios.updatePerfil({
-        email: DATOS.correo,
-        nombre: DATOS.nombre,
-        apellido: DATOS.apellido,
-        anio: DATOS.anio,
-        div: DATOS.division,
-        avatar: DATOS.avatar,
-        password: DATOS.pwd
-      }).catch(function(err){ console.warn("Error actualizando perfil vía API:", err.message); });
+      // Comprimir avatar antes de enviarlo al servidor para asegurar que se guarde bien
+      await new Promise(function(resolve){
+        comprimirAvatarParaServidor(DATOS.avatar, function(avatarComprimido){
+          API.usuarios.updatePerfil({
+            email: DATOS.correo,
+            nombre: DATOS.nombre,
+            apellido: DATOS.apellido,
+            anio: DATOS.anio,
+            div: DATOS.division,
+            avatar: avatarComprimido,
+            password: DATOS.pwd
+          }).catch(function(err){ console.warn("Error actualizando perfil vía API:", err.message); })
+            .finally(resolve);
+        });
+      });
     }
     try{
       var usuarios = JSON.parse(localStorage.getItem("digi-admin-usuarios")||"[]");
