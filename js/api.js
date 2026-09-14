@@ -9,6 +9,12 @@ const _inFlight = new Map();
 const CACHE_TTL_MS = 5000; // 5 segundos para llamadas GET idénticas
 
 const API = {
+  // Limpieza manual de caché
+  clearCache() {
+    _cache.clear();
+    _inFlight.clear();
+  },
+
   // Base request wrapper
   async request(endpoint, options = {}) {
     const method = (options.method || 'GET').toUpperCase();
@@ -125,8 +131,11 @@ const API = {
 
   // 3. Usuarios
   usuarios: {
-    async getAll() {
-      return API.request('/api/usuarios');
+    async getAll(options = {}) {
+      return API.request('/api/usuarios', options);
+    },
+    async getMe() {
+      return API.request('/api/usuarios/me', { noCache: true });
     },
     async create(usuarioData) {
       return API.request('/api/usuarios', {

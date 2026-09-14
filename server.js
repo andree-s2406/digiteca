@@ -13,6 +13,7 @@ const statsRoutes = require('./routes/stats');
 const rankingRoutes = require('./routes/ranking');
 const uploadRoutes = require('./routes/upload');
 const contactoRoutes = require('./routes/contacto');
+const syncRoutes = require('./routes/sync');
 
 const compression = require('compression');
 
@@ -114,6 +115,7 @@ function apiAuthGuard(req, res, next) {
     '/stats/visita',
     '/stats/lectura',
     '/stats/libro-abierto',
+    '/sync',
     '/health'
   ];
   if (publicPaths.some(p => req.path === p || req.path.startsWith(p))) {
@@ -135,7 +137,10 @@ function apiAuthGuard(req, res, next) {
     return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
   }
 
-  if (adminEndpoints.some(p => req.path.startsWith(p)) && !isAdmin) {
+  // Permitir que cualquier usuario autenticado vea y edite su propio perfil
+  const isSelfProfile = req.path === '/usuarios/perfil' || req.path === '/usuarios/me';
+
+  if (adminEndpoints.some(p => req.path.startsWith(p)) && !isAdmin && !isSelfProfile) {
     return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
   }
 
@@ -153,6 +158,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/ranking', rankingRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/contacto', contactoRoutes);
+app.use('/api/sync', syncRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

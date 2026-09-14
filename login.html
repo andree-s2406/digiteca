@@ -122,6 +122,8 @@
 <script src="js/lucide.min.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/api.js"></script>
+<script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+<script src="js/sync.js"></script>
 <script>
 if(typeof setupThemeToggle === "function") setupThemeToggle();
 
@@ -149,12 +151,12 @@ async function intentarLogin(){
   var msg   = document.getElementById("loginMsg");
   var btn   = document.getElementById("btnLogin");
 
-  /* Limpiar errores previos */
-  msg.className = "login-msg";
-  msg.style.display = "none";
   document.getElementById("loginEmail").classList.remove("error");
   document.getElementById("loginPwd").classList.remove("error");
+  msg.className = "login-msg";
+  msg.textContent = "";
 
+  /* Validación básica */
   if(!email){
     mostrarMsgLogin("Ingresá tu correo electrónico.", "err");
     document.getElementById("loginEmail").classList.add("error");
@@ -190,6 +192,14 @@ async function intentarLogin(){
     }
   } catch (apiErr) {
     console.warn("API login:", apiErr.message);
+    // Si la API responde con un error legítimo de autenticación, mostrarlo y no usar fallback desactualizado
+    if (apiErr.message && (apiErr.message.includes("Credenciales") || apiErr.message.includes("restringida") || apiErr.message.includes("inválidas") || apiErr.message.includes("401") || apiErr.message.includes("403"))) {
+      mostrarMsgLogin(apiErr.message, "err");
+      btn.disabled = false;
+      btn.innerHTML = DigiIcons.get("unlock",{size:18,style:"margin-right:6px"})+" Ingresar";
+      document.getElementById("loginPwd").classList.add("error");
+      return;
+    }
   }
 
   // Fallback si la API offline o para verificación local

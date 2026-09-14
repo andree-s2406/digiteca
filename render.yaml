@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: digiteca
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PUSHER_APP_ID
+        value: "2194430"
+      - key: PUSHER_KEY
+        value: "214fc694ea6233c9ba09"
+      - key: PUSHER_SECRET
+        sync: false
+      - key: PUSHER_CLUSTER
+        value: "us2"
+      - key: GITHUB_OWNER
+        value: "andresrodriguez750-max"
+      - key: GITHUB_REPO
+        value: "digiteca-libros"
+      - key: GITHUB_TOKEN
+        sync: false

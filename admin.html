@@ -916,6 +916,8 @@
 <script src="js/icons.js"></script>
 <script src="js/motion.js"></script>
 <script src="js/api.js"></script>
+<script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/quick-nav.js" defer></script>
 <script>
 // ── LIBROS BASE ──
@@ -1033,6 +1035,44 @@ async function sincronizarConBackend(){
     console.warn("Sincronización con backend falló:", e.message);
   }
 }
+
+// ════════════════════════════════════════════════
+// ESCUCHADORES DE SINCRONIZACIÓN EN TIEMPO REAL (PUSHER / MULTI-DISPOSITIVO)
+// ════════════════════════════════════════════════
+window.addEventListener('digi:usuarios-updated', async function(e){
+  console.log("[Admin] Cambio detectado en usuarios desde otro dispositivo:", e.detail);
+  try {
+    if(window.API && window.API.usuarios){
+      var usrs = await API.usuarios.getAll({ noCache: true });
+      if(Array.isArray(usrs) && usrs.length > 0){
+        MEMORIA_USUARIOS = usrs;
+        setUsuarios(usrs);
+        if(typeof renderTablaUsuarios === "function") renderTablaUsuarios();
+        if(typeof renderCardsUsuariosMobile === "function") renderCardsUsuariosMobile();
+        if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
+      }
+    }
+  } catch(err){
+    console.warn("Error refrescando usuarios tras evento sync:", err);
+  }
+});
+
+window.addEventListener('digi:libros-updated', async function(e){
+  console.log("[Admin] Cambio detectado en libros desde otro dispositivo:", e.detail);
+  try {
+    if(window.API && window.API.libros){
+      var libs = await API.libros.getAll({ noCache: true });
+      if(Array.isArray(libs) && libs.length > 0){
+        MEMORIA_LIBROS = libs;
+        setLibros(libs);
+        if(typeof renderTablaLibros === "function") renderTablaLibros(libs);
+        if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
+      }
+    }
+  } catch(err){
+    console.warn("Error refrescando libros tras evento sync:", err);
+  }
+});
 
 // ════════════════════════════════════════════════
 // SINCRONIZACIÓN UNIFICADA DE MÓDULOS CON ANIMACIÓN 360°

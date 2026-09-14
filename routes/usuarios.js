@@ -1,10 +1,44 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
+const syncService = require('../services/sync');
 
-// GET /api/usuarios - Listar todos los usuarios (para panel admin)
+// GET /api/usuarios/me - Obtener el perfil actualizado del usuario autenticado
+router.get('/me', async (req, res) => {
+  try {
+    const userEmail = req.headers['x-user-email'];
+    if (!userEmail) {
+      return res.status(401).json({ error: 'No autenticado' });
+    }
+    const result = await query(
+      `SELECT id::text AS id, email, nombre, apellido, rol, anio, estado, avatar, creado_en 
+       FROM usuarios 
+       WHERE LOWER(email) = $1 LIMIT 1;`,
+      [userEmail.toLowerCase().trim()]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error en GET /api/usuarios/me:', err);
+    res.status(500).json({ error: 'Error al obtener perfil' });
+  }
+});
+
+// GET /api/usuarios - Listar todos los usuarios (para panel admin con ETag)
 router.get('/', async (req, res) => {
   try {
+    const currentVersion = syncService.getVersions().usuarios;
+    const etag = `"usr-${currentVersion}"`;
+
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('ETag', etag);
+
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+
     const result = await query(
       `SELECT id::text AS id, email, nombre, apellido, rol, anio, estado, avatar, creado_en 
        FROM usuarios 
@@ -62,7 +96,9 @@ router.post('/', async (req, res) => {
       ]
     );
 
-    res.status(201).json(result.rows[0]);
+    const nuevoUsuario = result.rows[0];
+    syncService.notifyDataChange('usuarios', { action: 'create', id: nuevoUsuario.id, email: nuevoUsuario.email });
+    res.status(201).json(nuevoUsuario);
   } catch (err) {
     console.error('Error en POST /api/usuarios:', err);
     res.status(500).json({ error: 'Error al crear usuario' });
@@ -115,9 +151,11 @@ router.put('/perfil', async (req, res) => {
       ]
     );
 
+    const updatedUser = result.rows[0];
+    syncService.notifyDataChange('usuarios', { action: 'update-perfil', id: updatedUser.id, email: updatedUser.email });
     res.json({
       message: 'Perfil actualizado exitosamente',
-      user: result.rows[0]
+      user: updatedUser
     });
   } catch (err) {
     console.error('Error en PUT /api/usuarios/perfil:', err);
@@ -163,7 +201,9 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    res.json(result.rows[0]);
+    const updated = result.rows[0];
+    syncService.notifyDataChange('usuarios', { action: 'update', id: updated.id, email: updated.email });
+    res.json(updated);
   } catch (err) {
     console.error('Error en PUT /api/usuarios/:id:', err);
     res.status(500).json({ error: 'Error al actualizar usuario' });
@@ -189,7 +229,9 @@ router.patch('/:id/estado', async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    res.json(result.rows[0]);
+    const updated = result.rows[0];
+    syncService.notifyDataChange('usuarios', { action: 'patch-estado', id: updated.id, email: updated.email, estado: updated.estado });
+    res.json(updated);
   } catch (err) {
     console.error('Error en PATCH /api/usuarios/:id/estado:', err);
     res.status(500).json({ error: 'Error al cambiar estado de usuario' });
@@ -212,7 +254,9 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    res.json({ message: 'Usuario eliminado exitosamente', id: result.rows[0].id });
+    const deletedId = result.rows[0].id;
+    syncService.notifyDataChange('usuarios', { action: 'delete', id: deletedId });
+    res.json({ message: 'Usuario eliminado exitosamente', id: deletedId });
   } catch (err) {
     console.error('Error en DELETE /api/usuarios/:id:', err);
     res.status(500).json({ error: 'Error al eliminar usuario' });

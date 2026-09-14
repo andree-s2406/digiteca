@@ -246,6 +246,8 @@
 <script src="js/pdf.min.js"></script>
 <script src="js/motion.js"></script>
 <script src="js/api.js"></script>
+<script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/quick-nav.js" defer></script>
 <script>
 // PORTADAS: inicialización instantánea desde caché local (0 ms de espera)
@@ -323,6 +325,12 @@ async function cargarLibrosAPI(){
     console.warn("Sincronización en segundo plano con API falló:", err.message);
   }
 }
+
+// Sincronización en tiempo real vía Pusher / Multi-dispositivo
+window.addEventListener('digi:libros-updated', function(e){
+  console.log("[Catálogo] Actualización de libros recibida en tiempo real:", e.detail);
+  cargarLibrosAPI();
+});
 
 function filtrarPorDivisionUsuario(){
   try{

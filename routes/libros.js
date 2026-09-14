@@ -3,6 +3,7 @@ const router = express.Router();
 const { query } = require('../db/connection');
 const fs = require('fs');
 const path = require('path');
+const syncService = require('../services/sync');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const LIBROS_JSON = path.join(DATA_DIR, 'libros.json');
@@ -30,11 +31,12 @@ function loadLocalBackup() {
   return null;
 }
 
-function invalidateCache() {
+function invalidateCache(action = 'update', payload = {}) {
   cachedLibros = null;
   lastCacheTime = 0;
   bookDetailCache.clear();
   pdfBufferCache.clear();
+  syncService.notifyDataChange('libros', { action, ...payload });
 }
 
 // Helper para convertir el formato de la BD al formato frontend esperado
@@ -85,9 +87,18 @@ router.get('/', async (req, res) => {
     const isGeneralList = !q && !materia && !anio && !tipo;
     const now = Date.now();
 
-    // Cache hit instantáneo en 0 ms
-    if (isGeneralList && cachedLibros && (now - lastCacheTime < CACHE_TTL_MS)) {
-      return res.json(cachedLibros);
+    // Cache hit instantáneo con soporte ETag
+    if (isGeneralList) {
+      const currentVersion = syncService.getVersions().libros;
+      const etag = `"lib-${currentVersion}"`;
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('ETag', etag);
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
+      }
+      if (cachedLibros && (now - lastCacheTime < CACHE_TTL_MS)) {
+        return res.json(cachedLibros);
+      }
     }
 
     let sql = `
@@ -367,7 +378,7 @@ router.post('/', async (req, res) => {
       );
     }
 
-    invalidateCache();
+    invalidateCache('create', { id: result.rows[0].id });
     res.status(201).json(mapLibroRow(result.rows[0]));
   } catch (err) {
     console.error('Error en POST /api/libros:', err);
@@ -440,7 +451,7 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Libro no encontrado' });
     }
 
-    invalidateCache();
+    invalidateCache('update', { id: rawId });
     res.json(mapLibroRow(result.rows[0]));
   } catch (err) {
     console.error('Error en PUT /api/libros/:id:', err);
@@ -461,7 +472,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Libro no encontrado' });
     }
 
-    invalidateCache();
+    invalidateCache('delete', { id: rawId });
     res.json({ message: 'Libro eliminado exitosamente', id: result.rows[0].id });
   } catch (err) {
     console.error('Error en DELETE /api/libros/:id:', err);
