@@ -158,15 +158,11 @@
     </div>
     <!-- Visor PDF alternativo (Google Drive preview / enlaces especiales) -->
     <iframe id="pdfFrame" class="pdf-frame" src="" allowfullscreen style="display:none"></iframe>
-    <!-- Barra flotante táctil para bajar y subir en el libro (Móvil y Pantallas Táctiles) -->
-    <div class="pdf-mobile-scroll-bar" id="pdfMobileScrollBar" style="display:none">
-      <button class="pdf-scroll-btn" id="pdfScrollUpBtn" title="Subir en el libro" aria-label="Subir en el libro">
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
-      </button>
-      <div class="pdf-scroll-indicator" id="pdfPageIndicator">1 / 1</div>
-      <button class="pdf-scroll-btn" id="pdfScrollDownBtn" title="Bajar en el libro" aria-label="Bajar en el libro">
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
+    <!-- Riel y Barrita interactiva para bajar en el libro a gusto con indicador de página en tiempo real -->
+    <div class="pdf-scrubber-track" id="pdfScrubberTrack" style="display:none">
+      <div class="pdf-scrubber-thumb" id="pdfScrubberThumb">
+        <div class="pdf-scrubber-bubble" id="pdfScrubberBubble">Pág 1</div>
+      </div>
     </div>
   </div>
 </div>
@@ -485,8 +481,8 @@ async function cargarPDF(l){
   var noDisp    = document.getElementById("pdfNoDisp");
   var container = document.getElementById("pdfContainer");
 
-  var scrollBar = document.getElementById("pdfMobileScrollBar");
-  if(scrollBar) scrollBar.style.display = "none";
+  var scrubber = document.getElementById("pdfScrubberTrack");
+  if(scrubber) scrubber.style.display = "none";
 
   if(!l || !l.pdf || l.pdf.trim() === ""){
     if(noDisp) noDisp.style.display = "flex";
@@ -655,41 +651,88 @@ async function renderPdfContinuous(source){
     // Renderizar primera página inmediatamente
     renderSinglePage(1, targetWidth);
 
-    // Activar barra táctil para bajar y subir cómodamente en el libro
-    var scrollBar = document.getElementById("pdfMobileScrollBar");
-    var pageInd   = document.getElementById("pdfPageIndicator");
-    if(scrollBar) scrollBar.style.display = "flex";
+    // Activar barrita interactiva para bajar en el libro a gusto con indicador en tiempo real
+    var scrubberTrack  = document.getElementById("pdfScrubberTrack");
+    var scrubberThumb  = document.getElementById("pdfScrubberThumb");
+    var scrubberBubble = document.getElementById("pdfScrubberBubble");
 
-    function updatePageIndicator(){
-      if(!container || !numPages) return;
-      var st = container.scrollTop;
-      var ch = container.clientHeight;
-      var sh = container.scrollHeight;
-      var pageHeight = Math.max(1, (sh - 20) / numPages);
-      var curPage = Math.min(numPages, Math.max(1, Math.round((st + ch * 0.35) / pageHeight) + 1));
-      if(pageInd) pageInd.textContent = curPage + " / " + numPages;
-    }
+    if(scrubberTrack && scrubberThumb && scrubberBubble){
+      scrubberTrack.style.display = "flex";
+      var isDraggingScrubber = false;
 
-    container.addEventListener("scroll", updatePageIndicator, { passive: true });
-    updatePageIndicator();
+      function updateScrubberFromScroll(){
+        if(isDraggingScrubber || !container || !numPages) return;
+        var st = container.scrollTop;
+        var ch = container.clientHeight;
+        var sh = container.scrollHeight;
+        var maxScroll = sh - ch;
+        var pct = maxScroll > 0 ? (st / maxScroll) : 0;
+        pct = Math.max(0, Math.min(1, pct));
 
-    var btnDown = document.getElementById("pdfScrollDownBtn");
-    var btnUp   = document.getElementById("pdfScrollUpBtn");
-    if(btnDown && !btnDown._bound){
-      btnDown._bound = true;
-      btnDown.onclick = function(e){
-        e.stopPropagation();
-        var scrollStep = Math.round(container.clientHeight * 0.85);
-        container.scrollBy({ top: scrollStep, behavior: "smooth" });
-      };
-    }
-    if(btnUp && !btnUp._bound){
-      btnUp._bound = true;
-      btnUp.onclick = function(e){
-        e.stopPropagation();
-        var scrollStep = Math.round(container.clientHeight * 0.85);
-        container.scrollBy({ top: -scrollStep, behavior: "smooth" });
-      };
+        var trackH = scrubberTrack.clientHeight;
+        var thumbH = scrubberThumb.clientHeight;
+        var maxThumbTop = Math.max(0, trackH - thumbH);
+        scrubberThumb.style.top = (pct * maxThumbTop) + "px";
+
+        var pageHeight = Math.max(1, (sh - 20) / numPages);
+        var curPage = Math.min(numPages, Math.max(1, Math.round((st + ch * 0.35) / pageHeight) + 1));
+        scrubberBubble.textContent = "Pág " + curPage + " de " + numPages;
+      }
+
+      container.removeEventListener("scroll", container._scrubberTracker || function(){});
+      container._scrubberTracker = updateScrubberFromScroll;
+      container.addEventListener("scroll", updateScrubberFromScroll, { passive: true });
+      updateScrubberFromScroll();
+
+      function handleScrubMove(clientY){
+        var rect = scrubberTrack.getBoundingClientRect();
+        var trackH = rect.height;
+        var thumbH = scrubberThumb.clientHeight;
+        var maxThumbTop = Math.max(1, trackH - thumbH);
+        var relY = clientY - rect.top - (thumbH / 2);
+        var pct = Math.max(0, Math.min(1, relY / maxThumbTop));
+
+        scrubberThumb.style.top = (pct * maxThumbTop) + "px";
+
+        var maxScroll = container.scrollHeight - container.clientHeight;
+        container.scrollTop = pct * maxScroll;
+
+        var curPage = Math.min(numPages, Math.max(1, Math.round(pct * (numPages - 1)) + 1));
+        scrubberBubble.textContent = "Pág " + curPage + " de " + numPages;
+      }
+
+      function onScrubStart(e){
+        isDraggingScrubber = true;
+        scrubberTrack.classList.add("dragging");
+        scrubberThumb.classList.add("dragging");
+        var clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+        handleScrubMove(clientY);
+        if(e.cancelable && e.type === "touchstart") e.preventDefault();
+      }
+
+      function onScrubMove(e){
+        if(!isDraggingScrubber) return;
+        var clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+        handleScrubMove(clientY);
+        if(e.cancelable) e.preventDefault();
+      }
+
+      function onScrubEnd(){
+        if(!isDraggingScrubber) return;
+        isDraggingScrubber = false;
+        scrubberTrack.classList.remove("dragging");
+        scrubberThumb.classList.remove("dragging");
+        updateScrubberFromScroll();
+      }
+
+      scrubberTrack.onmousedown = onScrubStart;
+      window.addEventListener("mousemove", onScrubMove);
+      window.addEventListener("mouseup", onScrubEnd);
+
+      scrubberTrack.ontouchstart = onScrubStart;
+      window.addEventListener("touchmove", onScrubMove, { passive: false });
+      window.addEventListener("touchend", onScrubEnd);
+      window.addEventListener("touchcancel", onScrubEnd);
     }
 
     if(window.DigiMotion && typeof DigiMotion.initReadingProgress === "function"){
