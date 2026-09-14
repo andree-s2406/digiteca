@@ -359,14 +359,21 @@ def register_book_api(book_data):
     return None
 
 
+PROCESSED_SET = None
+
 def load_progress():
+    global PROCESSED_SET
+    if PROCESSED_SET is not None:
+        return PROCESSED_SET
     if os.path.exists(PROGRESS_FILE):
         try:
             with open(PROGRESS_FILE, 'r', encoding='utf-8') as fp:
-                return set(json.load(fp))
+                PROCESSED_SET = set(json.load(fp))
+                return PROCESSED_SET
         except Exception:
-            return set()
-    return set()
+            pass
+    PROCESSED_SET = set()
+    return PROCESSED_SET
 
 
 def save_progress_threadsafe(file_id):
@@ -374,8 +381,9 @@ def save_progress_threadsafe(file_id):
         try:
             current = load_progress()
             current.add(file_id)
-            with open(PROGRESS_FILE, 'w', encoding='utf-8') as fp:
-                json.dump(list(current), fp, indent=2)
+            if len(current) % 15 == 0:
+                with open(PROGRESS_FILE, 'w', encoding='utf-8') as fp:
+                    json.dump(list(current), fp)
         except Exception:
             pass
 
@@ -623,6 +631,12 @@ def main():
 
     elapsed = time.time() - start_time
     rate = success_count / elapsed if elapsed > 0 else 0
+
+    try:
+        with open(PROGRESS_FILE, 'w', encoding='utf-8') as fp:
+            json.dump(list(load_progress()), fp)
+    except Exception:
+        pass
 
     print("\n" + "=" * 68)
     print(f"🎉 ¡Tanda completada en {elapsed:.1f} segundos!")
