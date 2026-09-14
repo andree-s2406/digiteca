@@ -659,6 +659,19 @@ async function renderPdfContinuous(source){
     if(scrubberTrack && scrubberThumb && scrubberBubble){
       scrubberTrack.style.display = "flex";
       var isDraggingScrubber = false;
+      var bubbleFadeTimer = null;
+
+      function showBubbleTemporarily(){
+        scrubberBubble.classList.add("visible");
+        scrubberThumb.classList.add("active");
+        if(bubbleFadeTimer) clearTimeout(bubbleFadeTimer);
+        if(!isDraggingScrubber){
+          bubbleFadeTimer = setTimeout(function(){
+            scrubberBubble.classList.remove("visible");
+            scrubberThumb.classList.remove("active");
+          }, 1200);
+        }
+      }
 
       function updateScrubberFromScroll(){
         if(isDraggingScrubber || !container || !numPages) return;
@@ -677,12 +690,20 @@ async function renderPdfContinuous(source){
         var pageHeight = Math.max(1, (sh - 20) / numPages);
         var curPage = Math.min(numPages, Math.max(1, Math.round((st + ch * 0.35) / pageHeight) + 1));
         scrubberBubble.textContent = "Pág " + curPage + " de " + numPages;
+        showBubbleTemporarily();
       }
 
       container.removeEventListener("scroll", container._scrubberTracker || function(){});
       container._scrubberTracker = updateScrubberFromScroll;
       container.addEventListener("scroll", updateScrubberFromScroll, { passive: true });
       updateScrubberFromScroll();
+      // Ocultar burbuja inicial después de 1 segundo para no estorbar
+      setTimeout(function(){
+        if(!isDraggingScrubber){
+          scrubberBubble.classList.remove("visible");
+          scrubberThumb.classList.remove("active");
+        }
+      }, 1000);
 
       function handleScrubMove(clientY){
         var rect = scrubberTrack.getBoundingClientRect();
@@ -699,12 +720,14 @@ async function renderPdfContinuous(source){
 
         var curPage = Math.min(numPages, Math.max(1, Math.round(pct * (numPages - 1)) + 1));
         scrubberBubble.textContent = "Pág " + curPage + " de " + numPages;
+        showBubbleTemporarily();
       }
 
       function onScrubStart(e){
         isDraggingScrubber = true;
         scrubberTrack.classList.add("dragging");
         scrubberThumb.classList.add("dragging");
+        scrubberBubble.classList.add("visible");
         var clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
         handleScrubMove(clientY);
         if(e.cancelable && e.type === "touchstart") e.preventDefault();
@@ -723,6 +746,11 @@ async function renderPdfContinuous(source){
         scrubberTrack.classList.remove("dragging");
         scrubberThumb.classList.remove("dragging");
         updateScrubberFromScroll();
+        if(bubbleFadeTimer) clearTimeout(bubbleFadeTimer);
+        bubbleFadeTimer = setTimeout(function(){
+          scrubberBubble.classList.remove("visible");
+          scrubberThumb.classList.remove("active");
+        }, 1200);
       }
 
       scrubberTrack.onmousedown = onScrubStart;
