@@ -360,42 +360,8 @@ html.dark .meta-badge.am {
   -webkit-user-select: none;
 }
 
-/* ── BARRA DE DESPLAZAMIENTO (SCROLLBAR) PARA BAJAR EN EL LIBRO ── */
-.pdf-container::-webkit-scrollbar {
-  width: 10px;
-}
-
-.pdf-container::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 10px;
-}
-
-.pdf-container::-webkit-scrollbar-thumb {
-  background: var(--cel-o);
-  border-radius: 10px;
-  border: 2px solid var(--bg-alt);
-}
-
-.pdf-container::-webkit-scrollbar-thumb:hover {
-  background: var(--cel);
-}
-
-.pdf-container {
-  scrollbar-width: thin;
-  scrollbar-color: var(--cel-o) transparent;
-}
-
 html.dark .pdf-container {
   background: #0B131E;
-}
-
-html.dark .pdf-container::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-html.dark .pdf-container::-webkit-scrollbar-thumb {
-  background: var(--cel);
-  border-color: #0B131E;
 }
 
 .pdf-loading-spinner {
@@ -626,89 +592,9 @@ html.dark .pdf-page-item {
   }
 }
 
-@media (max-width: 768px) {
-  /* Barra de desplazamiento para bajar en el libro: más grande, táctil y visible en móvil */
-  .pdf-container::-webkit-scrollbar {
-    width: 16px;
-  }
-  .pdf-container::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.08);
-    border-radius: 12px;
-  }
-  .pdf-container::-webkit-scrollbar-thumb {
-    background: var(--cel-o);
-    border-radius: 12px;
-    border: 3px solid var(--bg-alt);
-    min-height: 48px;
-  }
-  .pdf-container {
-    scrollbar-width: auto;
-    scrollbar-color: var(--cel-o) rgba(0, 0, 0, 0.08);
-  }
-  html.dark .pdf-container::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.08);
-  }
-  html.dark .pdf-container::-webkit-scrollbar-thumb {
-    border-color: #0B131E;
-  }
-
-  /* Controles flotantes para subir y bajar rápido en móvil */
-  .pdf-mobile-scroll-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    position: absolute;
-    right: 22px;
-    bottom: 24px;
-    z-index: 100;
-  }
-  .pdf-scroll-btn {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: var(--cel-o);
-    color: #FFFFFF;
-    border: 2px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    backdrop-filter: blur(4px);
-    transition: transform 0.15s ease, background 0.15s ease;
-  }
-  .pdf-scroll-btn:active {
-    transform: scale(0.92);
-    background: var(--cel);
-  }
-}
-
-.pdf-mobile-scroll-controls {
-  display: none;
-}
-
 @media (max-width: 600px) {
   .libro-hero {
     padding: 90px 16px 0;
-  }
-  .libro-acciones {
-    flex-direction: column;
-    width: 100%;
-    gap: 10px;
-  }
-  .btn-leer {
-    width: 100%;
-    justify-content: center;
-    padding: 16px 24px;
-    font-size: 1.05rem;
-    border-radius: 16px;
-    box-shadow: 0 6px 20px rgba(46, 127, 179, 0.4);
-  }
-  .btn-guardar {
-    width: 100%;
-    justify-content: center;
-    padding: 13px 24px;
-    border-radius: 16px;
   }
   .indice-list {
     grid-template-columns: 1fr;
