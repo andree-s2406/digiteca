@@ -276,10 +276,11 @@ router.post('/', async (req, res) => {
       "Inglés": "🗣️", "Informática": "💻", "Ciencias Naturales": "🔬",
       "Educación Sexual Integral (ESI)": "🌱", "Literatura Infantil / Cuentos": "📚",
       "Tecnología": "⚙️", "Robótica": "🤖", "Arte": "🎨", "Música": "🎵",
-      "Filosofía": "🏛️", "Economía": "📈", "Derecho y Ciudadanía": "⚖️"
+      "Filosofía": "🏛️", "Economía": "📈", "Derecho y Ciudadanía": "⚖️",
+      "Historietas": ""
     };
 
-    const emojiFinal = e || EMOJIS[mat] || "📚";
+    const emojiFinal = e !== undefined ? e : (EMOJIS[mat] || "");
     const categoriaC = c || mat.toLowerCase().replace(/[^a-z0-9]/g, '');
     const categoriaL = l || mat;
 
@@ -363,10 +364,11 @@ router.put('/:id', async (req, res) => {
       "Inglés": "🗣️", "Informática": "💻", "Ciencias Naturales": "🔬",
       "Educación Sexual Integral (ESI)": "🌱", "Literatura Infantil / Cuentos": "📚",
       "Tecnología": "⚙️", "Robótica": "🤖", "Arte": "🎨", "Música": "🎵",
-      "Filosofía": "🏛️", "Economía": "📈", "Derecho y Ciudadanía": "⚖️"
+      "Filosofía": "🏛️", "Economía": "📈", "Derecho y Ciudadanía": "⚖️",
+      "Historietas": ""
     };
 
-    const emojiFinal = e || EMOJIS[mat] || "📚";
+    const emojiFinal = e !== undefined ? e : (EMOJIS[mat] || "");
     const categoriaC = c || mat.toLowerCase().replace(/[^a-z0-9]/g, '');
     const categoriaL = l || mat;
 
