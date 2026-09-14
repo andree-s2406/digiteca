@@ -450,19 +450,26 @@ function buildSidebar(){
   /* ── MATERIAS ── */
   var allMats = [];
   for(var j = 0; j < LIBROS.length; j++){
-    if(allMats.indexOf(LIBROS[j].mat) < 0) allMats.push(LIBROS[j].mat);
+    var mVal = (LIBROS[j].mat || "").trim();
+    if(mVal && allMats.indexOf(mVal) < 0) allMats.push(mVal);
   }
-  allMats.sort();
+  allMats.sort(function(a, b){ return a.localeCompare(b, 'es', { sensitivity: 'base' }); });
+
+  var filterMatTxt = (document.getElementById("sbMatFilter") ? document.getElementById("sbMatFilter").value : "").trim().toLowerCase();
 
   var sbM = document.getElementById("sbMaterias");
   sbM.innerHTML = "";
   var matsConResultados = 0;
   for(var m = 0; m < allMats.length; m++){
     var mat = allMats[m];
-    var cnt = baseParaMats.filter(function(l){ return l.mat === mat; }).length;
+    var cnt = baseParaMats.filter(function(l){ return (l.mat||"").trim() === mat; }).length;
     /* Mostrar materia aunque tenga 0 si está activa, para poder deseleccionar */
     if(cnt === 0 && filtMat !== mat) continue;
     matsConResultados++;
+
+    /* Filtro de búsqueda rápida en el acordeón */
+    if(filterMatTxt && norm(mat).indexOf(norm(filterMatTxt)) < 0) continue;
+
     var b2  = document.createElement("button");
     b2.className = "sb-option" + (norm(filtMat||"") === norm(mat||"") ? " active" : "");
     if(cnt === 0) b2.style.opacity = "0.45";
@@ -479,6 +486,14 @@ function buildSidebar(){
     sbM.appendChild(b2);
   }
   document.getElementById("accMatCount").textContent = matsConResultados;
+
+  var inpMatFilt = document.getElementById("sbMatFilter");
+  if(inpMatFilt && !inpMatFilt._bound){
+    inpMatFilt._bound = true;
+    inpMatFilt.addEventListener("input", function(){
+      buildSidebar();
+    });
+  }
 }
 
 /* ── CHIPS ACTIVOS ── */
