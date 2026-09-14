@@ -158,6 +158,16 @@
     </div>
     <!-- Visor PDF alternativo (Google Drive preview / enlaces especiales) -->
     <iframe id="pdfFrame" class="pdf-frame" src="" allowfullscreen style="display:none"></iframe>
+    <!-- Barra flotante táctil para bajar y subir en el libro (Móvil y Pantallas Táctiles) -->
+    <div class="pdf-mobile-scroll-bar" id="pdfMobileScrollBar" style="display:none">
+      <button class="pdf-scroll-btn" id="pdfScrollUpBtn" title="Subir en el libro" aria-label="Subir en el libro">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+      </button>
+      <div class="pdf-scroll-indicator" id="pdfPageIndicator">1 / 1</div>
+      <button class="pdf-scroll-btn" id="pdfScrollDownBtn" title="Bajar en el libro" aria-label="Bajar en el libro">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -475,6 +485,9 @@ async function cargarPDF(l){
   var noDisp    = document.getElementById("pdfNoDisp");
   var container = document.getElementById("pdfContainer");
 
+  var scrollBar = document.getElementById("pdfMobileScrollBar");
+  if(scrollBar) scrollBar.style.display = "none";
+
   if(!l || !l.pdf || l.pdf.trim() === ""){
     if(noDisp) noDisp.style.display = "flex";
     if(frame) frame.style.display = "none";
@@ -641,6 +654,43 @@ async function renderPdfContinuous(source){
 
     // Renderizar primera página inmediatamente
     renderSinglePage(1, targetWidth);
+
+    // Activar barra táctil para bajar y subir cómodamente en el libro
+    var scrollBar = document.getElementById("pdfMobileScrollBar");
+    var pageInd   = document.getElementById("pdfPageIndicator");
+    if(scrollBar) scrollBar.style.display = "flex";
+
+    function updatePageIndicator(){
+      if(!container || !numPages) return;
+      var st = container.scrollTop;
+      var ch = container.clientHeight;
+      var sh = container.scrollHeight;
+      var pageHeight = Math.max(1, (sh - 20) / numPages);
+      var curPage = Math.min(numPages, Math.max(1, Math.round((st + ch * 0.35) / pageHeight) + 1));
+      if(pageInd) pageInd.textContent = curPage + " / " + numPages;
+    }
+
+    container.addEventListener("scroll", updatePageIndicator, { passive: true });
+    updatePageIndicator();
+
+    var btnDown = document.getElementById("pdfScrollDownBtn");
+    var btnUp   = document.getElementById("pdfScrollUpBtn");
+    if(btnDown && !btnDown._bound){
+      btnDown._bound = true;
+      btnDown.onclick = function(e){
+        e.stopPropagation();
+        var scrollStep = Math.round(container.clientHeight * 0.85);
+        container.scrollBy({ top: scrollStep, behavior: "smooth" });
+      };
+    }
+    if(btnUp && !btnUp._bound){
+      btnUp._bound = true;
+      btnUp.onclick = function(e){
+        e.stopPropagation();
+        var scrollStep = Math.round(container.clientHeight * 0.85);
+        container.scrollBy({ top: -scrollStep, behavior: "smooth" });
+      };
+    }
 
     if(window.DigiMotion && typeof DigiMotion.initReadingProgress === "function"){
       DigiMotion.initReadingProgress("#pdfContainer");
