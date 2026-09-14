@@ -158,6 +158,15 @@
     </div>
     <!-- Visor PDF alternativo (Google Drive preview / enlaces especiales) -->
     <iframe id="pdfFrame" class="pdf-frame" src="" allowfullscreen style="display:none"></iframe>
+    <!-- Controles rápidos de desplazamiento para móvil -->
+    <div class="pdf-mobile-scroll-controls" id="pdfMobileScroll">
+      <button class="pdf-scroll-btn" onclick="scrollPdfPage(-1)" title="Subir página" aria-label="Subir página">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+      </button>
+      <button class="pdf-scroll-btn" onclick="scrollPdfPage(1)" title="Bajar página" aria-label="Bajar página">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -763,6 +772,16 @@ window.addEventListener("resize", ajustarEscalaPdf);
 
 function irAlVisor(){
   document.getElementById("visorSection").scrollIntoView({behavior:"smooth"});
+}
+
+function scrollPdfPage(dir){
+  var container = document.getElementById("pdfContainer");
+  if(!container || container.style.display === "none"){
+    window.scrollBy({ top: dir * (window.innerHeight * 0.75), behavior: "smooth" });
+    return;
+  }
+  var scrollAmount = container.clientHeight * 0.82;
+  container.scrollBy({ top: dir * scrollAmount, behavior: "smooth" });
 }
 
 function pantallaCompleta(){
