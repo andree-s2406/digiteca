@@ -499,7 +499,7 @@ async function cargarPDF(l){
   }
 
   var url = l.pdf.trim();
-  var streamUrl = (url.indexOf("github.com") >= 0 && l && l.id) ? ("/api/libros/" + l.id + "/pdf") : url;
+  var streamUrl = (l && l.id) ? ("/api/libros/" + l.id + "/pdf") : url;
   var pdfKey = (l.id || "") + "::" + streamUrl;
 
   // Si este PDF ya fue cargado o se está cargando activamente, no duplicar la carga
@@ -527,20 +527,8 @@ async function cargarPDF(l){
     return;
   }
 
-  // 2. Google Drive (Se mantiene embebido en iframe)
-  if(url.indexOf("drive.google.com") >= 0){
-    url = url.replace(/\/(view|edit)[^]*$/, "/preview");
-    if(noDisp) noDisp.style.display = "none";
-    if(container) container.style.display = "none";
-    if(scrubber) scrubber.style.display = "none";
-    if(frame){
-      frame.style.display = "block";
-      frame.src = url;
-    }
-    return;
-  }
-
-  // 3. Renderizado continuo nativo con PDF.js (Móvil y Escritorio)
+  // 2. LECTURA PROTEGIDA Y CIFRADA EN MEMORIA (PDF.js en Canvas)
+  // Ningún libro se embebe en visores externos ni iframes con botones de descarga
   if(window.pdfjsLib){
     renderPdfContinuous(streamUrl);
     return;

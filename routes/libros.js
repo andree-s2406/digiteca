@@ -206,7 +206,21 @@ router.get('/:id/pdf', async (req, res) => {
     const titulo = result.rows[0].titulo || 'libro';
 
     if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
-      const upstream = await fetch(pdfUrl, { redirect: 'follow' });
+      let downloadUrl = pdfUrl;
+      if (pdfUrl.includes('drive.google.com')) {
+        const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (driveMatch && driveMatch[1]) {
+          downloadUrl = `https://drive.usercontent.google.com/download?id=${driveMatch[1]}&export=download&confirm=t`;
+        }
+      }
+
+      let upstream = await fetch(downloadUrl, { redirect: 'follow' });
+      if (!upstream.ok && downloadUrl !== pdfUrl) {
+        const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (driveMatch && driveMatch[1]) {
+          upstream = await fetch(`https://drive.google.com/uc?export=download&id=${driveMatch[1]}`, { redirect: 'follow' });
+        }
+      }
       if (!upstream.ok) {
         return res.status(upstream.status).send('No se pudo obtener el PDF del servidor remoto');
       }
