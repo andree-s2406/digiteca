@@ -585,6 +585,15 @@ async function renderPdfContinuous(source){
     pagesFlow.style.display = "none";
   }
 
+  var loadWatchdog = setTimeout(function(){
+    if(thisGen === pdfRenderGeneration && loadingEl && loadingEl.style.display !== "none"){
+      var spinnerText = loadingEl.querySelector("span");
+      if(spinnerText){
+        spinnerText.innerHTML = 'La carga está demorando más de lo habitual...<br><button onclick="window.location.reload()" style="margin-top:10px;padding:6px 14px;border-radius:6px;background:var(--cel-o,#2A7B9B);color:#fff;border:none;cursor:pointer;font-weight:600">Recargar página</button>';
+      }
+    }
+  }, 8000);
+
   // Desconectar observadores y cancelar tareas anteriores
   if(currentLoadingTask){
     try { currentLoadingTask.destroy(); }catch(e){}
@@ -608,15 +617,25 @@ async function renderPdfContinuous(source){
       var arrayBuf = await blob.arrayBuffer();
       if(thisGen !== pdfRenderGeneration) return;
       loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
-    } else if(typeof source === "string" && (!source.startsWith("http://") && !source.startsWith("https://") || source.indexOf(window.location.host) >= 0)){
-      var res = await fetch(source);
-      if(thisGen !== pdfRenderGeneration) return;
-      if(!res.ok) throw new Error("HTTP " + res.status);
-      var arrayBuf = await res.arrayBuffer();
-      if(thisGen !== pdfRenderGeneration) return;
-      loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
     } else {
-      loadingTask = pdfjsLib.getDocument(source);
+      // Carga directa con streaming progresivo nativo de PDF.js (inicia renderizado inmediato de página 1)
+      loadingTask = pdfjsLib.getDocument({
+        url: source,
+        withCredentials: false,
+        enableXfa: true,
+        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+        cMapPacked: true
+      });
+    }
+
+    if(loadingTask && typeof loadingTask.onProgress === 'function' || loadingTask) {
+      loadingTask.onProgress = function(p){
+        if(p && p.total > 0 && loadingEl){
+          var pct = Math.round((p.loaded / p.total) * 100);
+          var txt = loadingEl.querySelector("span");
+          if(txt) txt.textContent = "Cargando documento (" + pct + "%)...";
+        }
+      };
     }
 
     currentLoadingTask = loadingTask;
@@ -627,6 +646,7 @@ async function renderPdfContinuous(source){
 
     var numPages = currentPdfDoc.numPages;
 
+    clearTimeout(loadWatchdog);
     if(loadingEl) loadingEl.style.display = "none";
     if(pagesFlow){
       pagesFlow.innerHTML = "";
@@ -805,6 +825,7 @@ async function renderPdfContinuous(source){
     }
 
   } catch(err) {
+    clearTimeout(loadWatchdog);
     if(thisGen !== pdfRenderGeneration) return;
 
     console.warn("Fallo en render nativo PDF.js:", err);
@@ -824,9 +845,13 @@ async function renderPdfContinuous(source){
     }
 
     if(frame){
-      frame.style.display = "block";
-      var sep = typeof source === "string" && source.indexOf("?") >= 0 ? "&" : "#";
-      frame.src = (typeof source === "string" && source.match(/\.pdf(\?.*)?$/i)) ? (source + sep + "toolbar=0&navpanes=0&scrollbar=1&view=FitH") : source;
+      frame.style.display = "none";
+      frame.src = "about:blank";
+    }
+    if(noDisp){
+      noDisp.style.display = "flex";
+      noDisp.innerHTML = '<div class="pdf-nd-icon" style="color:var(--cel-o)"><i data-lucide="refresh-cw" style="width:54px;height:54px"></i></div><h3>Error al procesar el libro</h3><p>Ocurrió una interrupción en la conexión al transferir el documento.</p><button onclick="cargarLibro(true)" style="margin-top:14px;padding:10px 22px;border-radius:10px;background:var(--cel-o,#2A7B9B);color:#fff;border:none;font-weight:700;cursor:pointer;font-size:15px;box-shadow:0 4px 12px rgba(42,123,155,0.25)">Reintentar lectura</button>';
+      if(window.lucide && lucide.createIcons) lucide.createIcons();
     }
   }
 }

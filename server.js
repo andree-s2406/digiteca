@@ -97,8 +97,8 @@ app.use(express.static(path.join(__dirname), { maxAge: 0, etag: true }));
 
 // Middleware de seguridad de autenticación para la API REST
 function apiAuthGuard(req, res, next) {
-  // 1. Métodos GET para catálogo, libros, ranking y salud son públicos
-  if (req.method === 'GET' && (
+  // 1. Métodos GET y HEAD para catálogo, libros, ranking y salud son públicos
+  if ((req.method === 'GET' || req.method === 'HEAD') && (
     req.path.startsWith('/libros') ||
     req.path.startsWith('/ranking') ||
     req.path === '/health'

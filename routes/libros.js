@@ -214,39 +214,70 @@ router.get('/:id/pdf', async (req, res) => {
         }
       }
 
-      let upstream = await fetch(downloadUrl, { redirect: 'follow' });
+      let upstream;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 35000);
+        upstream = await fetch(downloadUrl, { redirect: 'follow', signal: controller.signal });
+        clearTimeout(timer);
+      } catch (fetchErr) {
+        console.warn(`[PDF Stream] Timeout o fallo en fetch a ${downloadUrl}:`, fetchErr.message);
+        return res.status(504).send('Tiempo de espera agotado al conectar con el servidor del libro');
+      }
+
       if (!upstream.ok && downloadUrl !== pdfUrl) {
         const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
         if (driveMatch && driveMatch[1]) {
-          upstream = await fetch(`https://drive.google.com/uc?export=download&id=${driveMatch[1]}`, { redirect: 'follow' });
+          try {
+            upstream = await fetch(`https://drive.google.com/uc?export=download&id=${driveMatch[1]}`, { redirect: 'follow' });
+          } catch(e){}
         }
       }
-      if (!upstream.ok) {
-        return res.status(upstream.status).send('No se pudo obtener el PDF del servidor remoto');
+      if (!upstream || !upstream.ok) {
+        return res.status(upstream ? upstream.status : 502).send('No se pudo obtener el PDF del servidor remoto');
       }
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
       res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Accept-Ranges', 'bytes');
       
       const contentLength = upstream.headers.get('content-length');
       if (contentLength) res.setHeader('Content-Length', contentLength);
 
+      const { Readable } = require('stream');
+      if (upstream.body && typeof Readable.fromWeb === 'function') {
+        const nodeStream = Readable.fromWeb(upstream.body);
+        const chunks = [];
+        let totalSize = 0;
+        nodeStream.on('data', chunk => {
+          if (totalSize < 50 * 1024 * 1024) { // Solo almacenar en caché si pesa menos de 50 MB
+            chunks.push(chunk);
+            totalSize += chunk.length;
+          }
+        });
+        nodeStream.on('end', () => {
+          if (chunks.length > 0 && totalSize < 50 * 1024 * 1024) {
+            try {
+              const fullBuf = Buffer.concat(chunks);
+              if (pdfBufferCache.size >= PDF_CACHE_MAX_ENTRIES) {
+                const oldestKey = pdfBufferCache.keys().next().value;
+                pdfBufferCache.delete(oldestKey);
+              }
+              pdfBufferCache.set(cacheKey, {
+                buffer: fullBuf,
+                title: titulo,
+                length: contentLength || fullBuf.length,
+                time: Date.now()
+              });
+            } catch(e){}
+          }
+        });
+        return nodeStream.pipe(res);
+      }
+
       const arrayBuf = await upstream.arrayBuffer();
       const buf = Buffer.from(arrayBuf);
-
-      // Guardar en caché LRU básica
-      if (pdfBufferCache.size >= PDF_CACHE_MAX_ENTRIES) {
-        const oldestKey = pdfBufferCache.keys().next().value;
-        pdfBufferCache.delete(oldestKey);
-      }
-      pdfBufferCache.set(cacheKey, {
-        buffer: buf,
-        title: titulo,
-        length: contentLength,
-        time: now
-      });
-
       return res.send(buf);
     } else {
       const localPath = path.join(__dirname, '..', pdfUrl.replace(/^\//, ''));
