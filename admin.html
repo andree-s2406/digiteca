@@ -2308,20 +2308,20 @@ function renderRanking(){
     return a.libro_id - b.libro_id;
   });
 
-  var ranking = lista.slice(0, 5);
+  var ranking = lista.slice(0, 8);
 
   if(ranking.length === 0){
     rkEl.innerHTML = '<div class="empty-state">' +
       '<div class="empty-icon"><i data-lucide="book-open" style="width:48px;height:48px"></i></div>' +
       '<h3>No hay libros registrados</h3>' +
-      '<p>Cuando agregues libros y los usuarios comiencen a leerlos, el Top 5 aparecerá automáticamente aquí.</p>' +
+      '<p>Cuando agregues libros y los usuarios comiencen a leerlos, el Top 8 aparecerá automáticamente aquí.</p>' +
       '</div>';
     return;
   }
 
   var h = "";
 
-  for(var i=0; i<ranking.length && i<5; i++){
+  for(var i=0; i<ranking.length && i<8; i++){
     var item = ranking[i];
     var pos = i + 1;
     var veces = item.veces_abierto || 0;

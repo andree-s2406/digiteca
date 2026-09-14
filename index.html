@@ -373,7 +373,7 @@ function renderCatalogo(){
     return a.libro.id - b.libro.id;
   });
 
-  var ranked = lista.slice(0, 5);
+  var ranked = lista.slice(0, 8);
 
   if(ranked.length === 0){
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px 20px;color:var(--txt-m)">' +
@@ -385,7 +385,7 @@ function renderCatalogo(){
   }
 
   var h = "";
-  for(var i=0; i<ranked.length && i<5; i++){
+  for(var i=0; i<ranked.length && i<8; i++){
     var l   = ranked[i].libro;
     var pos = i + 1;
     var badgeTexto = "#" + pos + " más buscado";

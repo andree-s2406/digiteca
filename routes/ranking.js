@@ -6,7 +6,7 @@ let cachedRanking = null;
 let lastRankingFetch = 0;
 const RANKING_CACHE_TTL_MS = 20 * 1000; // 20 segundos
 
-// GET /api/ranking - Obtener Top 5 libros más abiertos / más buscados
+// GET /api/ranking - Obtener Top 8 libros más abiertos / más buscados
 router.get('/', async (req, res) => {
   try {
     const now = Date.now();
@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
        LEFT JOIN estadisticas_eventos e ON e.referencia_id = l.id AND (e.tipo = 'libro_abierto' OR e.tipo = 'lectura')
        GROUP BY l.id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios
        ORDER BY veces_abierto DESC, l.id ASC
-       LIMIT 5;`
+       LIMIT 8;`
     );
 
     const ranking = result.rows.map((row, index) => ({
