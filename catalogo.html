@@ -96,8 +96,13 @@
           <span>Cerrar sesión</span>
         </button>
       </div>
-    </div>
-    <button class="hamburger" id="hamburger" aria-label="Menu"><i data-lucide="menu"></i></button>
+    <button class="hamburger" id="hamburger" aria-label="Abrir menú" aria-expanded="false">
+      <span class="ham-box">
+        <span class="ham-line ham-top"></span>
+        <span class="ham-line ham-mid"></span>
+        <span class="ham-line ham-bot"></span>
+      </span>
+    </button>
   </div>
 </nav>
 
@@ -158,6 +163,9 @@
       </span>
     </button>
     <div class="sb-body" id="bodyMat">
+      <div class="sb-mat-search-wrap" style="padding: 8px 12px 2px; position: sticky; top: 0; background: var(--sidebar); z-index: 2;">
+        <input type="text" id="sbMatFilter" placeholder="🔍 Filtrar materia..." style="width:100%; box-sizing:border-box; padding:6px 10px; font-size:0.8rem; border-radius:8px; border:1px solid var(--borde); background:var(--inp); color:var(--txt); outline:none;" />
+      </div>
       <div class="sb-body-inner" id="sbMaterias"></div>
     </div>
 
@@ -243,7 +251,12 @@
 // PORTADAS: inicialización instantánea desde caché local (0 ms de espera)
 var LIBROS = [];
 try {
-  var cacheLocal = JSON.parse(localStorage.getItem("digi-admin-libros") || "[]");
+  var rawCache = localStorage.getItem("digi-admin-libros");
+  if (rawCache && (rawCache.includes("íAíAí") || rawCache.includes("îíaíl") || rawCache.includes("írí.í"))) {
+    localStorage.removeItem("digi-admin-libros");
+    rawCache = null;
+  }
+  var cacheLocal = rawCache ? JSON.parse(rawCache) : [];
   if (Array.isArray(cacheLocal) && cacheLocal.length > 0) {
     LIBROS = cacheLocal;
   }
@@ -611,19 +624,64 @@ function render(lista, pag){
     DigiMotion.initTiltCards(".libro-card");
   }
 
-  /* paginación */
+  /* paginación inteligente con elipsis */
   var totalPags = Math.ceil(total / POR_PAG);
-  var pg = "";
-  for(var p = 1; p <= totalPags; p++){
-    pg += '<button class="pag-btn' + (p === pagActual ? " activa" : "") + '" data-p="' + p + '">' + p + '</button>';
+  var pagBox = document.getElementById("paginacion");
+  if(totalPags <= 1){
+    pagBox.innerHTML = "";
+  } else {
+    var pg = "";
+    // Botón Anterior
+    pg += '<button class="pag-btn pag-prev" data-p="' + (pagActual - 1) + '" ' + (pagActual === 1 ? 'disabled' : '') + ' aria-label="Página anterior">&lsaquo;</button>';
+
+    var paginas = [];
+    if (totalPags <= 7) {
+      for (var p = 1; p <= totalPags; p++) paginas.push(p);
+    } else if (pagActual <= 4) {
+      // 1 2 3 4 5 ... totalPags
+      for (var p = 1; p <= 5; p++) paginas.push(p);
+      paginas.push("...");
+      paginas.push(totalPags);
+    } else if (pagActual >= totalPags - 3) {
+      // 1 ... (últimas 5 páginas)
+      paginas.push(1);
+      paginas.push("...");
+      for (var p = totalPags - 4; p <= totalPags; p++) paginas.push(p);
+    } else {
+      // 1 ... 28 29 30 31 ... totalPags (2 antes, actual, 1 después)
+      paginas.push(1);
+      paginas.push("...");
+      paginas.push(pagActual - 2);
+      paginas.push(pagActual - 1);
+      paginas.push(pagActual);
+      paginas.push(pagActual + 1);
+      paginas.push("...");
+      paginas.push(totalPags);
+    }
+
+    for (var k = 0; k < paginas.length; k++) {
+      var item = paginas[k];
+      if (item === "...") {
+        pg += '<span class="pag-ellipsis">&hellip;</span>';
+      } else {
+        pg += '<button class="pag-btn' + (item === pagActual ? " activa" : "") + '" data-p="' + item + '">' + item + '</button>';
+      }
+    }
+
+    // Botón Siguiente
+    pg += '<button class="pag-btn pag-next" data-p="' + (pagActual + 1) + '" ' + (pagActual === totalPags ? 'disabled' : '') + ' aria-label="Página siguiente">&rsaquo;</button>';
+
+    pagBox.innerHTML = pg;
+    pagBox.querySelectorAll(".pag-btn:not([disabled])").forEach(function(b){
+      b.onclick = function(){
+        var targetP = parseInt(b.getAttribute("data-p"), 10);
+        if(!isNaN(targetP) && targetP >= 1 && targetP <= totalPags && targetP !== pagActual){
+          render(filtrados, targetP);
+          window.scrollTo({ top:0, behavior:"smooth" });
+        }
+      };
+    });
   }
-  document.getElementById("paginacion").innerHTML = pg;
-  document.querySelectorAll(".pag-btn").forEach(function(b){
-    b.onclick = function(){
-      render(filtrados, parseInt(b.getAttribute("data-p")));
-      window.scrollTo({ top:0, behavior:"smooth" });
-    };
-  });
 }
 
 /* ── INIT ── */
@@ -697,7 +755,15 @@ window.onscroll = function(){
   document.getElementById("scroll-top").classList.toggle("visible", window.scrollY > 200);
 };
 document.getElementById("scroll-top").onclick = function(){ window.scrollTo({ top:0, behavior:"smooth" }); };
-document.getElementById("hamburger").onclick = function(){ document.getElementById("navLinks").classList.toggle("open"); };
+if(typeof initHamburger === "function") { initHamburger(); }
+else {
+  var hb = document.getElementById("hamburger");
+  if(hb) hb.onclick = function(){
+    var isOpen = document.getElementById("navLinks").classList.toggle("open");
+    this.classList.toggle("open", isOpen);
+    this.setAttribute("aria-expanded", isOpen);
+  };
+}
 
 // Panel de control — visible para admin, preceptor y profesor
 (function(){

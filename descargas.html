@@ -95,8 +95,13 @@
           <span>Cerrar sesión</span>
         </button>
       </div>
-    </div>
-    <button class="hamburger" id="hamburger" aria-label="Menu"><i data-lucide="menu"></i></button>
+    <button class="hamburger" id="hamburger" aria-label="Abrir menú" aria-expanded="false">
+      <span class="ham-box">
+        <span class="ham-line ham-top"></span>
+        <span class="ham-line ham-mid"></span>
+        <span class="ham-line ham-bot"></span>
+      </span>
+    </button>
   </div>
 </nav>
 
@@ -303,7 +308,15 @@ window.onscroll = function(){
   document.getElementById("scroll-top").classList.toggle("visible", window.scrollY > 200);
 };
 document.getElementById("scroll-top").onclick = function(){ window.scrollTo({top:0,behavior:"smooth"}); };
-document.getElementById("hamburger").onclick = function(){ document.getElementById("navLinks").classList.toggle("open"); };
+if(typeof initHamburger === "function") { initHamburger(); }
+else {
+  var hb = document.getElementById("hamburger");
+  if(hb) hb.onclick = function(){
+    var isOpen = document.getElementById("navLinks").classList.toggle("open");
+    this.classList.toggle("open", isOpen);
+    this.setAttribute("aria-expanded", isOpen);
+  };
+}
 
 /* ── INIT ── */
 cargarDescargas();

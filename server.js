@@ -72,10 +72,10 @@ app.use('/api/auth/login', loginRateLimiter);
 // Servir archivos estáticos del frontend con caché controlada
 const staticOptions = { maxAge: '1d', etag: true };
 
-// Protección de enlace directo: Si el usuario intenta entrar directamente al link del PDF o descargarlo desde la barra de direcciones, redirigir al catálogo
+// Protección de enlace directo: Si el usuario intenta entrar directamente al link del PDF en la pestaña principal, redirigir al catálogo (NUNCA dentro de un iframe)
 app.use('/libros', (req, res, next) => {
-  const isDirectNav = req.headers['sec-fetch-dest'] === 'document' || req.headers['sec-fetch-mode'] === 'navigate';
-  if (isDirectNav && req.path.toLowerCase().endsWith('.pdf')) {
+  const dest = req.headers['sec-fetch-dest'];
+  if (dest === 'document' && req.path.toLowerCase().endsWith('.pdf')) {
     return res.redirect('/catalogo.html');
   }
   next();

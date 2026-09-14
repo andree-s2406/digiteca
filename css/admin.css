@@ -638,6 +638,18 @@ html.dark .nav-item.active {
   height: 2px;
   background: var(--txt);
   border-radius: 2px;
+  transition: transform 0.3s cubic-bezier(0.34, 1.25, 0.64, 1), opacity 0.2s ease;
+  transform-origin: center;
+}
+.hamburger-admin.open span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+.hamburger-admin.open span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+.hamburger-admin.open span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
 }
 
 .topbar-breadcrumb {
@@ -678,7 +690,7 @@ button#themeBtn,
   background: var(--bg-card) !important;
   color: var(--txt) !important;
   cursor: pointer !important;
-  display: inline-flex !important;
+  display: inline-flex;
   align-items: center !important;
   justify-content: center !important;
   transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease !important;
@@ -980,12 +992,17 @@ html.dark .theme-switch-pill .thumb-icon-moon {
 }
 
 .panel,
+section.panel,
 .admin-section {
   display: none;
+  padding: 0 !important;
+  margin: 0;
 }
 .panel.active,
+section.panel.active,
 .admin-section.active {
   display: block;
+  padding: 0 !important;
   animation: panelSlideFade 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -2732,7 +2749,17 @@ html.dark .periodo-option-btn .check-icon {
 ════════════════════════════════════════════════ */
 /* Ocultar elementos móviles en pantallas de escritorio */
 @media (min-width: 769px) {
-  .mobile-only { display: none !important; }
+  .mobile-only,
+  #themeSwitchPill,
+  .theme-switch-pill {
+    display: none !important;
+  }
+  .desktop-only,
+  #themeBtn,
+  button#themeBtn,
+  .theme-btn.desktop-only {
+    display: inline-flex !important;
+  }
   .mobile-tabbar { display: none !important; }
   .mobile-fab { display: none !important; }
   .mobile-chips-carousel { display: none !important; }
@@ -2741,7 +2768,18 @@ html.dark .periodo-option-btn .check-icon {
 
 /* Modo pantalla móvil (< 768px) */
 @media (max-width: 768px) {
-  .desktop-only { display: none !important; }
+  .desktop-only,
+  #themeBtn,
+  button#themeBtn,
+  .theme-btn.desktop-only,
+  .theme-btn {
+    display: none !important;
+  }
+  .mobile-only.theme-switch-pill,
+  #themeSwitchPill,
+  .theme-switch-pill {
+    display: inline-flex !important;
+  }
 
   body {
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 14px)) !important;
@@ -2872,10 +2910,17 @@ html.dark .periodo-option-btn .check-icon {
 
   .content,
   .main-content {
-    padding: 6px 12px calc(74px + env(safe-area-inset-bottom, 12px)) 12px !important;
+    padding: 8px 12px calc(74px + env(safe-area-inset-bottom, 12px)) 12px !important;
     margin: 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
+  }
+
+  .panel,
+  section.panel,
+  .admin-section {
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   /* Botón flotante FAB justo arriba de la barra inferior */
@@ -3395,4 +3440,68 @@ html.dark .active-filter-chip {
     gap: 5px !important;
   }
 }
+
+/* ── PAGINACIÓN INTELIGENTE (ADMIN) ── */
+.paginacion {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.pag-btn {
+  min-width: 38px;
+  height: 38px;
+  border-radius: 20px;
+  padding: 0 12px;
+  border: 1px solid var(--borde);
+  background: var(--bg-card);
+  color: var(--txt-m);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+  font-size: 0.88rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-subtle);
+}
+
+.pag-btn:hover {
+  background: var(--cel-o);
+  color: #FFFFFF;
+  border-color: var(--cel-o);
+  transform: translateY(-1px);
+}
+
+.pag-btn.activa {
+  background: var(--cel-o);
+  color: #FFFFFF;
+  border-color: var(--cel-o);
+  box-shadow: 0 4px 12px rgba(46, 127, 179, 0.35);
+}
+
+.pag-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 38px;
+  color: var(--txt-m);
+  font-weight: 700;
+  user-select: none;
+  font-size: 1.1rem;
+}
+
+.pag-btn:disabled,
+.pag-btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 

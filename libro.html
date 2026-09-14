@@ -98,8 +98,13 @@
           <span>Cerrar sesión</span>
         </button>
       </div>
-    </div>
-    <button class="hamburger" id="hamburger" aria-label="Menu"><i data-lucide="menu"></i></button>
+    <button class="hamburger" id="hamburger" aria-label="Abrir menú" aria-expanded="false">
+      <span class="ham-box">
+        <span class="ham-line ham-top"></span>
+        <span class="ham-line ham-mid"></span>
+        <span class="ham-line ham-bot"></span>
+      </span>
+    </button>
   </div>
 </nav>
 
@@ -511,7 +516,8 @@ async function cargarPDF(l){
 
   // 3. Renderizado continuo nativo con PDF.js (Móvil y Escritorio)
   if(window.pdfjsLib){
-    renderPdfContinuous(url);
+    var streamUrl = (url.indexOf("github.com") >= 0 && l && l.id) ? ("/api/libros/" + l.id + "/pdf") : url;
+    renderPdfContinuous(streamUrl);
     return;
   }
 
@@ -641,9 +647,21 @@ async function renderPdfContinuous(source){
     }
 
   } catch(err) {
-    console.warn("Fallo en render nativo PDF.js, usando visor de respaldo:", err);
+    console.warn("Fallo en render nativo PDF.js:", err);
     if(loadingEl) loadingEl.style.display = "none";
     if(container) container.style.display = "none";
+    
+    var isNotFound = (err && (String(err).includes("404") || String(err).includes("Failed to fetch") || String(err).includes("Missing PDF")));
+    if(isNotFound || !source || source.startsWith("/libros/libro_")){
+      if(noDisp){
+        noDisp.style.display = "flex";
+        noDisp.innerHTML = '<div class="pdf-nd-icon" style="color:var(--cel-o)"><i data-lucide="file-text" style="width:64px;height:64px"></i></div><h3>PDF no disponible</h3><p>El archivo de este ejemplar aún no fue vinculado o fue retirado temporalmente.</p>';
+        if(window.lucide && lucide.createIcons) lucide.createIcons();
+      }
+      if(frame) frame.style.display = "none";
+      return;
+    }
+
     if(frame){
       frame.style.display = "block";
       var sep = typeof source === "string" && source.indexOf("?") >= 0 ? "&" : "#";
@@ -846,7 +864,15 @@ window.onscroll=function(){
   document.getElementById("scroll-top").classList.toggle("visible",window.scrollY > 200);
 };
 document.getElementById("scroll-top").onclick=function(){window.scrollTo({top:0,behavior:"smooth"});};
-document.getElementById("hamburger").onclick=function(){document.getElementById("navLinks").classList.toggle("open");};
+if(typeof initHamburger === "function") { initHamburger(); }
+else {
+  var hb = document.getElementById("hamburger");
+  if(hb) hb.onclick = function(){
+    var isOpen = document.getElementById("navLinks").classList.toggle("open");
+    this.classList.toggle("open", isOpen);
+    this.setAttribute("aria-expanded", isOpen);
+  };
+}
 
 // ── INIT ──
 // (La carga del libro se ejecuta mediante cargarLibro() en la parte superior)

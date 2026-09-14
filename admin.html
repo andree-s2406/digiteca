@@ -45,31 +45,6 @@
 <link rel="stylesheet" href="css/animations.css?v=2.2"/>
 <link rel="stylesheet" href="css/admin.css?v=2.2"/>
 <style>
-  /* Garantía visual absoluta para el botón de tema y logos circulares */
-  .theme-btn, #themeBtn {
-    width: 40px !important;
-    height: 40px !important;
-    border-radius: 50% !important;
-    border: 1px solid var(--borde) !important;
-    background: var(--bg-card) !important;
-    color: var(--txt) !important;
-    cursor: pointer !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-    flex-shrink: 0 !important;
-  }
-  .theme-btn:hover, #themeBtn:hover {
-    background: var(--bg-alt) !important;
-    border-color: var(--cel-o) !important;
-    transform: scale(1.06) !important;
-  }
-  .theme-btn:active, #themeBtn:active {
-    transform: scale(0.92) !important;
-  }
   .sidebar-logo, .login-logo, .logo-img {
     border-radius: 50% !important;
     background: #FFFFFF !important;
@@ -211,9 +186,14 @@
           <i data-lucide="globe" style="width:14px;height:14px"></i>
           <span>Portal Público</span>
         </a>
-        <!-- Botón de Tema Circular con Morphicons para PC (idéntico al resto de las páginas) -->
-        <button class="theme-btn desktop-only" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="theme-morph-path"></path></svg></button>
-        <!-- Switch Píldora animado exclusivo para Celular -->
+        <!-- Botón circular Morphicons de cambio de tema (PC / Escritorio) -->
+        <button class="theme-btn desktop-only" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema">
+          <svg class="theme-morph-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path class="theme-morph-path"></path>
+          </svg>
+        </button>
+
+        <!-- Switch Píldora animado de cambio de tema (Móvil / Celular) -->
         <div class="theme-switch-pill mobile-only" id="themeSwitchPill" onclick="toggleThemePill()" role="button" tabindex="0" title="Cambiar tema" aria-label="Cambiar tema claro u oscuro">
           <span class="pill-icon-wrap pill-sun"><i data-lucide="sun" style="width:13px;height:13px"></i></span>
           <span class="pill-icon-wrap pill-moon"><i data-lucide="moon" style="width:13px;height:13px"></i></span>
@@ -373,7 +353,7 @@
         <div class="inventory-controls">
           <div class="search-input-wrap">
             <i data-lucide="search" class="search-icon" style="width:16px;height:16px"></i>
-            <input type="text" class="search-input" id="buscarLibroAdmin" placeholder="Buscar por título, autor o materia..." oninput="renderTablaLibros()"/>
+            <input type="text" class="search-input" id="buscarLibroAdmin" placeholder="Buscar por título, autor o materia..." oninput="pagLibrosAdmin=1; renderTablaLibros()"/>
           </div>
           <button type="button" class="btn-filter-trigger" id="btnFiltrosLibros" onclick="abrirModalFiltrosLibros()" title="Filtros" aria-label="Abrir filtros de libros">
             <i data-lucide="sliders-horizontal" style="width:15px;height:15px"></i>
@@ -385,8 +365,8 @@
               <option value="">Todas las materias</option>
               <option>Matemática</option><option>Física</option><option>Química</option>
               <option>Biología</option><option>Historia</option><option>Geografía</option>
-              <option>Lengua y Literatura</option><option>Inglés</option>
-              <option>Informática</option><option>Ciencias Naturales</option>
+              <option>Lengua y Literatura</option><option>Literatura Infantil / Cuentos</option>
+              <option>Inglés</option><option>Informática</option><option>Ciencias Naturales</option>
             </select>
           </div>
         </div>
@@ -417,6 +397,9 @@
 
         <!-- Lista de Tarjetas Táctiles (Móvil) -->
         <div class="mobile-cards-container" id="mobileCardsLibros"></div>
+
+        <!-- Paginación Inteligente de Libros (Escritorio y Móvil) -->
+        <div class="paginacion" id="paginacionLibrosAdmin"></div>
       </section>
 
       <!-- ════════════════════════════════════════════════
@@ -545,7 +528,7 @@
           <datalist id="listaMaterias">
             <option>Matemática</option><option>Física</option><option>Química</option>
             <option>Biología</option><option>Historia</option><option>Geografía</option>
-            <option>Lengua y Literatura</option><option>Inglés</option>
+            <option>Lengua y Literatura</option><option>Literatura Infantil / Cuentos</option><option>Inglés</option>
             <option>Informática</option><option>Ciencias Naturales</option>
             <option>Educación Física</option><option>Arte</option><option>Música</option>
             <option>Tecnología</option><option>Economía</option><option>Filosofía</option>
@@ -953,7 +936,17 @@ function LS_set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e
 
 function getLibros(){
   if(Array.isArray(MEMORIA_LIBROS) && MEMORIA_LIBROS.length > 0) return MEMORIA_LIBROS;
-  return LS_get("digi-admin-libros", []);
+  var cached = LS_get("digi-admin-libros", []);
+  if(Array.isArray(cached) && cached.length > 0){
+    var tieneCorrupcion = cached.some(function(l){
+      return l && l.mat && (l.mat.includes("íAíAí") || l.mat.includes("îíaíl") || l.mat.includes("írí.í"));
+    });
+    if(tieneCorrupcion){
+      try { localStorage.removeItem("digi-admin-libros"); } catch(e){}
+      return [];
+    }
+  }
+  return cached;
 }
 function setLibros(v){
   if(Array.isArray(v)) MEMORIA_LIBROS = v;
@@ -1587,8 +1580,14 @@ function handleMobileFabClick(){
 }
 
 function toggleSidebar(){
-  document.getElementById("sidebar").classList.toggle("open");
-  document.getElementById("sidebarOverlay").classList.toggle("open");
+  var sb = document.getElementById("sidebar");
+  var ov = document.getElementById("sidebarOverlay");
+  var btn = document.querySelector(".hamburger-admin");
+  if(sb) {
+    var isOpen = sb.classList.toggle("open");
+    if(ov) ov.classList.toggle("open", isOpen);
+    if(btn) btn.classList.toggle("open", isOpen);
+  }
 }
 
 // ════════════════════════════════════════════════
@@ -1620,6 +1619,18 @@ function libroPerteneceCursos(libro, cursos){
   return false;
 }
 
+var pagLibrosAdmin = 1;
+var POR_PAG_ADMIN = 12;
+
+function cambiarPaginaLibrosAdmin(p){
+  pagLibrosAdmin = p;
+  renderTablaLibros();
+  var pnl = document.getElementById("panelLibros");
+  if(pnl){
+    pnl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 function renderTablaLibros(librosParam){
   var rol   = (adminActual ? (adminActual.rol||"admin") : "admin").toLowerCase();
   var email = (adminActual ? (adminActual.email||"") : "").toLowerCase();
@@ -1630,6 +1641,7 @@ function renderTablaLibros(librosParam){
   var tipo = (window.filtroLibros && window.filtroLibros.tipo) || "";
   var anio = (window.filtroLibros && window.filtroLibros.anio) || "";
   var todosLibros = (Array.isArray(librosParam) && librosParam.length > 0) ? librosParam : getLibros();
+  actualizarOpcionesMateriasAdmin(todosLibros);
 
   // Filtrar según rol y filtros activos
   var libros = todosLibros.filter(function(l){
@@ -1665,10 +1677,19 @@ function renderTablaLibros(librosParam){
     btnAgregar.style.display = (rol === "alumno") ? "none" : "";
   }
 
+  // Paginación inteligente
+  var totalLibros = libros.length;
+  var totalPags = Math.ceil(totalLibros / POR_PAG_ADMIN);
+  if(pagLibrosAdmin > totalPags) pagLibrosAdmin = Math.max(1, totalPags);
+  if(pagLibrosAdmin < 1) pagLibrosAdmin = 1;
+  var ini = (pagLibrosAdmin - 1) * POR_PAG_ADMIN;
+  var fin = ini + POR_PAG_ADMIN;
+  var sliceLibros = libros.slice(ini, fin);
+
   var h = "";
-  for(var i=0;i<libros.length;i++){
+  for(var i=0;i<sliceLibros.length;i++){
     try {
-      var l = libros[i];
+      var l = sliceLibros[i];
       var cleanCover = (l.img && !l.img.startsWith("file:")) ? getCleanCover(l.img) : (l.img && l.img.includes("test.jpg") ? "img/test.jpg" : "");
       var imgH = cleanCover ? '<img class="tbl-img" src="'+cleanCover+'" alt="" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=\\\'tbl-img-placeholder\\\'>📖</div>\'"/>' :
                  '<div class="tbl-img-placeholder">'+(l.e||"📚")+'</div>';
@@ -1721,9 +1742,9 @@ function renderTablaLibros(librosParam){
 
   // Renderizar Tarjetas Móviles (Mobile-First)
   var cardsHtml = "";
-  for(var ci=0; ci<libros.length; ci++){
+  for(var ci=0; ci<sliceLibros.length; ci++){
     try {
-      var lb = libros[ci];
+      var lb = sliceLibros[ci];
       var aniosArrC = Array.isArray(lb.anios) ? lb.anios : [];
       var aniosStrC = aniosArrC.length > 0 ? aniosArrC.join(", ")+"° Año" : "General";
       var pEdit = true;
@@ -1756,6 +1777,52 @@ function renderTablaLibros(librosParam){
   var cardsWrap = document.getElementById("mobileCardsLibros");
   if(cardsWrap){
     cardsWrap.innerHTML = cardsHtml || '<div style="text-align:center;padding:30px;color:var(--txt-m);background:var(--bg-card);border:1px solid var(--borde);border-radius:16px"><p style="margin:0;font-weight:600">No se encontraron libros</p></div>';
+  }
+
+  // Renderizar controles de Paginación Inteligente
+  var pagBox = document.getElementById("paginacionLibrosAdmin");
+  if(pagBox){
+    if(totalPags <= 1){
+      pagBox.innerHTML = "";
+    } else {
+      var pg = "";
+      pg += '<button class="pag-btn pag-prev" onclick="cambiarPaginaLibrosAdmin(' + (pagLibrosAdmin - 1) + ')" ' + (pagLibrosAdmin === 1 ? 'disabled' : '') + ' aria-label="Página anterior">&lsaquo;</button>';
+
+      var paginas = [];
+      if (totalPags <= 7) {
+        for (var p = 1; p <= totalPags; p++) paginas.push(p);
+      } else if (pagLibrosAdmin <= 4) {
+        for (var p = 1; p <= 5; p++) paginas.push(p);
+        paginas.push("...");
+        paginas.push(totalPags);
+      } else if (pagLibrosAdmin >= totalPags - 3) {
+        paginas.push(1);
+        paginas.push("...");
+        for (var p = totalPags - 4; p <= totalPags; p++) paginas.push(p);
+      } else {
+        paginas.push(1);
+        paginas.push("...");
+        paginas.push(pagLibrosAdmin - 2);
+        paginas.push(pagLibrosAdmin - 1);
+        paginas.push(pagLibrosAdmin);
+        paginas.push(pagLibrosAdmin + 1);
+        paginas.push("...");
+        paginas.push(totalPags);
+      }
+
+      for (var pi = 0; pi < paginas.length; pi++) {
+        var num = paginas[pi];
+        if (num === "...") {
+          pg += '<span class="pag-ellipsis">…</span>';
+        } else {
+          var act = num === pagLibrosAdmin ? " activa" : "";
+          pg += '<button class="pag-btn' + act + '" onclick="cambiarPaginaLibrosAdmin(' + num + ')">' + num + '</button>';
+        }
+      }
+
+      pg += '<button class="pag-btn pag-next" onclick="cambiarPaginaLibrosAdmin(' + (pagLibrosAdmin + 1) + ')" ' + (pagLibrosAdmin === totalPags ? 'disabled' : '') + ' aria-label="Página siguiente">&rsaquo;</button>';
+      pagBox.innerHTML = pg;
+    }
   }
 
   // Actualizar indicador de filtros activos
@@ -1806,17 +1873,24 @@ function abrirModalFiltrosLibros(){
 
 function renderModalPillsLibros(){
   var todos = getLibros();
-  // 1. Materias
-  var materias = [
-    "Todas", "Matemática", "Física", "Química", "Biología", 
-    "Historia", "Geografía", "Lengua y Literatura", "Inglés", 
-    "Informática", "Ciencias Naturales"
+  // 1. Materias (dinámicas basadas en los libros cargados)
+  var baseMaterias = [
+    "Matemática", "Física", "Química", "Biología", 
+    "Historia", "Geografía", "Lengua y Literatura", "Literatura Infantil / Cuentos",
+    "Inglés", "Informática", "Ciencias Naturales"
   ];
   var counts = { "Todas": todos.length };
+  var materiasEnUso = [];
   for(var i=0; i<todos.length; i++){
     var m = todos[i].mat || "General";
     counts[m] = (counts[m]||0) + 1;
+    if(materiasEnUso.indexOf(m) < 0) materiasEnUso.push(m);
   }
+  for(var bm=0; bm<baseMaterias.length; bm++){
+    if(materiasEnUso.indexOf(baseMaterias[bm]) < 0) materiasEnUso.push(baseMaterias[bm]);
+  }
+  materiasEnUso.sort();
+  var materias = ["Todas"].concat(materiasEnUso);
   var hMat = "";
   for(var j=0; j<materias.length; j++){
     var mName = materias[j];
@@ -1866,6 +1940,7 @@ function aplicarFiltrosLibrosModal(){
   filtroLibros.anio = filtroLibrosDraft.anio || "";
   var selMat = document.getElementById("filtroMatAdmin");
   if(selMat) selMat.value = filtroLibros.mat || "";
+  pagLibrosAdmin = 1;
   cerrarModal('modalFiltrosLibros');
   renderTablaLibros();
 }
@@ -1875,6 +1950,7 @@ function limpiarFiltrosLibrosModal(){
   filtroLibros = { mat: "", tipo: "", anio: "" };
   var selMat = document.getElementById("filtroMatAdmin");
   if(selMat) selMat.value = "";
+  pagLibrosAdmin = 1;
   cerrarModal('modalFiltrosLibros');
   renderTablaLibros();
 }
@@ -1886,13 +1962,51 @@ function removerFiltroLibro(campo){
       var selMat = document.getElementById("filtroMatAdmin");
       if(selMat) selMat.value = "";
     }
+    pagLibrosAdmin = 1;
     renderTablaLibros();
+  }
+}
+
+function actualizarOpcionesMateriasAdmin(todos){
+  var selMat = document.getElementById("filtroMatAdmin");
+  var dlMat = document.getElementById("listaMaterias");
+  if(!todos || !Array.isArray(todos)) return;
+
+  var baseMats = [
+    "Matemática", "Física", "Química", "Biología", "Historia", 
+    "Geografía", "Lengua y Literatura", "Literatura Infantil / Cuentos",
+    "Educación Sexual Integral (ESI)", "Inglés", "Informática", 
+    "Ciencias Naturales", "Tecnología", "Robótica", "Arte", "Música"
+  ];
+  var matSet = {};
+  for(var b=0; b<baseMats.length; b++){ matSet[baseMats[b]] = true; }
+  for(var i=0; i<todos.length; i++){
+    if(todos[i].mat && todos[i].mat.trim()) matSet[todos[i].mat.trim()] = true;
+  }
+  var list = Object.keys(matSet).sort();
+
+  if(selMat){
+    var prevVal = selMat.value;
+    var optH = '<option value="">Todas las materias</option>';
+    for(var j=0; j<list.length; j++){
+      optH += '<option value="' + list[j] + '"' + (list[j] === prevVal ? ' selected' : '') + '>' + list[j] + '</option>';
+    }
+    selMat.innerHTML = optH;
+  }
+
+  if(dlMat){
+    var dlH = '';
+    for(var k=0; k<list.length; k++){
+      dlH += '<option>' + list[k] + '</option>';
+    }
+    dlMat.innerHTML = dlH;
   }
 }
 
 function sincronizarSelectLibroADesktop(){
   var selMat = document.getElementById("filtroMatAdmin");
   filtroLibros.mat = selMat ? selMat.value : "";
+  pagLibrosAdmin = 1;
   renderTablaLibros();
 }
 
@@ -2034,8 +2148,11 @@ async function guardarLibro(){
   var anios = aniosRaw ? aniosRaw.split(",").map(function(x){ return parseInt(x.trim()); }).filter(function(n){ return !isNaN(n); }) : [];
   var divisiones = getLibroDivs();
   var libros = getLibros();
-  var EMOJIS = {"Matemática":"matematica","Física":"fisica","Química":"quimica","Biología":"biologia","Historia":"historia",
-    "Geografía":"geografia","Lengua y Literatura":"lengua","Inglés":"ingles","Informática":"informatica","Ciencias Naturales":"ciencias"};
+  var EMOJIS = {
+    "Matemática":"matematica","Física":"fisica","Educación Física":"edufisica","Biofísica":"biofisica","Química":"quimica","Biología":"biologia","Historia":"historia",
+    "Geografía":"geografia","Lengua y Literatura":"lengua","Inglés":"ingles","Informática":"informatica","Ciencias Naturales":"ciencias",
+    "Educación Sexual Integral (ESI)":"esi","Literatura Infantil / Cuentos":"libro","Literatura":"literatura"
+  };
   var e = EMOJIS[mat] || "libro";
 
   if(libroEditando === null){

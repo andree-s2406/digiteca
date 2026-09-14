@@ -7,9 +7,10 @@ const path = require('path');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const LIBROS_JSON = path.join(DATA_DIR, 'libros.json');
 
-let cachedLibros = null;
-let lastCacheTime = 0;
-const CACHE_TTL_MS = 45 * 1000; // 45 segundos
+const bookDetailCache = new Map();
+let cachedLibros = loadLocalBackup();
+let lastCacheTime = cachedLibros ? Date.now() : 0;
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos en RAM
 
 function saveLocalBackup(libros) {
   try {
@@ -145,8 +146,6 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: 'Error al consultar libros' });
   }
 });
-
-const bookDetailCache = new Map();
 const DETAIL_TTL_MS = 60 * 1000; // 60 segundos
 
 // GET /api/libros/:id - Detalle completo de un libro
@@ -178,6 +177,44 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET /api/libros/:id/pdf - Transmisión en streaming de PDF con soporte CORS nativo
+router.get('/:id/pdf', async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [String(rawId)]);
+    if (result.rows.length === 0 || !result.rows[0].pdf_url) {
+      return res.status(404).send('PDF no disponible');
+    }
+
+    const pdfUrl = result.rows[0].pdf_url;
+    if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
+      const upstream = await fetch(pdfUrl, { redirect: 'follow' });
+      if (!upstream.ok) {
+        return res.status(upstream.status).send('No se pudo obtener el PDF del servidor remoto');
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(result.rows[0].titulo || 'libro')}.pdf"`);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      const contentLength = upstream.headers.get('content-length');
+      if (contentLength) res.setHeader('Content-Length', contentLength);
+
+      const arrayBuf = await upstream.arrayBuffer();
+      return res.send(Buffer.from(arrayBuf));
+    } else {
+      const localPath = path.join(__dirname, '..', pdfUrl.replace(/^\//, ''));
+      if (fs.existsSync(localPath)) {
+        return res.sendFile(localPath);
+      }
+      return res.status(404).send('Archivo no encontrado');
+    }
+  } catch (err) {
+    console.error('Error al transmitir PDF:', err);
+    res.status(500).send('Error interno al cargar el PDF');
+  }
+});
+
 // POST /api/libros - Crear libro
 router.post('/', async (req, res) => {
   try {
@@ -190,46 +227,67 @@ router.post('/', async (req, res) => {
     const EMOJIS = {
       "Matemática": "📐", "Física": "⚡", "Química": "⚗️", "Biología": "🧬",
       "Historia": "🏛️", "Geografía": "🌍", "Lengua y Literatura": "📖",
-      "Inglés": "🗣️", "Informática": "💻", "Ciencias Naturales": "🔬"
+      "Inglés": "🗣️", "Informática": "💻", "Ciencias Naturales": "🔬",
+      "Educación Sexual Integral (ESI)": "🌱", "Literatura Infantil / Cuentos": "📚",
+      "Tecnología": "⚙️", "Robótica": "🤖", "Arte": "🎨", "Música": "🎵",
+      "Filosofía": "🏛️", "Economía": "📈", "Derecho y Ciudadanía": "⚖️"
     };
 
     const emojiFinal = e || EMOJIS[mat] || "📚";
     const categoriaC = c || mat.toLowerCase().replace(/[^a-z0-9]/g, '');
     const categoriaL = l || mat;
 
-        // Obtener siguiente ID seguro secuencial
-    const maxRes = await query(`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM libros WHERE id < 1000000000;`);
-    let nextId = parseInt(maxRes.rows[0].next_id, 10);
-    if (isNaN(nextId) || nextId < 1) nextId = 1;
-
-    // Verificar que no colisione
-    while (true) {
-      const checkExists = await query(`SELECT 1 FROM libros WHERE id = $1;`, [nextId]);
-      if (checkExists.rows.length === 0) break;
-      nextId++;
+    let result;
+    if (req.body.id && !isNaN(parseInt(req.body.id, 10))) {
+      result = await query(
+        `INSERT INTO libros (id, titulo, autor, materia, tipo, anios, divisiones, portada_url, pdf_url, emoji, categoria_c, categoria_l, descripcion, subido_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         ON CONFLICT (id) DO UPDATE SET
+           titulo = EXCLUDED.titulo,
+           autor = EXCLUDED.autor,
+           materia = EXCLUDED.materia,
+           portada_url = EXCLUDED.portada_url,
+           pdf_url = EXCLUDED.pdf_url
+         RETURNING *;`,
+        [
+          parseInt(req.body.id, 10),
+          t.trim(),
+          a.trim(),
+          mat.trim(),
+          tipo || 'Libro',
+          JSON.stringify(anios || []),
+          JSON.stringify(divisiones || []),
+          img || '',
+          pdf || '',
+          emojiFinal,
+          categoriaC,
+          categoriaL,
+          x || '',
+          subioPor || 'admin'
+        ]
+      );
+    } else {
+      result = await query(
+        `INSERT INTO libros (titulo, autor, materia, tipo, anios, divisiones, portada_url, pdf_url, emoji, categoria_c, categoria_l, descripcion, subido_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         RETURNING *;`,
+        [
+          t.trim(),
+          a.trim(),
+          mat.trim(),
+          tipo || 'Libro',
+          JSON.stringify(anios || []),
+          JSON.stringify(divisiones || []),
+          img || '',
+          pdf || '',
+          emojiFinal,
+          categoriaC,
+          categoriaL,
+          x || '',
+          subioPor || 'admin'
+        ]
+      );
     }
-
-    const result = await query(
-      `INSERT INTO libros (id, titulo, autor, materia, tipo, anios, divisiones, portada_url, pdf_url, emoji, categoria_c, categoria_l, descripcion, subido_por)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-       RETURNING *;`,
-      [
-        nextId,
-        t.trim(),
-        a.trim(),
-        mat.trim(),
-        tipo || 'Libro',
-        JSON.stringify(anios || []),
-        JSON.stringify(divisiones || []),
-        img || '',
-        pdf || '',
-        emojiFinal,
-        categoriaC,
-        categoriaL,
-        x || '',
-        subioPor || 'admin'
-      ]
-    );
 
     invalidateCache();
     res.status(201).json(mapLibroRow(result.rows[0]));
@@ -256,7 +314,10 @@ router.put('/:id', async (req, res) => {
     const EMOJIS = {
       "Matemática": "📐", "Física": "⚡", "Química": "⚗️", "Biología": "🧬",
       "Historia": "🏛️", "Geografía": "🌍", "Lengua y Literatura": "📖",
-      "Inglés": "🗣️", "Informática": "💻", "Ciencias Naturales": "🔬"
+      "Inglés": "🗣️", "Informática": "💻", "Ciencias Naturales": "🔬",
+      "Educación Sexual Integral (ESI)": "🌱", "Literatura Infantil / Cuentos": "📚",
+      "Tecnología": "⚙️", "Robótica": "🤖", "Arte": "🎨", "Música": "🎵",
+      "Filosofía": "🏛️", "Economía": "📈", "Derecho y Ciudadanía": "⚖️"
     };
 
     const emojiFinal = e || EMOJIS[mat] || "📚";
@@ -322,7 +383,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     invalidateCache();
-    res.json({ message: 'Libro eliminado exitosamente', id });
+    res.json({ message: 'Libro eliminado exitosamente', id: result.rows[0].id });
   } catch (err) {
     console.error('Error en DELETE /api/libros/:id:', err);
     res.status(500).json({ error: 'Error al eliminar libro' });

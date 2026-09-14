@@ -13,6 +13,9 @@
     'ciencias': 'flask-conical',
     'quimica': 'test-tube-2',
     'fisica': 'atom',
+    'edufisica': 'trophy',
+    'educacion-fisica': 'trophy',
+    'biofisica': 'dna',
     'biologia': 'dna',
     'historia': 'landmark',
     'geografia': 'globe',
@@ -393,6 +396,7 @@
         if (morph && typeof morph.set === "function") morph.set(targetPath);
         else if (path) path.setAttribute("d", targetPath);
       }
+      try { window.dispatchEvent(new Event("themechange")); } catch(e){}
     }
 
     // Inicializar según preferencia almacenada
@@ -429,6 +433,69 @@
     });
   }
 
+  // ── CONTROL Y ANIMACIÓN DEL MENÚ HAMBURGUESA MÓVIL ──
+  function initHamburger() {
+    var btn = document.getElementById("hamburger") || document.querySelector(".hamburger");
+    var navLinks = document.getElementById("navLinks");
+    if (!btn) return;
+    if (btn._hamInitialized) return;
+    btn._hamInitialized = true;
+
+    // Asegurar estructura interna con 3 líneas animadas
+    if (!btn.querySelector(".ham-box")) {
+      btn.innerHTML = '<span class="ham-box"><span class="ham-line ham-top"></span><span class="ham-line ham-mid"></span><span class="ham-line ham-bot"></span></span>';
+    }
+
+    function toggleMenu(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      var isOpen = navLinks ? navLinks.classList.toggle("open") : btn.classList.toggle("open");
+      btn.classList.toggle("open", isOpen);
+      btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      btn.setAttribute("aria-label", isOpen ? "Cerrar menú" : "Abrir menú");
+    }
+
+    btn.onclick = toggleMenu;
+
+    // Cerrar al hacer clic en cualquier enlace dentro del menú
+    if (navLinks) {
+      navLinks.querySelectorAll("a").forEach(function(link) {
+        link.addEventListener("click", function() {
+          navLinks.classList.remove("open");
+          btn.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+          btn.setAttribute("aria-label", "Abrir menú");
+        });
+      });
+    }
+
+    // Cerrar menú al hacer clic afuera
+    document.addEventListener("click", function(e) {
+      if (navLinks && navLinks.classList.contains("open")) {
+        if (!navLinks.contains(e.target) && !btn.contains(e.target)) {
+          navLinks.classList.remove("open");
+          btn.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+          btn.setAttribute("aria-label", "Abrir menú");
+        }
+      }
+    });
+
+    // Cerrar menú con tecla Escape
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape" && navLinks && navLinks.classList.contains("open")) {
+        navLinks.classList.remove("open");
+        btn.classList.remove("open");
+        btn.setAttribute("aria-expanded", "false");
+        btn.setAttribute("aria-label", "Abrir menú");
+      }
+    });
+  }
+
+  global.initHamburger = initHamburger;
+
   // Auto inicializar cuando el DOM esté listo
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
@@ -436,12 +503,14 @@
         DigiIcons.create();
         initUserMenu();
         setupThemeToggle();
+        initHamburger();
       });
     } else {
       setTimeout(function() {
         DigiIcons.create();
         initUserMenu();
         setupThemeToggle();
+        initHamburger();
       }, 0);
     }
   }
