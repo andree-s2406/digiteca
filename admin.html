@@ -1795,7 +1795,7 @@ function renderTablaLibros(librosParam){
       }
       var coverSrc = getCleanCover(lb.img);
       cardsHtml += '<div class="mobile-book-card" onclick="editarLibro(\''+lb.id+'\')">';
-      cardsHtml += '  <img class="book-card-cover" src="'+coverSrc+'" alt="Portada" onerror="this.onerror=null;this.src=\'img/test.jpg\'"/>';
+      cardsHtml += '  <img class="book-card-cover" src="'+coverSrc+'" alt="Portada" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'img/test.jpg\'"/>';
       cardsHtml += '  <div class="book-card-info">';
       cardsHtml += '    <span class="book-card-tag">'+(lb.mat||"General")+'</span>';
       cardsHtml += '    <h3 class="book-card-title">'+(lb.t||"Sin título")+'</h3>';
@@ -2370,7 +2370,7 @@ function renderRanking(){
     h += '<div class="rank-card">';
     h += '  <div class="rank-card-main">';
     h += '    <span class="rank-pos">#' + pos + '</span>';
-    h += '    <img src="' + item.portada_url + '" class="rank-cover" alt="" onerror="this.src=\'img/test.jpg\'">';
+    h += '    <img src="' + item.portada_url + '" class="rank-cover" alt="" loading="lazy" decoding="async" onerror="this.src=\'img/test.jpg\'">';
     h += '    <div class="rank-info">';
     h += '      <p class="rank-title" title="' + (item.titulo || "") + '">' + (item.titulo || "Sin título") + '</p>';
     h += '      <p class="rank-meta">' + (item.autor || "Autor no especificado") + ' • <span class="rank-materia">' + (item.materia || "General") + '</span></p>';

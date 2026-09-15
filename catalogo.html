@@ -35,6 +35,10 @@
 <title>Catálogo – DigiTeca</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="dns-prefetch" href="https://fonts.googleapis.com">
+<link rel="dns-prefetch" href="https://fonts.gstatic.com">
+<link rel="preconnect" href="https://js.pusher.com">
+<link rel="dns-prefetch" href="https://js.pusher.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet"/>
 <link rel="shortcut icon" href="/favicon/favicon-32x32.png" type="image/x-icon">
 <link rel="stylesheet" href="css/variables.css"/>
@@ -250,6 +254,25 @@
 <script src="js/sync.js"></script>
 <script src="js/quick-nav.js" defer></script>
 <script>
+// Normalizador ultra-rápido de texto (sin acentos, minúsculas)
+function norm(s){
+  if(!s) return "";
+  return s.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/ñ/g, "n");
+}
+
+// Pre-indexación en memoria de campos de búsqueda (0 ms en filtrado posterior)
+function indexarLibros(libros){
+  if(!Array.isArray(libros)) return;
+  for(var i = 0; i < libros.length; i++){
+    var l = libros[i];
+    if(!l._normT) l._normT = norm(l.t || "");
+    if(!l._normA) l._normA = norm(l.a || "");
+    if(!l._normM) l._normM = norm(l.mat || "");
+  }
+}
+
 // PORTADAS: inicialización instantánea desde caché local (0 ms de espera)
 var LIBROS = [];
 try {
@@ -261,6 +284,7 @@ try {
   var cacheLocal = rawCache ? JSON.parse(rawCache) : [];
   if (Array.isArray(cacheLocal) && cacheLocal.length > 0) {
     LIBROS = cacheLocal;
+    indexarLibros(LIBROS);
   }
 } catch(e) {}
 
@@ -279,16 +303,18 @@ function actualizarHeroStats(){
     }
   }
 
-  // 2. Materias activas (estático, sin animación)
-  var allMats = [];
+  // 2. Materias activas (conteo O(N) único con Set)
+  var totalMats = 0;
   if(Array.isArray(LIBROS)){
+    var setMats = new Set();
     for(var j = 0; j < LIBROS.length; j++){
-      if(LIBROS[j].mat && allMats.indexOf(LIBROS[j].mat) < 0) allMats.push(LIBROS[j].mat);
+      var mv = (LIBROS[j].mat || "").trim();
+      if(mv) setMats.add(mv);
     }
+    totalMats = setMats.size;
   }
-  var totalMats = allMats.length || 5;
   if(statMatEl){
-    statMatEl.textContent = totalMats;
+    statMatEl.textContent = totalMats || 5;
   }
 
   // 3. Acceso libre (24/7) (estático, sin animación)
@@ -304,6 +330,8 @@ async function cargarLibrosAPI(){
       const librosDB = await API.libros.getAll();
       if (Array.isArray(librosDB) && librosDB.length > 0) {
         LIBROS = librosDB;
+        cachedAllMats = null;
+        indexarLibros(LIBROS);
         filtrarPorDivisionUsuario();
         filtrados = LIBROS.slice();
         actualizarHeroStats();
@@ -397,45 +425,62 @@ function libroTieneAnio(l, k){
   return anios.indexOf(parseInt(k)) >= 0;
 }
 
-/* ── CONSTRUIR SIDEBAR ── */
-function buildSidebar(){
-  /*
-   * Lógica de contadores cruzados:
-   * - Los contadores de AÑO muestran cuántos libros del subconjunto
-   *   filtrado por MATERIA (y búsqueda) corresponden a cada año.
-   * - Los contadores de MATERIA muestran cuántos libros del subconjunto
-   *   filtrado por AÑO (y búsqueda) corresponden a cada materia.
-   * Así, al seleccionar 6° Año, los contadores de materia se reducen
-   * mostrando solo los libros de ese año.
-   */
+/* ── CONSTRUIR SIDEBAR (ALGORITMO OPTIMIZADO O(N) CON MAPAS DE FRECUENCIA) ── */
+var cachedAllMats = null;
+function getAllMaterias(){
+  if(cachedAllMats && cachedAllMats.length > 0) return cachedAllMats;
+  var set = new Set();
+  for(var j = 0; j < LIBROS.length; j++){
+    var mVal = (LIBROS[j].mat || "").trim();
+    if(mVal) set.add(mVal);
+  }
+  cachedAllMats = Array.from(set).sort(function(a, b){
+    return a.localeCompare(b, 'es', { sensitivity: 'base' });
+  });
+  return cachedAllMats;
+}
 
-  /* Base filtrada solo por búsqueda (sin año ni materia) */
+function buildSidebar(){
+  var normFiltMat = filtMat ? norm(filtMat) : "";
+
+  /* 1. Base filtrada solo por búsqueda rápida en campos pre-indexados */
   var baseQ = LIBROS.filter(function(l){
     return !filtQ
-      || l.t.toLowerCase().indexOf(filtQ) >= 0
-      || l.a.toLowerCase().indexOf(filtQ) >= 0
-      || l.mat.toLowerCase().indexOf(filtQ) >= 0;
+      || (l._normT && l._normT.indexOf(filtQ) >= 0)
+      || (l._normA && l._normA.indexOf(filtQ) >= 0)
+      || (l._normM && l._normM.indexOf(filtQ) >= 0);
   });
 
-  /* Para los contadores de AÑO: usar base filtrada por materia activa */
+  /* 2. Subconjuntos para contadores cruzados */
   var baseParaAnios = filtMat
-    ? baseQ.filter(function(l){ return norm(l.mat||"") === norm(filtMat||""); })
+    ? baseQ.filter(function(l){ return l._normM === normFiltMat; })
     : baseQ;
 
-  /* Para los contadores de MATERIA: usar base filtrada por año activo */
   var baseParaMats = filtAnio
     ? baseQ.filter(function(l){ return libroTieneAnio(l, filtAnio); })
     : baseQ;
 
-  /* ── AÑOS ── */
+  /* ── AÑOS: Conteo en un solo pase O(N) ── */
+  var anioCounts = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "otros": 0 };
+  for (var aIdx = 0; aIdx < baseParaAnios.length; aIdx++) {
+    var arr = baseParaAnios[aIdx].anios;
+    if (!arr || !arr.length) {
+      anioCounts["otros"]++;
+    } else {
+      for (var k = 0; k < arr.length; k++) {
+        var sk = String(arr[k]);
+        if (anioCounts[sk] !== undefined) anioCounts[sk]++;
+      }
+    }
+  }
+
   var anioKeys = ["1","2","3","4","5","6","otros"];
   var sbA = document.getElementById("sbAnios");
   sbA.innerHTML = "";
   var anioTotal = 0;
   for(var i = 0; i < anioKeys.length; i++){
-    var k     = anioKeys[i];
-    var count = baseParaAnios.filter(function(l){ return libroTieneAnio(l, k); }).length;
-    /* Mostrar opción aunque tenga 0 si está activa, para poder deseleccionar */
+    var k = anioKeys[i];
+    var count = anioCounts[k] || 0;
     if(count === 0 && filtAnio !== k) continue;
     anioTotal++;
     var btn = document.createElement("button");
@@ -455,31 +500,32 @@ function buildSidebar(){
   }
   document.getElementById("accAnioCount").textContent = anioTotal;
 
-  /* ── MATERIAS ── */
-  var allMats = [];
-  for(var j = 0; j < LIBROS.length; j++){
-    var mVal = (LIBROS[j].mat || "").trim();
-    if(mVal && allMats.indexOf(mVal) < 0) allMats.push(mVal);
+  /* ── MATERIAS: Conteo en un solo pase O(N) con HashMap ── */
+  var matCounts = Object.create(null);
+  for (var mIdx = 0; mIdx < baseParaMats.length; mIdx++) {
+    var mv = (baseParaMats[mIdx].mat || "").trim();
+    if (mv) {
+      matCounts[mv] = (matCounts[mv] || 0) + 1;
+    }
   }
-  allMats.sort(function(a, b){ return a.localeCompare(b, 'es', { sensitivity: 'base' }); });
 
+  var allMats = getAllMaterias();
   var filterMatTxt = (document.getElementById("sbMatFilter") ? document.getElementById("sbMatFilter").value : "").trim().toLowerCase();
+  var normFilterMatTxt = filterMatTxt ? norm(filterMatTxt) : "";
 
   var sbM = document.getElementById("sbMaterias");
   sbM.innerHTML = "";
   var matsConResultados = 0;
   for(var m = 0; m < allMats.length; m++){
     var mat = allMats[m];
-    var cnt = baseParaMats.filter(function(l){ return (l.mat||"").trim() === mat; }).length;
-    /* Mostrar materia aunque tenga 0 si está activa, para poder deseleccionar */
+    var cnt = matCounts[mat] || 0;
     if(cnt === 0 && filtMat !== mat) continue;
     matsConResultados++;
 
-    /* Filtro de búsqueda rápida en el acordeón */
-    if(filterMatTxt && norm(mat).indexOf(norm(filterMatTxt)) < 0) continue;
+    if(normFilterMatTxt && norm(mat).indexOf(normFilterMatTxt) < 0) continue;
 
-    var b2  = document.createElement("button");
-    b2.className = "sb-option" + (norm(filtMat||"") === norm(mat||"") ? " active" : "");
+    var b2 = document.createElement("button");
+    b2.className = "sb-option" + (normFiltMat && norm(mat) === normFiltMat ? " active" : "");
     if(cnt === 0) b2.style.opacity = "0.45";
     b2.innerHTML =
       '<span class="sb-opt-label">' + mat + '</span>' +
@@ -536,20 +582,12 @@ function renderChips(){
 }
 
 /* ── APLICAR ── */
-function norm(s){
-  return (s||"").toLowerCase()
-    .replace(/[áàäâã]/g,"a")
-    .replace(/[éèëê]/g,"e")
-    .replace(/[íìïî]/g,"i")
-    .replace(/[óòöôõ]/g,"o")
-    .replace(/[úùüû]/g,"u")
-    .replace(/[ñ]/g,"n");
-}
 function aplicar(){
+  var normFiltMat = filtMat ? norm(filtMat) : "";
   var lista = LIBROS.filter(function(l){
     var ma = !filtAnio || libroTieneAnio(l, filtAnio);
-    var mm = !filtMat  || norm(l.mat||"") === norm(filtMat);
-    var mq = !filtQ || norm(l.t).indexOf(filtQ)>=0 || norm(l.a).indexOf(filtQ)>=0 || norm(l.mat).indexOf(filtQ)>=0;
+    var mm = !filtMat  || (l._normM && l._normM === normFiltMat);
+    var mq = !filtQ || (l._normT && l._normT.indexOf(filtQ) >= 0) || (l._normA && l._normA.indexOf(filtQ) >= 0) || (l._normM && l._normM.indexOf(filtQ) >= 0);
     return ma && mm && mq;
   });
   var sort = document.getElementById("sortSel").value;
@@ -712,13 +750,33 @@ actualizarHeroStats();
 buildSidebar();
 aplicar();
 
-/* ── BUSCADOR ── */
+/* ── BUSCADOR EN VIVO CON DEBOUNCE (0 ms LAG) ── */
+var searchDebounceTimer = null;
+var searchInputEl = document.getElementById("searchInput");
+if(searchInputEl){
+  searchInputEl.addEventListener("input", function(){
+    clearTimeout(searchDebounceTimer);
+    var self = this;
+    searchDebounceTimer = setTimeout(function(){
+      filtQ = norm(self.value.trim());
+      buildSidebar();
+      aplicar();
+    }, 200);
+  });
+  searchInputEl.onkeydown = function(e){
+    if(e.key === "Enter"){
+      clearTimeout(searchDebounceTimer);
+      filtQ = norm(this.value.trim());
+      buildSidebar();
+      aplicar();
+    }
+  };
+}
 document.getElementById("btnBuscar").onclick = function(){
+  clearTimeout(searchDebounceTimer);
   filtQ = norm(document.getElementById("searchInput").value.trim());
+  buildSidebar();
   aplicar();
-};
-document.getElementById("searchInput").onkeydown = function(e){
-  if(e.key === "Enter") document.getElementById("btnBuscar").click();
 };
 
 /* ── LIMPIAR ── */
