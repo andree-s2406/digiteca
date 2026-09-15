@@ -9,13 +9,16 @@
   top: 0;
   left: 0;
   height: 3.5px;
-  width: 0%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
   background: linear-gradient(90deg, var(--cel-o), var(--cel), #38bdf8);
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
   z-index: 10000;
   pointer-events: none;
-  transition: width 0.12s linear;
+  transition: transform 0.08s ease-out;
   border-radius: 0 2px 2px 0;
+  will-change: transform;
 }
 
 /* ── EFECTOS DE ENTRADA Y FÍSICAS FLUIDAS ── */
@@ -75,16 +78,15 @@
   border-radius: 8px;
 }
 
-/* ── TARJETAS Y COMPONENTES CON PERSPECTIVA Y ELEVACIÓN SUAVE ── */
+/* ── TARJETAS Y COMPONENTES CON ELEVACIÓN SUAVE (OPTIMIZADO PARA GPU) ── */
 .libro-card, .res-card, .desc-card, .sec-card, .stat-card, .catalogo-card, .serv-card, .rank-card {
-  transition: transform 0.32s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
-              box-shadow 0.32s ease,
+  transition: transform 0.28s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+              box-shadow 0.28s ease,
               border-color 0.25s ease !important;
-  will-change: transform, box-shadow;
-  perspective: 1000px;
 }
 
 .libro-card:hover, .catalogo-card:hover, .desc-card:hover, .serv-card:hover {
+  will-change: transform;
   transform: translateY(-6px) scale(1.01) !important;
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--cel-o) !important;
 }
@@ -96,10 +98,9 @@ html.dark .serv-card:hover {
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.6), 0 0 18px rgba(56, 189, 248, 0.25) !important;
 }
 
-/* ── 3D TILT & SPECULAR GLARE (BRILLO INTERACTIVO) ── */
+/* ── 3D TILT & SPECULAR GLARE (BRILLO INTERACTIVO OPTIMIZADO) ── */
 .tilt-card {
-  transform-style: preserve-3d;
-  transition: transform 0.15s ease-out, box-shadow 0.25s ease;
+  transition: transform 0.12s ease-out, box-shadow 0.25s ease;
 }
 
 .glare-overlay {
@@ -109,7 +110,7 @@ html.dark .serv-card:hover {
   pointer-events: none;
   background: radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 70%);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease;
   z-index: 5;
 }
 

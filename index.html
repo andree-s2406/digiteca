@@ -466,28 +466,51 @@ document.getElementById("btnEnviar").onclick=async function(){
   document.getElementById("rol").selectedIndex=0;
 };
 
-// Scroll y nav
-function handleScroll(){
-  var sy = window.scrollY || document.documentElement.scrollTop || 0;
+// Scroll y nav optimizado con rAF y caché de nodos
+(function(){
   var nb = document.getElementById("navbar");
   var st = document.getElementById("scroll-top");
-  if(nb) nb.classList.toggle("scrolled", sy > 30);
-  if(st) st.classList.toggle("visible", sy > 150);
-  var act = "";
-  ["hero","novedades","servicios","acerca","contacto"].forEach(function(id){
-    var el = document.getElementById(id);
-    if(el && sy >= el.offsetTop - 120) act = id;
+  var navLinks = document.querySelectorAll(".nav-links a");
+  var sectionIds = ["hero","novedades","servicios","acerca","contacto"];
+  var sections = sectionIds.map(function(id){
+    return { id: id, el: document.getElementById(id) };
   });
-  document.querySelectorAll(".nav-links a").forEach(function(a){
-    var href = a.getAttribute("href");
-    if(href && href.startsWith("#")){
-      a.classList.toggle("active", href === "#" + act);
+
+  var ticking = false;
+  function updateScroll(){
+    var sy = window.scrollY || document.documentElement.scrollTop || 0;
+    if(nb) nb.classList.toggle("scrolled", sy > 30);
+    if(st) st.classList.toggle("visible", sy > 150);
+
+    var act = "";
+    for(var i = 0; i < sections.length; i++){
+      var sec = sections[i];
+      if(sec.el && sy >= (sec.el.offsetTop - 130)){
+        act = sec.id;
+      }
     }
-  });
-}
-window.addEventListener("scroll", handleScroll);
-window.addEventListener("DOMContentLoaded", handleScroll);
-handleScroll();
+
+    for(var j = 0; j < navLinks.length; j++){
+      var a = navLinks[j];
+      var href = a.getAttribute("href");
+      if(href && href.startsWith("#")){
+        a.classList.toggle("active", href === "#" + act);
+      }
+    }
+    ticking = false;
+  }
+
+  function onScroll(){
+    if(!ticking){
+      requestAnimationFrame(updateScroll);
+      ticking = true;
+    }
+  }
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("DOMContentLoaded", updateScroll, { passive: true });
+  updateScroll();
+})();
 
 var stBtn = document.getElementById("scroll-top");
 if(stBtn){

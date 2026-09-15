@@ -772,11 +772,26 @@ document.getElementById("modalClose").onclick = cerrarModal;
 function cerrarModal(){ document.getElementById("modalOverlay").classList.remove("open"); document.body.style.overflow = ""; }
 document.addEventListener("keydown", function(e){ if(e.key === "Escape") cerrarModal(); });
 
-/* ── SCROLL ── */
-window.onscroll = function(){
-  document.getElementById("navbar").classList.toggle("scrolled", window.scrollY > 30);
-  document.getElementById("scroll-top").classList.toggle("visible", window.scrollY > 200);
-};
+/* ── SCROLL OPTIMIZADO CON RAF ── */
+(function(){
+  var navEl = document.getElementById("navbar");
+  var stEl = document.getElementById("scroll-top");
+  var ticking = false;
+
+  function updateScroll(){
+    var sy = window.scrollY || document.documentElement.scrollTop || 0;
+    if(navEl) navEl.classList.toggle("scrolled", sy > 30);
+    if(stEl) stEl.classList.toggle("visible", sy > 200);
+    ticking = false;
+  }
+
+  window.addEventListener("scroll", function(){
+    if(!ticking){
+      requestAnimationFrame(updateScroll);
+      ticking = true;
+    }
+  }, { passive: true });
+})();
 document.getElementById("scroll-top").onclick = function(){ window.scrollTo({ top:0, behavior:"smooth" }); };
 if(typeof initHamburger === "function") { initHamburger(); }
 else {
