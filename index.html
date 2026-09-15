@@ -406,7 +406,7 @@ function renderCatalogo(){
     var badgeTexto = "#" + pos + " más buscado";
 
     h += '<div class="libro-card" onclick="window.location.href=\'libro.html?id=' + encodeURIComponent(l.id) + '\'" style="cursor:pointer">';
-    h += '<img class="libro-img" src="' + getImg(l) + '" alt="' + (l.t||"") + '" loading="lazy" onerror="this.onerror=null;this.src=\'img/test.jpg\'"/>';
+    h += '<img class="libro-img" src="' + getImg(l) + '" alt="' + (l.t||"") + '" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'img/test.jpg\'"/>';
     if(pos > 0) {
       h += '<span class="libro-rank">' + DigiIcons.get("flame", {size:14, color:"#e85d04"}) + ' ' + badgeTexto + '</span>';
     }
