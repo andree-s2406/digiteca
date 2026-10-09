@@ -44,6 +44,11 @@
 <link rel="stylesheet" href="css/animations.css"/>
 <link rel="stylesheet" href="css/libro.css"/>
 <script src="js/pdf.min.js"></script>
+<script>
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+  }
+</script>
 </head>
 <body>
 
