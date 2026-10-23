@@ -198,12 +198,29 @@ router.get('/:id/pdf', async (req, res) => {
     const cacheKey = String(rawId);
     const now = Date.now();
 
-    // Cache hit en RAM (0 ms)
+    // Cache hit en RAM (0 ms) con soporte nativo de peticiones parciales (Range)
     const cached = pdfBufferCache.get(cacheKey);
     if (cached && (now - cached.time < 30 * 60 * 1000)) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(cached.title || 'libro')}.pdf"`);
       res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Accept-Ranges', 'bytes');
+
+      const range = req.headers.range;
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : cached.buffer.length - 1;
+        if (!isNaN(start) && start < cached.buffer.length) {
+          const validEnd = Math.min(isNaN(end) ? cached.buffer.length - 1 : end, cached.buffer.length - 1);
+          const chunksize = (validEnd - start) + 1;
+          res.status(206);
+          res.setHeader('Content-Range', `bytes ${start}-${validEnd}/${cached.buffer.length}`);
+          res.setHeader('Content-Length', chunksize);
+          return res.end(cached.buffer.slice(start, validEnd + 1));
+        }
+      }
+
       if (cached.length) res.setHeader('Content-Length', cached.length);
       return res.send(cached.buffer);
     }
@@ -225,11 +242,16 @@ router.get('/:id/pdf', async (req, res) => {
         }
       }
 
+      const fetchHeaders = {};
+      if (req.headers.range) {
+        fetchHeaders['Range'] = req.headers.range;
+      }
+
       let upstream;
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 35000);
-        upstream = await fetch(downloadUrl, { redirect: 'follow', signal: controller.signal });
+        upstream = await fetch(downloadUrl, { headers: fetchHeaders, redirect: 'follow', signal: controller.signal });
         clearTimeout(timer);
       } catch (fetchErr) {
         console.warn(`[PDF Stream] Timeout o fallo en fetch a ${downloadUrl}:`, fetchErr.message);
@@ -240,7 +262,7 @@ router.get('/:id/pdf', async (req, res) => {
         const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
         if (driveMatch && driveMatch[1]) {
           try {
-            upstream = await fetch(`https://drive.google.com/uc?export=download&id=${driveMatch[1]}`, { redirect: 'follow' });
+            upstream = await fetch(`https://drive.google.com/uc?export=download&id=${driveMatch[1]}`, { headers: fetchHeaders, redirect: 'follow' });
           } catch(e){}
         }
       }
@@ -248,10 +270,16 @@ router.get('/:id/pdf', async (req, res) => {
         return res.status(upstream ? upstream.status : 502).send('No se pudo obtener el PDF del servidor remoto');
       }
 
+      if (upstream.status === 206) {
+        res.status(206);
+        const cr = upstream.headers.get('content-range');
+        if (cr) res.setHeader('Content-Range', cr);
+        res.setHeader('Accept-Ranges', 'bytes');
+      }
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
       res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Accept-Ranges', 'bytes');
       
       const contentLength = upstream.headers.get('content-length');
       if (contentLength) res.setHeader('Content-Length', contentLength);

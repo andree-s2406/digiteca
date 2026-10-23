@@ -44,6 +44,15 @@
 <link rel="stylesheet" href="css/animations.css"/>
 <link rel="stylesheet" href="css/libro.css"/>
 <script src="js/pdf.min.js"></script>
+<script>
+if (window.pdfjsLib) {
+  try {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.location.origin + '/js/pdf.worker.min.js';
+  } catch(e) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+  }
+}
+</script>
 </head>
 <body>
 
@@ -393,10 +402,19 @@ function renderDetalleLibro(l, recargarVisor){
 
   async function intentarAutoCoverPdf(){
     if (l && l.pdf && !l.pdf.startsWith("archivo:") && window.pdfjsLib) {
+      var loadingTask = null;
+      var pdfDoc = null;
       try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
-        var loadingTask = pdfjsLib.getDocument(l.pdf);
-        var pdfDoc = await loadingTask.promise;
+        if(!pdfjsLib.GlobalWorkerOptions.workerSrc){
+          pdfjsLib.GlobalWorkerOptions.workerSrc = window.location.origin + '/js/pdf.worker.min.js';
+        }
+        var coverSource = (l && l.id) ? ("/api/libros/" + l.id + "/pdf") : l.pdf;
+        loadingTask = pdfjsLib.getDocument({
+          url: coverSource,
+          disableRange: true,
+          disableStream: false
+        });
+        pdfDoc = await loadingTask.promise;
         var page = await pdfDoc.getPage(1);
         var unscaledVp = page.getViewport({ scale: 1.0 });
         var scale = 500 / unscaledVp.width;
@@ -415,6 +433,10 @@ function renderDetalleLibro(l, recargarVisor){
         }
         return;
       } catch(e) {}
+      finally {
+        try { if(pdfDoc) await pdfDoc.destroy(); }catch(e){}
+        try { if(loadingTask) loadingTask.destroy(); }catch(e){}
+      }
     }
     if(img) img.style.display = "none";
   }
@@ -481,7 +503,11 @@ var renderedPages = {};
 
 // Configurar Worker de PDF.js
 if (window.pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = window.location.origin + '/js/pdf.worker.min.js';
+  } catch(e) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+  }
 }
 
 // ── VISOR PDF CON LECTURA CONTINUA NATIVA (MÓVIL Y PC) ──
@@ -587,14 +613,16 @@ async function renderPdfContinuous(source){
     pagesFlow.style.display = "none";
   }
 
+  var watchdogFired = false;
   var loadWatchdog = setTimeout(function(){
     if(thisGen === pdfRenderGeneration && loadingEl && loadingEl.style.display !== "none"){
+      watchdogFired = true;
       var spinnerText = loadingEl.querySelector("span");
       if(spinnerText){
-        spinnerText.innerHTML = 'La carga está demorando más de lo habitual...<br><button onclick="window.location.reload()" style="margin-top:10px;padding:6px 14px;border-radius:6px;background:var(--cel-o,#2A7B9B);color:#fff;border:none;cursor:pointer;font-weight:600">Recargar página</button>';
+        spinnerText.innerHTML = 'La carga está demorando más de lo habitual...<br><button onclick="cargarLibro(true)" style="margin-top:10px;padding:6px 14px;border-radius:6px;background:var(--cel-o,#2A7B9B);color:#fff;border:none;cursor:pointer;font-weight:600">Reintentar</button>';
       }
     }
-  }, 8000);
+  }, 22000);
 
   // Desconectar observadores y cancelar tareas anteriores
   if(currentLoadingTask){
@@ -613,27 +641,86 @@ async function renderPdfContinuous(source){
   renderedPages = {};
 
   try {
-    var loadingTask;
+    var pdfData = null;
+
     if(typeof source === "string" && (source.startsWith("data:application/pdf") || source.startsWith("data:application/octet-stream") || source.startsWith("data:binary/octet-stream"))){
       var blob = dataURLtoBlob(source);
       var arrayBuf = await blob.arrayBuffer();
       if(thisGen !== pdfRenderGeneration) return;
-      loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
+      pdfData = new Uint8Array(arrayBuf);
     } else {
-      // Carga directa con streaming progresivo nativo de PDF.js (inicia renderizado inmediato de página 1)
+      // 1. Descarga vía fetch nativo con lectura progresiva de chunks y monitoreo exacto
+      try {
+        var response = await fetch(source);
+        if(!response.ok){
+          throw new Error("HTTP " + response.status + ": " + response.statusText);
+        }
+        var contentLength = response.headers.get("content-length");
+        var total = contentLength ? parseInt(contentLength, 10) : 0;
+
+        if(response.body && typeof response.body.getReader === "function"){
+          var reader = response.body.getReader();
+          var received = 0;
+          var chunks = [];
+          while(true){
+            if(thisGen !== pdfRenderGeneration) return;
+            var chunkRes = await reader.read();
+            if(chunkRes.done) break;
+            chunks.push(chunkRes.value);
+            received += chunkRes.value.length;
+            if(total > 0 && loadingEl && !watchdogFired){
+              var pct = Math.min(99, Math.round((received / total) * 100));
+              var txt = loadingEl.querySelector("span");
+              if(txt) txt.textContent = "Cargando documento (" + pct + "%)...";
+            }
+          }
+          if(thisGen !== pdfRenderGeneration) return;
+          var fullBytes = new Uint8Array(received);
+          var offset = 0;
+          for(var i = 0; i < chunks.length; i++){
+            fullBytes.set(chunks[i], offset);
+            offset += chunks[i].length;
+          }
+          pdfData = fullBytes;
+        } else {
+          var ab = await response.arrayBuffer();
+          if(thisGen !== pdfRenderGeneration) return;
+          pdfData = new Uint8Array(ab);
+        }
+      } catch(fetchErr){
+        console.warn("Fetch stream nativo falló, fallback a URL directa:", fetchErr.message);
+      }
+    }
+
+    if(thisGen !== pdfRenderGeneration) return;
+
+    if(loadingEl && !watchdogFired){
+      var txt = loadingEl.querySelector("span");
+      if(txt) txt.textContent = "Abriendo páginas...";
+    }
+
+    var loadingTask;
+    if(pdfData){
       loadingTask = pdfjsLib.getDocument({
-        url: source,
-        withCredentials: false,
+        data: pdfData,
         enableXfa: true,
         cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
         cMapPacked: true
       });
-    }
-
-    if(loadingTask && typeof loadingTask.onProgress === 'function' || loadingTask) {
+    } else {
+      // Fallback a URL con disableRange para evitar bloqueos por solicitudes parciales erróneas
+      loadingTask = pdfjsLib.getDocument({
+        url: source,
+        withCredentials: false,
+        enableXfa: true,
+        disableRange: true,
+        disableStream: false,
+        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+        cMapPacked: true
+      });
       loadingTask.onProgress = function(p){
-        if(p && p.total > 0 && loadingEl){
-          var pct = Math.round((p.loaded / p.total) * 100);
+        if(p && p.total > 0 && loadingEl && !watchdogFired){
+          var pct = Math.min(99, Math.round((p.loaded / p.total) * 100));
           var txt = loadingEl.querySelector("span");
           if(txt) txt.textContent = "Cargando documento (" + pct + "%)...";
         }
