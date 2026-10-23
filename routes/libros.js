@@ -176,17 +176,34 @@ router.get('/:id', async (req, res) => {
       return res.json(cached.data);
     }
 
-    const result = await query(`SELECT * FROM libros WHERE id::text = $1::text`, [String(rawId)]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Libro no encontrado' });
+    try {
+      const result = await query(`SELECT * FROM libros WHERE id::text = $1::text`, [String(rawId)]);
+      if (result.rows.length > 0) {
+        const mapped = mapLibroRow(result.rows[0], true);
+        bookDetailCache.set(String(rawId), { data: mapped, time: now });
+        return res.json(mapped);
+      }
+    } catch(dbErr) {
+      console.warn('DB query en /api/libros/:id falló, recurriendo a backup local:', dbErr.message);
     }
 
-    const mapped = mapLibroRow(result.rows[0], true);
-    bookDetailCache.set(String(rawId), { data: mapped, time: now });
+    // Fallback a backup local en memoria o archivo data/libros.json
+    const backup = cachedLibros || loadLocalBackup() || [];
+    const localFound = backup.find(b => String(b.id) === String(rawId));
+    if (localFound) {
+      const mapped = mapLibroRow(localFound, true);
+      bookDetailCache.set(String(rawId), { data: mapped, time: now });
+      return res.json(mapped);
+    }
 
-    res.json(mapped);
+    return res.status(404).json({ error: 'Libro no encontrado' });
   } catch (err) {
     console.error('Error en GET /api/libros/:id:', err);
+    const backup = cachedLibros || loadLocalBackup() || [];
+    const localFound = backup.find(b => String(b.id) === String(req.params.id));
+    if (localFound) {
+      return res.json(mapLibroRow(localFound, true));
+    }
     res.status(500).json({ error: 'Error al obtener libro' });
   }
 });

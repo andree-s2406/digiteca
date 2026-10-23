@@ -277,7 +277,7 @@ var guardado    = false;
 if(typeof setupThemeToggle==="function") setupThemeToggle();
 
 // ── CARGAR LIBRO DESDE URL / API / LOCALSTORAGE ──
-async function cargarLibro(){
+async function cargarLibro(forzarRecarga){
   var params = new URLSearchParams(window.location.search);
   var idParam = params.get("id");
   var l = null;
@@ -318,7 +318,7 @@ async function cargarLibro(){
     try {
       var fresh = await API.libros.getById(idParam);
       if(fresh && fresh.id){
-        var pdfCambio = !l || !l.pdf || (fresh.pdf && fresh.pdf !== l.pdf);
+        var pdfCambio = forzarRecarga || !l || !l.pdf || (fresh.pdf && fresh.pdf !== l.pdf && !l.pdf.includes(fresh.pdf) && !fresh.pdf.includes(l.pdf));
         libroActual = fresh;
         renderDetalleLibro(fresh, pdfCambio);
       }
@@ -408,45 +408,14 @@ function renderDetalleLibro(l, recargarVisor){
     var ca = document.getElementById("coverAuthorPH"); if(ca) ca.style.display = "none";
   }
 
-  async function intentarAutoCoverPdf(){
-    if (l && l.pdf && !l.pdf.startsWith("archivo:") && window.pdfjsLib) {
-      var loadingTask = null;
-      var pdfDoc = null;
-      try {
-        if(!pdfjsLib.GlobalWorkerOptions.workerSrc){
-          pdfjsLib.GlobalWorkerOptions.workerSrc = window.location.origin + '/js/pdf.worker.min.js';
-        }
-        var coverSource = (l && l.id) ? ("/api/libros/" + l.id + "/pdf") : l.pdf;
-        loadingTask = pdfjsLib.getDocument({
-          url: coverSource,
-          disableRange: true,
-          disableStream: false
-        });
-        pdfDoc = await loadingTask.promise;
-        var page = await pdfDoc.getPage(1);
-        var unscaledVp = page.getViewport({ scale: 1.0 });
-        var scale = 500 / unscaledVp.width;
-        var viewport = page.getViewport({ scale: scale });
-        var canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        var ctx = canvas.getContext("2d");
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-        var autoUrl = canvas.toDataURL("image/jpeg", 0.82);
-        if (img) {
-          img.src = autoUrl;
-          mostrarCover();
-        }
-        return;
-      } catch(e) {}
-      finally {
-        try { if(pdfDoc) await pdfDoc.destroy(); }catch(e){}
-        try { if(loadingTask) loadingTask.destroy(); }catch(e){}
-      }
+  function mostrarPlaceholderCover(){
+    if(img){
+      img.classList.remove("loaded");
+      img.style.display = "none";
     }
-    if(img) img.style.display = "none";
+    var em = document.getElementById("coverEmoji"); if(em) em.style.display = "block";
+    var ct = document.getElementById("coverTitlePH"); if(ct) ct.style.display = "block";
+    var ca = document.getElementById("coverAuthorPH"); if(ca) ca.style.display = "block";
   }
 
   if(img){
@@ -457,10 +426,10 @@ function renderDetalleLibro(l, recargarVisor){
         mostrarCover();
       } else {
         img.onload = mostrarCover;
-        img.onerror = intentarAutoCoverPdf;
+        img.onerror = mostrarPlaceholderCover;
       }
     } else {
-      intentarAutoCoverPdf();
+      mostrarPlaceholderCover();
     }
   }
 
@@ -504,6 +473,7 @@ var currentBlobUrl = null;
 var currentPdfDoc = null;
 var currentLoadingTask = null;
 var currentlyLoadedPdfKey = null;
+var isPdfLoadingInProgress = false;
 var pdfRenderGeneration = 0;
 var pdfPageObserver = null;
 var renderingPages = {};
@@ -527,6 +497,7 @@ async function cargarPDF(l){
 
   if(!l || !l.pdf || l.pdf.trim() === ""){
     currentlyLoadedPdfKey = null;
+    isPdfLoadingInProgress = false;
     if(noDisp) noDisp.style.display = "flex";
     if(frame) { frame.style.display = "none"; frame.src = "about:blank"; }
     if(container) container.style.display = "none";
@@ -539,7 +510,7 @@ async function cargarPDF(l){
   var pdfKey = (l.id || "") + "::" + streamUrl;
 
   // Si este PDF ya fue cargado o se está cargando activamente, no duplicar la carga
-  if(currentlyLoadedPdfKey === pdfKey && (currentPdfDoc || currentLoadingTask)){
+  if(currentlyLoadedPdfKey === pdfKey && (currentPdfDoc || isPdfLoadingInProgress || currentLoadingTask)){
     return;
   }
   currentlyLoadedPdfKey = pdfKey;
@@ -598,6 +569,7 @@ var currentTargetWidth = 0;
 // Renderizador fluido de páginas continuas con protección total contra ejecuciones duplicadas
 async function renderPdfContinuous(source){
   var thisGen = ++pdfRenderGeneration;
+  isPdfLoadingInProgress = true;
 
   var container = document.getElementById("pdfContainer");
   var pagesFlow = document.getElementById("pdfPages");
@@ -615,7 +587,11 @@ async function renderPdfContinuous(source){
   if(scrubber) scrubber.style.display = "none";
 
   if(container) container.style.display = "flex";
-  if(loadingEl) loadingEl.style.display = "flex";
+  if(loadingEl){
+    loadingEl.style.display = "flex";
+    var initTxt = loadingEl.querySelector("span");
+    if(initTxt) initTxt.textContent = "Conectando con el documento...";
+  }
   if(pagesFlow){
     pagesFlow.innerHTML = "";
     pagesFlow.style.display = "none";
@@ -632,14 +608,15 @@ async function renderPdfContinuous(source){
     }
   }, 22000);
 
-  // Desconectar observadores y cancelar tareas anteriores
+  // Desconectar observadores y cancelar tareas anteriores de forma segura no bloqueante
   if(currentLoadingTask){
     try { currentLoadingTask.destroy(); }catch(e){}
     currentLoadingTask = null;
   }
   if(currentPdfDoc){
-    try { await currentPdfDoc.destroy(); }catch(e){}
+    var oldDoc = currentPdfDoc;
     currentPdfDoc = null;
+    try { oldDoc.destroy().catch(function(){}); }catch(e){}
   }
   if(pdfPageObserver){
     pdfPageObserver.disconnect();
@@ -754,6 +731,7 @@ async function renderPdfContinuous(source){
     if(thisGen !== pdfRenderGeneration) return;
     currentPdfDoc = pdfDoc;
     currentLoadingTask = null;
+    isPdfLoadingInProgress = false;
 
     var numPages = currentPdfDoc.numPages;
 
@@ -936,6 +914,7 @@ async function renderPdfContinuous(source){
     }
 
   } catch(err) {
+    isPdfLoadingInProgress = false;
     clearTimeout(loadWatchdog);
     if(thisGen !== pdfRenderGeneration) return;
 
@@ -1018,6 +997,24 @@ async function renderSinglePage(pageNum, targetWidth){
 
     renderedPages[pageNum] = true;
     delete renderingPages[pageNum];
+
+    // Snapshot automático de portada para ejemplares sin cover previa o con imagen rota
+    if(pageNum === 1){
+      try {
+        var imgCover = document.getElementById("coverImg");
+        if(imgCover && !imgCover.classList.contains("loaded")){
+          var thumbUrl = canvas.toDataURL("image/jpeg", 0.85);
+          if(thumbUrl && thumbUrl.length > 100){
+            imgCover.src = thumbUrl;
+            imgCover.classList.add("loaded");
+            imgCover.style.display = "block";
+            var em = document.getElementById("coverEmoji"); if(em) em.style.display = "none";
+            var ct = document.getElementById("coverTitlePH"); if(ct) ct.style.display = "none";
+            var ca = document.getElementById("coverAuthorPH"); if(ca) ca.style.display = "none";
+          }
+        }
+      } catch(eSnap){}
+    }
   } catch(e) {
     console.warn("Error renderizando página " + pageNum + ":", e);
     delete renderingPages[pageNum];

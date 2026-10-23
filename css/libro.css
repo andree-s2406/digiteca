@@ -793,7 +793,7 @@ body.pdf-fullscreen-active {
 }
 
 body.pdf-fullscreen-active #navbar,
-body.pdf-fullscreen-active .hero-libro,
+body.pdf-fullscreen-active .libro-hero,
 body.pdf-fullscreen-active .visor-header,
 body.pdf-fullscreen-active footer,
 body.pdf-fullscreen-active #scroll-top {
@@ -834,7 +834,7 @@ body.pdf-fullscreen-active .btn-exit-fs {
 
 /* ── PROTECCIÓN ANTI-IMPRESIÓN Y COPIA ── */
 @media print {
-  html, body, #navbar, .hero-libro, .visor-section, footer {
+  html, body, #navbar, .libro-hero, .visor-section, footer {
     display: none !important;
     visibility: hidden !important;
   }
