@@ -294,11 +294,13 @@ async function cargarLibro(){
     }
   }
 
-  // Si no se especificó id o no está en caché, intentar usar el primer recurso guardado
+  // Si no se especificó id o no está en caché, intentar usar el primer recurso que tenga PDF
   if(!l && (!idParam || idParam === "")){
     try {
       var localAll = JSON.parse(localStorage.getItem("digi-admin-libros")||"[]");
-      if(localAll && localAll.length > 0) l = localAll[0];
+      if(localAll && localAll.length > 0){
+        l = localAll.find(function(b){ return b && b.pdf && b.pdf.startsWith("http"); }) || localAll[0];
+      }
     } catch(e){}
   }
 
@@ -306,6 +308,9 @@ async function cargarLibro(){
   if(l){
     libroActual = l;
     renderDetalleLibro(l, true);
+    if(!idParam && l.id){
+      window.history.replaceState({}, "", "libro.html?id=" + encodeURIComponent(l.id));
+    }
   }
 
   // 2. SINCRONIZACIÓN EN SEGUNDO PLANO CON LA API (SWR)
@@ -324,9 +329,12 @@ async function cargarLibro(){
     try {
       var all = await API.libros.getAll();
       if(all && all.length > 0){
-        l = all[0];
+        l = all.find(function(b){ return b && b.pdf && b.pdf.startsWith("http"); }) || all[0];
         libroActual = l;
         renderDetalleLibro(l, true);
+        if(l && l.id){
+          window.history.replaceState({}, "", "libro.html?id=" + encodeURIComponent(l.id));
+        }
       }
     } catch(e){}
   }
@@ -672,6 +680,10 @@ async function renderPdfContinuous(source){
               var pct = Math.min(99, Math.round((received / total) * 100));
               var txt = loadingEl.querySelector("span");
               if(txt) txt.textContent = "Cargando documento (" + pct + "%)...";
+            } else if(loadingEl && !watchdogFired && received > 0){
+              var mb = (received / (1024 * 1024)).toFixed(1);
+              var txt = loadingEl.querySelector("span");
+              if(txt) txt.textContent = "Cargando documento (" + mb + " MB)...";
             }
           }
           if(thisGen !== pdfRenderGeneration) return;
@@ -688,7 +700,17 @@ async function renderPdfContinuous(source){
           pdfData = new Uint8Array(ab);
         }
       } catch(fetchErr){
-        console.warn("Fetch stream nativo falló, fallback a URL directa:", fetchErr.message);
+        console.warn("Fallo al descargar stream del PDF:", fetchErr.message);
+        clearTimeout(loadWatchdog);
+        if(thisGen !== pdfRenderGeneration) return;
+        if(loadingEl) loadingEl.style.display = "none";
+        if(container) container.style.display = "none";
+        if(noDisp){
+          noDisp.style.display = "flex";
+          noDisp.innerHTML = '<div class="pdf-nd-icon" style="color:var(--cel-o)"><i data-lucide="file-text" style="width:64px;height:64px"></i></div><h3>PDF no disponible</h3><p>El archivo de este ejemplar aún no fue vinculado o fue retirado temporalmente.</p>';
+          if(window.lucide && lucide.createIcons) lucide.createIcons();
+        }
+        return;
       }
     }
 
