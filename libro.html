@@ -327,9 +327,16 @@ async function cargarLibro(forzarRecarga){
     }
   } else if(!l && window.API && window.API.libros){
     try {
-      var all = await API.libros.getAll();
-      if(all && all.length > 0){
-        l = all.find(function(b){ return b && b.pdf && b.pdf.startsWith("http"); }) || all[0];
+      var single = await API.libros.getById('10').catch(function(){ return null; });
+      if(single && single.id){
+        l = single;
+      } else {
+        var all = await API.libros.getAll();
+        if(all && all.length > 0){
+          l = all.find(function(b){ return b && b.pdf && b.pdf.startsWith("http"); }) || all[0];
+        }
+      }
+      if(l){
         libroActual = l;
         renderDetalleLibro(l, true);
         if(l && l.id){
@@ -636,7 +643,10 @@ async function renderPdfContinuous(source){
     } else {
       // 1. Descarga vía fetch nativo con lectura progresiva de chunks y monitoreo exacto
       try {
-        var response = await fetch(source);
+        var controller = new AbortController();
+        var fetchTimer = setTimeout(function(){ controller.abort(); }, 25000);
+        var response = await fetch(source, { signal: controller.signal });
+        clearTimeout(fetchTimer);
         if(!response.ok){
           throw new Error("HTTP " + response.status + ": " + response.statusText);
         }
@@ -684,7 +694,7 @@ async function renderPdfContinuous(source){
         if(container) container.style.display = "none";
         if(noDisp){
           noDisp.style.display = "flex";
-          noDisp.innerHTML = '<div class="pdf-nd-icon" style="color:var(--cel-o)"><i data-lucide="file-text" style="width:64px;height:64px"></i></div><h3>PDF no disponible</h3><p>El archivo de este ejemplar aún no fue vinculado o fue retirado temporalmente.</p>';
+          noDisp.innerHTML = '<div class="pdf-nd-icon" style="color:var(--cel-o)"><i data-lucide="wifi-off" style="width:64px;height:64px"></i></div><h3>Conectando con el documento</h3><p>La conexión tardó más de lo esperado o el servidor está ocupado.</p><button onclick="cargarLibro(true)" style="margin-top:14px;padding:10px 22px;border-radius:10px;background:var(--cel-o,#2A7B9B);color:#fff;border:none;font-weight:700;cursor:pointer;font-size:15px;box-shadow:0 4px 12px rgba(42,123,155,0.25)">Reintentar lectura</button>';
           if(window.lucide && lucide.createIcons) lucide.createIcons();
         }
         return;

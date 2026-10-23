@@ -175,8 +175,18 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Error interno del servidor', detalle: err.message });
 });
 
+// Red de seguridad global para evitar caídas del proceso
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [Servidor] Excepción no capturada:', err.message);
+  if (err.stack) console.error(err.stack);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.warn('⚠️ [Servidor] Rechazo de promesa no gestionado:', reason);
+});
+
 // Iniciar servidor y verificar conexión a CockroachDB
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   console.log(`====================================================`);
   console.log(`🚀 Servidor DigiTeca iniciado en http://localhost:${PORT}`);
   console.log(`📚 Conectando con CockroachDB...`);
@@ -190,3 +200,31 @@ app.listen(PORT, async () => {
     console.warn(`💡 Verifica tu variable DATABASE_URL en el archivo .env`);
   }
 });
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ [ERROR CRÍTICO] El puerto ${PORT} ya está en uso.`);
+    console.error(`💡 Solución: Se cerrará esta instancia. Ejecuta iniciar_digiteca.bat para liberar el puerto automáticamente.\n`);
+    process.exit(1);
+  } else {
+    console.error('❌ Error fatal en el servidor HTTP:', err);
+    process.exit(1);
+  }
+});
+
+// Cierre ordenado
+function gracefulShutdown(signal) {
+  console.log(`\n🛑 Recibido ${signal}. Cerrando conexiones...`);
+  server.close(async () => {
+    try {
+      const { pool } = require('./db/connection');
+      await pool.end();
+      console.log('✅ Conexiones cerradas.');
+    } catch (_) {}
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 3000).unref();
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

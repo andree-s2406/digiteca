@@ -7,6 +7,10 @@ const syncService = require('../services/sync');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const LIBROS_JSON = path.join(DATA_DIR, 'libros.json');
+const PDF_CACHE_DIR = path.join(DATA_DIR, 'pdf_cache');
+if (!fs.existsSync(PDF_CACHE_DIR)) {
+  try { fs.mkdirSync(PDF_CACHE_DIR, { recursive: true }); } catch (_) {}
+}
 
 const bookDetailCache = new Map();
 const pdfBufferCache = new Map(); // id -> { buffer, title, length, time }
@@ -208,18 +212,35 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// GET /api/libros/:id/pdf - Transmisión en streaming de PDF con soporte CORS nativo y caché en RAM
+// GET /api/libros/:id/pdf - Transmisión en streaming de PDF con soporte CORS nativo, caché en disco y RAM
 router.get('/:id/pdf', async (req, res) => {
   try {
     const rawId = req.params.id;
     const cacheKey = String(rawId);
     const now = Date.now();
 
-    // Cache hit en RAM (0 ms) con soporte nativo de peticiones parciales (Range)
+    // 1. Inmunidad a Cold Starts: Obtener título y metadatos localmente en 0 ms
+    const localList = cachedLibros || loadLocalBackup() || [];
+    const localBook = localList.find(b => String(b.id) === cacheKey);
+
+    let pdfUrl = localBook ? (localBook.pdf_url || localBook.pdf) : null;
+    let titulo = localBook ? (localBook.titulo || localBook.t || 'libro') : 'libro';
+
+    // 2. Caché persistente en disco (1 ms) con soporte nativo de Range requests y streaming
+    const diskPdfPath = path.join(PDF_CACHE_DIR, `libro_${cacheKey}.pdf`);
+    if (fs.existsSync(diskPdfPath)) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Accept-Ranges', 'bytes');
+      return res.sendFile(diskPdfPath, { acceptRanges: true });
+    }
+
+    // 3. Cache hit en RAM (0 ms) si aún está en memoria
     const cached = pdfBufferCache.get(cacheKey);
     if (cached && (now - cached.time < 30 * 60 * 1000)) {
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(cached.title || 'libro')}.pdf"`);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(cached.title || titulo)}.pdf"`);
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Accept-Ranges', 'bytes');
 
@@ -242,106 +263,149 @@ router.get('/:id/pdf', async (req, res) => {
       return res.send(cached.buffer);
     }
 
-    const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [cacheKey]);
-    if (result.rows.length === 0 || !result.rows[0].pdf_url) {
+    // 4. Si el libro no estaba en el backup local, consultar la BD con fallback seguro
+    if (!pdfUrl) {
+      try {
+        const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [cacheKey]);
+        if (result.rows.length > 0 && result.rows[0].pdf_url) {
+          pdfUrl = result.rows[0].pdf_url;
+          titulo = result.rows[0].titulo || 'libro';
+        }
+      } catch (dbErr) {
+        console.warn(`[PDF Stream] DB query falló para libro ${cacheKey}:`, dbErr.message);
+      }
+    }
+
+    if (!pdfUrl) {
       return res.status(404).send('PDF no disponible');
     }
 
-    const pdfUrl = result.rows[0].pdf_url;
-    const titulo = result.rows[0].titulo || 'libro';
-
-    if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
-      let downloadUrl = pdfUrl;
-      if (pdfUrl.includes('drive.google.com')) {
-        const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
-        if (driveMatch && driveMatch[1]) {
-          downloadUrl = `https://drive.usercontent.google.com/download?id=${driveMatch[1]}&export=download&confirm=t`;
-        }
-      }
-
-      const fetchHeaders = {};
-      if (req.headers.range) {
-        fetchHeaders['Range'] = req.headers.range;
-      }
-
-      let upstream;
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 35000);
-        upstream = await fetch(downloadUrl, { headers: fetchHeaders, redirect: 'follow', signal: controller.signal });
-        clearTimeout(timer);
-      } catch (fetchErr) {
-        console.warn(`[PDF Stream] Timeout o fallo en fetch a ${downloadUrl}:`, fetchErr.message);
-        return res.status(504).send('Tiempo de espera agotado al conectar con el servidor del libro');
-      }
-
-      if (!upstream.ok && downloadUrl !== pdfUrl) {
-        const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
-        if (driveMatch && driveMatch[1]) {
-          try {
-            upstream = await fetch(`https://drive.google.com/uc?export=download&id=${driveMatch[1]}`, { headers: fetchHeaders, redirect: 'follow' });
-          } catch(e){}
-        }
-      }
-      if (!upstream || !upstream.ok) {
-        return res.status(upstream ? upstream.status : 502).send('No se pudo obtener el PDF del servidor remoto');
-      }
-
-      if (upstream.status === 206) {
-        res.status(206);
-        const cr = upstream.headers.get('content-range');
-        if (cr) res.setHeader('Content-Range', cr);
-        res.setHeader('Accept-Ranges', 'bytes');
-      }
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      
-      const contentLength = upstream.headers.get('content-length');
-      if (contentLength) res.setHeader('Content-Length', contentLength);
-
-      const { Readable } = require('stream');
-      if (upstream.body && typeof Readable.fromWeb === 'function') {
-        const nodeStream = Readable.fromWeb(upstream.body);
-        const chunks = [];
-        let totalSize = 0;
-        nodeStream.on('data', chunk => {
-          if (totalSize < 50 * 1024 * 1024) { // Solo almacenar en caché si pesa menos de 50 MB
-            chunks.push(chunk);
-            totalSize += chunk.length;
-          }
-        });
-        nodeStream.on('end', () => {
-          if (chunks.length > 0 && totalSize < 50 * 1024 * 1024) {
-            try {
-              const fullBuf = Buffer.concat(chunks);
-              if (pdfBufferCache.size >= PDF_CACHE_MAX_ENTRIES) {
-                const oldestKey = pdfBufferCache.keys().next().value;
-                pdfBufferCache.delete(oldestKey);
-              }
-              pdfBufferCache.set(cacheKey, {
-                buffer: fullBuf,
-                title: titulo,
-                length: contentLength || fullBuf.length,
-                time: Date.now()
-              });
-            } catch(e){}
-          }
-        });
-        return nodeStream.pipe(res);
-      }
-
-      const arrayBuf = await upstream.arrayBuffer();
-      const buf = Buffer.from(arrayBuf);
-      return res.send(buf);
-    } else {
+    // 5. Si es un archivo local relativo en el servidor
+    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://')) {
       const localPath = path.join(__dirname, '..', pdfUrl.replace(/^\//, ''));
       if (fs.existsSync(localPath)) {
-        return res.sendFile(localPath);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        return res.sendFile(localPath, { acceptRanges: true });
       }
-      return res.status(404).send('Archivo no encontrado');
+      return res.status(404).send('Archivo local no encontrado');
     }
+
+    // 6. Transmisión desde URL remota (GitHub Releases, Drive, etc.)
+    let downloadUrl = pdfUrl;
+    if (pdfUrl.includes('drive.google.com')) {
+      const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
+      if (driveMatch && driveMatch[1]) {
+        downloadUrl = `https://drive.usercontent.google.com/download?id=${driveMatch[1]}&export=download&confirm=t`;
+      }
+    }
+
+    const fetchHeaders = {};
+    if (req.headers.range) {
+      fetchHeaders['Range'] = req.headers.range;
+    }
+
+    let upstream;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 35000);
+      upstream = await fetch(downloadUrl, { headers: fetchHeaders, redirect: 'follow', signal: controller.signal });
+      clearTimeout(timer);
+    } catch (fetchErr) {
+      console.warn(`[PDF Stream] Timeout o fallo en fetch a ${downloadUrl}:`, fetchErr.message);
+      return res.status(504).send('Tiempo de espera agotado al conectar con el servidor del libro');
+    }
+
+    if (!upstream.ok && downloadUrl !== pdfUrl) {
+      const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
+      if (driveMatch && driveMatch[1]) {
+        try {
+          upstream = await fetch(`https://drive.google.com/uc?export=download&id=${driveMatch[1]}`, { headers: fetchHeaders, redirect: 'follow' });
+        } catch(e){}
+      }
+    }
+    if (!upstream || !upstream.ok) {
+      return res.status(upstream ? upstream.status : 502).send('No se pudo obtener el PDF del servidor remoto');
+    }
+
+    if (upstream.status === 206) {
+      res.status(206);
+      const cr = upstream.headers.get('content-range');
+      if (cr) res.setHeader('Content-Range', cr);
+      res.setHeader('Accept-Ranges', 'bytes');
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    const contentLength = upstream.headers.get('content-length');
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    const { Readable } = require('stream');
+    if (upstream.body && typeof Readable.fromWeb === 'function') {
+      const nodeStream = Readable.fromWeb(upstream.body);
+      const chunks = [];
+      let totalSize = 0;
+
+      // Pipe directo al cliente de forma reactiva e inmediata
+      nodeStream.pipe(res);
+
+      // Guardar en búfer y en disco simultáneamente de fondo
+      const tempDiskPath = path.join(PDF_CACHE_DIR, `libro_${cacheKey}.tmp`);
+      let diskWriteStream = null;
+      try {
+        diskWriteStream = fs.createWriteStream(tempDiskPath);
+      } catch (e) {}
+
+      nodeStream.on('data', chunk => {
+        if (diskWriteStream) diskWriteStream.write(chunk);
+        if (totalSize < 50 * 1024 * 1024) {
+          chunks.push(chunk);
+          totalSize += chunk.length;
+        }
+      });
+
+      nodeStream.on('end', () => {
+        if (diskWriteStream) {
+          diskWriteStream.end(() => {
+            fs.rename(tempDiskPath, diskPdfPath, () => {});
+          });
+        }
+        if (chunks.length > 0 && totalSize < 50 * 1024 * 1024) {
+          try {
+            const fullBuf = Buffer.concat(chunks);
+            if (pdfBufferCache.size >= PDF_CACHE_MAX_ENTRIES) {
+              const oldestKey = pdfBufferCache.keys().next().value;
+              pdfBufferCache.delete(oldestKey);
+            }
+            pdfBufferCache.set(cacheKey, {
+              buffer: fullBuf,
+              title: titulo,
+              length: contentLength || fullBuf.length,
+              time: Date.now()
+            });
+          } catch(e){}
+        }
+      });
+
+      nodeStream.on('error', (err) => {
+        console.warn(`[PDF Stream] Error en stream de libro ${cacheKey}:`, err.message);
+        if (diskWriteStream) {
+          try { diskWriteStream.destroy(); fs.unlinkSync(tempDiskPath); } catch (_) {}
+        }
+      });
+
+      return;
+    }
+
+    const arrayBuf = await upstream.arrayBuffer();
+    const buf = Buffer.from(arrayBuf);
+    try {
+      fs.writeFileSync(diskPdfPath, buf);
+    } catch (_) {}
+    return res.send(buf);
   } catch (err) {
     console.error('Error al transmitir PDF:', err);
     res.status(500).send('Error interno al cargar el PDF');
