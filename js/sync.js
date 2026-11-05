@@ -45,6 +45,15 @@
       document.addEventListener('visibilitychange', onFocusOrVisible);
       window.addEventListener('focus', onFocusOrVisible);
 
+      window.addEventListener('pagehide', () => {
+        if (this.pusher) this.pusher.disconnect();
+      });
+      window.addEventListener('pageshow', (event) => {
+        if (!event.persisted) return;
+        if (this.pusher) this.pusher.connect();
+        this.checkVersions();
+      });
+
       // 4. Conectar con Pusher
       await this.initPusher();
 
