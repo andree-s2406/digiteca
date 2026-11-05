@@ -277,84 +277,27 @@ var guardado    = false;
 if(typeof setupThemeToggle==="function") setupThemeToggle();
 
 // ── CARGAR LIBRO DESDE URL / API / LOCALSTORAGE ──
-async function cargarLibro(forzarRecarga){
+async function cargarLibro(){
+  console.log("[VIEWER] Solicitando libro directamente a CockroachDB...");
   var params = new URLSearchParams(window.location.search);
   var idParam = params.get("id");
-  var l = null;
 
-  // 1. CARGA INSTANTÁNEA (0 ms): Renderizar inmediatamente desde la caché local
-  if(idParam){
-    var localLibros = [];
-    try { localLibros = JSON.parse(localStorage.getItem("digi-admin-libros")||"[]"); }catch(e){}
-    for(var i=0; i<localLibros.length; i++){
-      if(String(localLibros[i].id) === String(idParam)){
-        l = localLibros[i];
-        break;
-      }
-    }
-  }
-
-  // Si no se especificó id o no está en caché, intentar usar el primer recurso que tenga PDF
-  if(!l && (!idParam || idParam === "")){
-    try {
-      var localAll = JSON.parse(localStorage.getItem("digi-admin-libros")||"[]");
-      if(localAll && localAll.length > 0){
-        l = localAll.find(function(b){ return b && b.pdf && b.pdf.startsWith("http"); }) || localAll[0];
-      }
-    } catch(e){}
-  }
-
-  // Si tenemos datos en caché, renderizar al instante sin esperar la red
-  if(l){
-    libroActual = l;
-    renderDetalleLibro(l, true);
-    if(!idParam && l.id){
-      window.history.replaceState({}, "", "libro.html?id=" + encodeURIComponent(l.id));
-    }
-  }
-
-  // 2. SINCRONIZACIÓN EN SEGUNDO PLANO CON LA API (SWR)
-  if(idParam && window.API && window.API.libros){
-    try {
-      var fresh = await API.libros.getById(idParam);
-      if(fresh && fresh.id){
-        var pdfCambio = forzarRecarga || !l || !l.pdf || (fresh.pdf && fresh.pdf !== l.pdf && !l.pdf.includes(fresh.pdf) && !fresh.pdf.includes(l.pdf));
-        libroActual = fresh;
-        renderDetalleLibro(fresh, pdfCambio);
-      }
-    } catch(e){
-      console.warn("API getById:", e.message);
-    }
-  } else if(!l && window.API && window.API.libros){
-    try {
-      var single = await API.libros.getById('10').catch(function(){ return null; });
-      if(single && single.id){
-        l = single;
-      } else {
-        var all = await API.libros.getAll();
-        if(all && all.length > 0){
-          l = all.find(function(b){ return b && b.pdf && b.pdf.startsWith("http"); }) || all[0];
-        }
-      }
-      if(l){
-        libroActual = l;
-        renderDetalleLibro(l, true);
-        if(l && l.id){
-          window.history.replaceState({}, "", "libro.html?id=" + encodeURIComponent(l.id));
-        }
-      }
-    } catch(e){}
-  }
-
-  // 3. Si definitivamente no existe el libro:
-  if(!libroActual && !l){
-    document.getElementById("libroTitulo").textContent = "Recurso no encontrado";
-    document.getElementById("libroAutor").innerHTML    = "DigiTeca";
-    document.getElementById("libroDesc").textContent   = "El libro solicitado no se encuentra disponible actualmente en la base de datos.";
-    document.getElementById("breadcrumb").innerHTML    = '<a href="catalogo.html">Catálogo</a><span>›</span><span>No disponible</span>';
-    var noDisp = document.getElementById("pdfNoDisp"); if(noDisp) noDisp.style.display = "flex";
-    var frame  = document.getElementById("pdfFrame");  if(frame) frame.style.display = "none";
+  if(!idParam){
+    window.location.replace("catalogo.html");
     return;
+  }
+
+  try {
+    var fresh = await API.libros.getById(idParam);
+    if(fresh && fresh.id){
+      libroActual = fresh;
+      renderDetalleLibro(fresh, true);
+    } else {
+      mostrarLibroNoEncontrado();
+    }
+  } catch(e){
+    console.warn("Fallo al obtener libro de CockroachDB:", e.message);
+    mostrarLibroNoEncontrado();
   }
 
   // Registrar evento de lectura en segundo plano
@@ -365,6 +308,17 @@ async function cargarLibro(forzarRecarga){
       API.stats.registrarLectura(targetId, sesion.email, sesion.anio).catch(function(){});
     }
   } catch(e){}
+}
+
+
+function mostrarLibroNoEncontrado(){
+  document.getElementById("libroTitulo").textContent = "Recurso no encontrado";
+  document.getElementById("libroAutor").innerHTML    = "DigiTeca";
+  document.getElementById("libroDesc").textContent   = "El libro solicitado no se encuentra disponible actualmente en la base de datos.";
+  document.getElementById("breadcrumb").innerHTML    = '<a href="catalogo.html">Catálogo</a><span>›</span><span>No disponible</span>';
+  var noDisp = document.getElementById("pdfNoDisp"); if(noDisp) noDisp.style.display = "flex";
+  var frame  = document.getElementById("pdfFrame");  if(frame) frame.style.display = "none";
+  var container = document.getElementById("pdfContainer"); if(container) container.style.display = "none";
 }
 
 function renderDetalleLibro(l, recargarVisor){
@@ -497,6 +451,7 @@ if (window.pdfjsLib) {
 
 // ── VISOR PDF CON LECTURA CONTINUA NATIVA (MÓVIL Y PC) ──
 async function cargarPDF(l){
+  console.log("[VIEWER] cargarPDF started, book id:", l ? l.id : null);
   var frame     = document.getElementById("pdfFrame");
   var noDisp    = document.getElementById("pdfNoDisp");
   var container = document.getElementById("pdfContainer");
@@ -575,6 +530,7 @@ var currentTargetWidth = 0;
 
 // Renderizador fluido de páginas continuas con protección total contra ejecuciones duplicadas
 async function renderPdfContinuous(source){
+  console.log("[VIEWER] renderPdfContinuous started, source:", source);
   var thisGen = ++pdfRenderGeneration;
   isPdfLoadingInProgress = true;
 
@@ -633,111 +589,41 @@ async function renderPdfContinuous(source){
   renderedPages = {};
 
   try {
-    var pdfData = null;
+    var loadingTask;
 
     if(typeof source === "string" && (source.startsWith("data:application/pdf") || source.startsWith("data:application/octet-stream") || source.startsWith("data:binary/octet-stream"))){
       var blob = dataURLtoBlob(source);
       var arrayBuf = await blob.arrayBuffer();
       if(thisGen !== pdfRenderGeneration) return;
-      pdfData = new Uint8Array(arrayBuf);
-    } else {
-      // 1. Descarga vía fetch nativo con lectura progresiva de chunks y monitoreo exacto
-      try {
-        var controller = new AbortController();
-        var fetchTimer = setTimeout(function(){ controller.abort(); }, 25000);
-        var response = await fetch(source, { signal: controller.signal });
-        clearTimeout(fetchTimer);
-        if(!response.ok){
-          throw new Error("HTTP " + response.status + ": " + response.statusText);
-        }
-        var contentLength = response.headers.get("content-length");
-        var total = contentLength ? parseInt(contentLength, 10) : 0;
-
-        if(response.body && typeof response.body.getReader === "function"){
-          var reader = response.body.getReader();
-          var received = 0;
-          var chunks = [];
-          while(true){
-            if(thisGen !== pdfRenderGeneration) return;
-            var chunkRes = await reader.read();
-            if(chunkRes.done) break;
-            chunks.push(chunkRes.value);
-            received += chunkRes.value.length;
-            if(total > 0 && loadingEl && !watchdogFired){
-              var pct = Math.min(99, Math.round((received / total) * 100));
-              var txt = loadingEl.querySelector("span");
-              if(txt) txt.textContent = "Cargando documento (" + pct + "%)...";
-            } else if(loadingEl && !watchdogFired && received > 0){
-              var mb = (received / (1024 * 1024)).toFixed(1);
-              var txt = loadingEl.querySelector("span");
-              if(txt) txt.textContent = "Cargando documento (" + mb + " MB)...";
-            }
-          }
-          if(thisGen !== pdfRenderGeneration) return;
-          var fullBytes = new Uint8Array(received);
-          var offset = 0;
-          for(var i = 0; i < chunks.length; i++){
-            fullBytes.set(chunks[i], offset);
-            offset += chunks[i].length;
-          }
-          pdfData = fullBytes;
-        } else {
-          var ab = await response.arrayBuffer();
-          if(thisGen !== pdfRenderGeneration) return;
-          pdfData = new Uint8Array(ab);
-        }
-      } catch(fetchErr){
-        console.warn("Fallo al descargar stream del PDF:", fetchErr.message);
-        clearTimeout(loadWatchdog);
-        if(thisGen !== pdfRenderGeneration) return;
-        if(loadingEl) loadingEl.style.display = "none";
-        if(container) container.style.display = "none";
-        if(noDisp){
-          noDisp.style.display = "flex";
-          noDisp.innerHTML = '<div class="pdf-nd-icon" style="color:var(--cel-o)"><i data-lucide="wifi-off" style="width:64px;height:64px"></i></div><h3>Conectando con el documento</h3><p>La conexión tardó más de lo esperado o el servidor está ocupado.</p><button onclick="cargarLibro(true)" style="margin-top:14px;padding:10px 22px;border-radius:10px;background:var(--cel-o,#2A7B9B);color:#fff;border:none;font-weight:700;cursor:pointer;font-size:15px;box-shadow:0 4px 12px rgba(42,123,155,0.25)">Reintentar lectura</button>';
-          if(window.lucide && lucide.createIcons) lucide.createIcons();
-        }
-        return;
-      }
-    }
-
-    if(thisGen !== pdfRenderGeneration) return;
-
-    if(loadingEl && !watchdogFired){
-      var txt = loadingEl.querySelector("span");
-      if(txt) txt.textContent = "Abriendo páginas...";
-    }
-
-    var loadingTask;
-    if(pdfData){
       loadingTask = pdfjsLib.getDocument({
-        data: pdfData,
+        data: new Uint8Array(arrayBuf),
         enableXfa: true,
         cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
         cMapPacked: true
       });
     } else {
-      // Fallback a URL con disableRange para evitar bloqueos por solicitudes parciales erróneas
+      // Carga directa y reactiva con streaming de PDF.js vía Range requests
       loadingTask = pdfjsLib.getDocument({
         url: source,
         withCredentials: false,
         enableXfa: true,
-        disableRange: true,
-        disableStream: false,
         cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
         cMapPacked: true
       });
-      loadingTask.onProgress = function(p){
-        if(p && p.total > 0 && loadingEl && !watchdogFired){
-          var pct = Math.min(99, Math.round((p.loaded / p.total) * 100));
-          var txt = loadingEl.querySelector("span");
-          if(txt) txt.textContent = "Cargando documento (" + pct + "%)...";
-        }
-      };
     }
 
+    loadingTask.onProgress = function(p){
+      if(p && p.total > 0 && loadingEl && !watchdogFired){
+        var pct = Math.min(99, Math.round((p.loaded / p.total) * 100));
+        var txt = loadingEl.querySelector("span");
+        if(txt) txt.textContent = "Cargando documento (" + pct + "%)...";
+      }
+    };
+
     currentLoadingTask = loadingTask;
+    console.log("[VIEWER] awaiting loadingTask.promise...");
     var pdfDoc = await loadingTask.promise;
+    console.log("[VIEWER] pdfDoc resolved! numPages:", pdfDoc.numPages);
     if(thisGen !== pdfRenderGeneration) return;
     currentPdfDoc = pdfDoc;
     currentLoadingTask = null;

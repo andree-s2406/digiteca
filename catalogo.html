@@ -273,20 +273,8 @@ function indexarLibros(libros){
   }
 }
 
-// PORTADAS: inicialización instantánea desde caché local (0 ms de espera)
+// Catálogo directo desde CockroachDB
 var LIBROS = [];
-try {
-  var rawCache = localStorage.getItem("digi-admin-libros");
-  if (rawCache && (rawCache.includes("íAíAí") || rawCache.includes("îíaíl") || rawCache.includes("írí.í"))) {
-    localStorage.removeItem("digi-admin-libros");
-    rawCache = null;
-  }
-  var cacheLocal = rawCache ? JSON.parse(rawCache) : [];
-  if (Array.isArray(cacheLocal) && cacheLocal.length > 0) {
-    LIBROS = cacheLocal;
-    indexarLibros(LIBROS);
-  }
-} catch(e) {}
 
 function actualizarHeroStats(){
   var statEl = document.getElementById("statTotal");

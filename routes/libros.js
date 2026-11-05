@@ -1,47 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
-const fs = require('fs');
-const path = require('path');
 const syncService = require('../services/sync');
-
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const LIBROS_JSON = path.join(DATA_DIR, 'libros.json');
-const PDF_CACHE_DIR = path.join(DATA_DIR, 'pdf_cache');
-if (!fs.existsSync(PDF_CACHE_DIR)) {
-  try { fs.mkdirSync(PDF_CACHE_DIR, { recursive: true }); } catch (_) {}
-}
-
-const bookDetailCache = new Map();
-const pdfBufferCache = new Map(); // id -> { buffer, title, length, time }
-const PDF_CACHE_MAX_ENTRIES = 8;
-let cachedLibros = loadLocalBackup();
-let lastCacheTime = cachedLibros ? Date.now() : 0;
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos en RAM
-
-function saveLocalBackup(libros) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(LIBROS_JSON, JSON.stringify(libros, null, 2), 'utf8');
-  } catch(e) {}
-}
-
-function loadLocalBackup() {
-  try {
-    if (fs.existsSync(LIBROS_JSON)) {
-      return JSON.parse(fs.readFileSync(LIBROS_JSON, 'utf8'));
-    }
-  } catch(e) {}
-  return null;
-}
-
-function invalidateCache(action = 'update', payload = {}) {
-  cachedLibros = null;
-  lastCacheTime = 0;
-  bookDetailCache.clear();
-  pdfBufferCache.clear();
-  syncService.notifyDataChange('libros', { action, ...payload });
-}
 
 // Helper para convertir el formato de la BD al formato frontend esperado
 function mapLibroRow(row, isDetail = false) {
@@ -84,26 +44,10 @@ function mapLibroRow(row, isDetail = false) {
   };
 }
 
-// GET /api/libros - Listar libros con filtros (Optimizado para alta velocidad y bajo consumo de red)
+// GET /api/libros - Listar libros directamente desde CockroachDB
 router.get('/', async (req, res) => {
   try {
     const { q, materia, anio, tipo } = req.query;
-    const isGeneralList = !q && !materia && !anio && !tipo;
-    const now = Date.now();
-
-    // Cache hit instantáneo con soporte ETag
-    if (isGeneralList) {
-      const currentVersion = syncService.getVersions().libros;
-      const etag = `"lib-${currentVersion}"`;
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('ETag', etag);
-      if (req.headers['if-none-match'] === etag) {
-        return res.status(304).end();
-      }
-      if (cachedLibros && (now - lastCacheTime < CACHE_TTL_MS)) {
-        return res.json(cachedLibros);
-      }
-    }
 
     let sql = `
       SELECT 
@@ -148,25 +92,14 @@ router.get('/', async (req, res) => {
       }
     }
 
-    if (isGeneralList) {
-      cachedLibros = libros;
-      lastCacheTime = now;
-      saveLocalBackup(libros);
-    }
-
     res.json(libros);
   } catch (err) {
-    console.error('Error en GET /api/libros:', err);
-    const backup = cachedLibros || loadLocalBackup();
-    if (backup) {
-      return res.json(backup);
-    }
-    res.status(500).json({ error: 'Error al consultar libros' });
+    console.error('Error en GET /api/libros (CockroachDB):', err);
+    res.status(500).json({ error: 'Error al consultar libros en CockroachDB' });
   }
 });
-const DETAIL_TTL_MS = 60 * 1000; // 60 segundos
 
-// GET /api/libros/:id - Detalle completo de un libro
+// GET /api/libros/:id - Detalle completo de un libro directamente desde CockroachDB
 router.get('/:id', async (req, res) => {
   try {
     const rawId = req.params.id;
@@ -174,125 +107,36 @@ router.get('/:id', async (req, res) => {
       return res.status(400).json({ error: 'ID de libro inválido' });
     }
 
-    const now = Date.now();
-    const cached = bookDetailCache.get(String(rawId));
-    if (cached && (now - cached.time < DETAIL_TTL_MS)) {
-      return res.json(cached.data);
+    const result = await query(`SELECT * FROM libros WHERE id::text = $1::text`, [String(rawId)]);
+    if (result.rows.length > 0) {
+      return res.json(mapLibroRow(result.rows[0], true));
     }
 
-    try {
-      const result = await query(`SELECT * FROM libros WHERE id::text = $1::text`, [String(rawId)]);
-      if (result.rows.length > 0) {
-        const mapped = mapLibroRow(result.rows[0], true);
-        bookDetailCache.set(String(rawId), { data: mapped, time: now });
-        return res.json(mapped);
-      }
-    } catch(dbErr) {
-      console.warn('DB query en /api/libros/:id falló, recurriendo a backup local:', dbErr.message);
-    }
-
-    // Fallback a backup local en memoria o archivo data/libros.json
-    const backup = cachedLibros || loadLocalBackup() || [];
-    const localFound = backup.find(b => String(b.id) === String(rawId));
-    if (localFound) {
-      const mapped = mapLibroRow(localFound, true);
-      bookDetailCache.set(String(rawId), { data: mapped, time: now });
-      return res.json(mapped);
-    }
-
-    return res.status(404).json({ error: 'Libro no encontrado' });
+    return res.status(404).json({ error: 'Libro no encontrado en CockroachDB' });
   } catch (err) {
-    console.error('Error en GET /api/libros/:id:', err);
-    const backup = cachedLibros || loadLocalBackup() || [];
-    const localFound = backup.find(b => String(b.id) === String(req.params.id));
-    if (localFound) {
-      return res.json(mapLibroRow(localFound, true));
-    }
-    res.status(500).json({ error: 'Error al obtener libro' });
+    console.error('Error en GET /api/libros/:id (CockroachDB):', err);
+    res.status(500).json({ error: 'Error al consultar libro en la base de datos' });
   }
 });
 
-// GET /api/libros/:id/pdf - Transmisión en streaming de PDF con soporte CORS nativo, caché en disco y RAM
+// GET /api/libros/:id/pdf - Streaming nativo directo desde GitHub Releases mediante URL en CockroachDB
 router.get('/:id/pdf', async (req, res) => {
   try {
     const rawId = req.params.id;
-    const cacheKey = String(rawId);
-    const now = Date.now();
-
-    // 1. Inmunidad a Cold Starts: Obtener título y metadatos localmente en 0 ms
-    const localList = cachedLibros || loadLocalBackup() || [];
-    const localBook = localList.find(b => String(b.id) === cacheKey);
-
-    let pdfUrl = localBook ? (localBook.pdf_url || localBook.pdf) : null;
-    let titulo = localBook ? (localBook.titulo || localBook.t || 'libro') : 'libro';
-
-    // 2. Caché persistente en disco (1 ms) con soporte nativo de Range requests y streaming
-    const diskPdfPath = path.join(PDF_CACHE_DIR, `libro_${cacheKey}.pdf`);
-    if (fs.existsSync(diskPdfPath)) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Accept-Ranges', 'bytes');
-      return res.sendFile(diskPdfPath, { acceptRanges: true });
+    if (!rawId) {
+      return res.status(400).send('ID de libro inválido');
     }
 
-    // 3. Cache hit en RAM (0 ms) si aún está en memoria
-    const cached = pdfBufferCache.get(cacheKey);
-    if (cached && (now - cached.time < 30 * 60 * 1000)) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(cached.title || titulo)}.pdf"`);
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Accept-Ranges', 'bytes');
-
-      const range = req.headers.range;
-      if (range) {
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : cached.buffer.length - 1;
-        if (!isNaN(start) && start < cached.buffer.length) {
-          const validEnd = Math.min(isNaN(end) ? cached.buffer.length - 1 : end, cached.buffer.length - 1);
-          const chunksize = (validEnd - start) + 1;
-          res.status(206);
-          res.setHeader('Content-Range', `bytes ${start}-${validEnd}/${cached.buffer.length}`);
-          res.setHeader('Content-Length', chunksize);
-          return res.end(cached.buffer.slice(start, validEnd + 1));
-        }
-      }
-
-      if (cached.length) res.setHeader('Content-Length', cached.length);
-      return res.send(cached.buffer);
+    // 1. Consultar CockroachDB directamente para obtener el enlace de GitHub Releases y título
+    const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [String(rawId)]);
+    if (result.rows.length === 0 || !result.rows[0].pdf_url) {
+      return res.status(404).send('PDF no disponible en la base de datos');
     }
 
-    // 4. Si el libro no estaba en el backup local, consultar la BD con fallback seguro
-    if (!pdfUrl) {
-      try {
-        const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [cacheKey]);
-        if (result.rows.length > 0 && result.rows[0].pdf_url) {
-          pdfUrl = result.rows[0].pdf_url;
-          titulo = result.rows[0].titulo || 'libro';
-        }
-      } catch (dbErr) {
-        console.warn(`[PDF Stream] DB query falló para libro ${cacheKey}:`, dbErr.message);
-      }
-    }
+    const pdfUrl = result.rows[0].pdf_url.trim();
+    const titulo = result.rows[0].titulo || 'libro';
 
-    if (!pdfUrl) {
-      return res.status(404).send('PDF no disponible');
-    }
-
-    // 5. Si es un archivo local relativo en el servidor
-    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://')) {
-      const localPath = path.join(__dirname, '..', pdfUrl.replace(/^\//, ''));
-      if (fs.existsSync(localPath)) {
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        return res.sendFile(localPath, { acceptRanges: true });
-      }
-      return res.status(404).send('Archivo local no encontrado');
-    }
-
-    // 6. Transmisión desde URL remota (GitHub Releases, Drive, etc.)
+    // 2. Conectar y retransmitir directamente desde GitHub Releases (o URL almacenada)
     let downloadUrl = pdfUrl;
     if (pdfUrl.includes('drive.google.com')) {
       const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
@@ -313,8 +157,8 @@ router.get('/:id/pdf', async (req, res) => {
       upstream = await fetch(downloadUrl, { headers: fetchHeaders, redirect: 'follow', signal: controller.signal });
       clearTimeout(timer);
     } catch (fetchErr) {
-      console.warn(`[PDF Stream] Timeout o fallo en fetch a ${downloadUrl}:`, fetchErr.message);
-      return res.status(504).send('Tiempo de espera agotado al conectar con el servidor del libro');
+      console.warn(`[PDF Stream] Timeout o fallo en fetch a GitHub (${downloadUrl}):`, fetchErr.message);
+      return res.status(504).send('Tiempo de espera agotado al conectar con GitHub');
     }
 
     if (!upstream.ok && downloadUrl !== pdfUrl) {
@@ -326,16 +170,16 @@ router.get('/:id/pdf', async (req, res) => {
       }
     }
     if (!upstream || !upstream.ok) {
-      return res.status(upstream ? upstream.status : 502).send('No se pudo obtener el PDF del servidor remoto');
+      return res.status(upstream ? upstream.status : 502).send('No se pudo obtener el PDF desde GitHub');
     }
 
     if (upstream.status === 206) {
       res.status(206);
       const cr = upstream.headers.get('content-range');
       if (cr) res.setHeader('Content-Range', cr);
-      res.setHeader('Accept-Ranges', 'bytes');
     }
 
+    res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -346,73 +190,20 @@ router.get('/:id/pdf', async (req, res) => {
     const { Readable } = require('stream');
     if (upstream.body && typeof Readable.fromWeb === 'function') {
       const nodeStream = Readable.fromWeb(upstream.body);
-      const chunks = [];
-      let totalSize = 0;
-
-      // Pipe directo al cliente de forma reactiva e inmediata
       nodeStream.pipe(res);
-
-      // Guardar en búfer y en disco simultáneamente de fondo
-      const tempDiskPath = path.join(PDF_CACHE_DIR, `libro_${cacheKey}.tmp`);
-      let diskWriteStream = null;
-      try {
-        diskWriteStream = fs.createWriteStream(tempDiskPath);
-      } catch (e) {}
-
-      nodeStream.on('data', chunk => {
-        if (diskWriteStream) diskWriteStream.write(chunk);
-        if (totalSize < 50 * 1024 * 1024) {
-          chunks.push(chunk);
-          totalSize += chunk.length;
-        }
-      });
-
-      nodeStream.on('end', () => {
-        if (diskWriteStream) {
-          diskWriteStream.end(() => {
-            fs.rename(tempDiskPath, diskPdfPath, () => {});
-          });
-        }
-        if (chunks.length > 0 && totalSize < 50 * 1024 * 1024) {
-          try {
-            const fullBuf = Buffer.concat(chunks);
-            if (pdfBufferCache.size >= PDF_CACHE_MAX_ENTRIES) {
-              const oldestKey = pdfBufferCache.keys().next().value;
-              pdfBufferCache.delete(oldestKey);
-            }
-            pdfBufferCache.set(cacheKey, {
-              buffer: fullBuf,
-              title: titulo,
-              length: contentLength || fullBuf.length,
-              time: Date.now()
-            });
-          } catch(e){}
-        }
-      });
-
-      nodeStream.on('error', (err) => {
-        console.warn(`[PDF Stream] Error en stream de libro ${cacheKey}:`, err.message);
-        if (diskWriteStream) {
-          try { diskWriteStream.destroy(); fs.unlinkSync(tempDiskPath); } catch (_) {}
-        }
-      });
-
-      return;
+    } else {
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      res.send(buffer);
     }
-
-    const arrayBuf = await upstream.arrayBuffer();
-    const buf = Buffer.from(arrayBuf);
-    try {
-      fs.writeFileSync(diskPdfPath, buf);
-    } catch (_) {}
-    return res.send(buf);
   } catch (err) {
-    console.error('Error al transmitir PDF:', err);
-    res.status(500).send('Error interno al cargar el PDF');
+    console.error('Error en /api/libros/:id/pdf:', err);
+    res.status(500).send('Error interno al transmitir PDF');
   }
 });
 
-// POST /api/libros - Crear libro
+// ═══════════════════════════════════════════════════════════
+// MUTACIONES (POST, PUT, DELETE)
+// ═══════════════════════════════════════════════════════════
 router.post('/', async (req, res) => {
   try {
     const { t, a, mat, tipo, anios, divisiones, img, pdf, e, c, l, x, subioPor } = req.body;
