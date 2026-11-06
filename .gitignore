@@ -1,6 +1,7 @@
 # Archivos pesados (PDFs locales)
 libros/
 *.pdf
+!docs/MANUAL_DE_USUARIO.pdf
 img/portadas/*
 !img/portadas/.gitkeep
 

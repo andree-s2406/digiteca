@@ -1,99 +1,113 @@
-# 📌 PUNTOS IMPORTANTES Y REGLAS DE ARQUITECTURA - DIGITECA
+# Directrices de Arquitectura y Reglas del Sistema - DigiTeca
 
-Este documento recopila de forma permanente las directrices, restricciones de negocio, medidas de seguridad y optimizaciones de rendimiento del proyecto DigiTeca. **Debe ser consultado y respetado ante cualquier modificación futura del sistema.**
+Este documento compila de forma permanente las directrices técnicas, restricciones de negocio, medidas de seguridad y estándares de rendimiento del proyecto DigiTeca. Debe ser consultado y respetado ante cualquier modificación futura del sistema.
 
----
-
-## 🚫 1. Prohibición Estricta de Descarga de Libros
-* **Regla:** Está terminantemente **prohibido que los usuarios descarguen los libros** en formato PDF.
-* **Prohibido:**
-  * No colocar botones con atributos `download` ni textos "Descargar", "Descargar PDF", "Guardar libro".
-  * No crear endpoints públicos tipo `/api/libros/:id/descargar`.
-* **Comportamiento en la interfaz:**
-  * En todas las vistas (`libro.html`, `catalogo.html`, `descargas.html`, `admin.html`), la única acción permitida para el usuario final es **"Leer en línea"** o previsualizar dentro del visor integrado.
+Para una descripción detallada de cada componente, consulte la documentación complementaria en el directorio `docs/`:
+* [Arquitectura del Sistema](docs/ARQUITECTURA.md)
+* [Referencia de la API REST](docs/API.md)
+* [Especificación de la Base de Datos](docs/BASE_DE_DATOS.md)
+* [Guía de Instalación y Despliegue](docs/DESPLIEGUE.md)
 
 ---
 
-## 🔒 2. Cifrado y Ofuscación de Enlaces de Lectura
+## 1. Prohibición Estricta de Descarga de Libros
+
+* **Regla:** Está terminantemente prohibido que los usuarios descarguen los libros en formato físico o archivo local (PDF).
+* **Restricciones de Código e Interfaz:**
+  * No colocar botones con atributos `download` ni textos como "Descargar", "Descargar PDF" o "Guardar libro".
+  * No exponer endpoints públicos destinados a la descarga de archivos.
+* **Comportamiento en la Interfaz:**
+  * En todas las vistas (`libro.html`, `catalogo.html`, `descargas.html`, `admin.html`), la única acción permitida para el usuario final es "Leer en línea" o previsualizar dentro del visor integrado.
+
+---
+
+## 2. Cifrado y Ofuscación de Enlaces de Lectura
+
 * **Carga en Memoria (Blob URLs):**
-  * Los PDFs **nunca** se incrustan usando la ruta estática directa del archivo en el DOM (ej. `src="/libros/archivo.pdf"`).
-  * En su lugar, el visor (`libro.html`) realiza un `fetch()` al archivo, lo convierte en un `Blob` en la memoria del navegador y genera una URL efímera (`blob:http://...#toolbar=0&navpanes=0`).
-  * Esta URL blob es única de la sesión actual en memoria, no se puede compartir por enlace externo y oculta las herramientas nativas de descarga del visor.
+  * Los archivos PDF nunca se incrustan utilizando la ruta estática directa del archivo en el DOM (por ejemplo: `src="/libros/archivo.pdf"`).
+  * El visor (`libro.html`) realiza una petición mediante `fetch()` al archivo, lo convierte en un objeto `Blob` en la memoria volátil del navegador y genera una URL efímera (`blob:http://...#toolbar=0&navpanes=0`).
+  * Dicha URL blob es exclusiva de la sesión en curso en memoria, no puede ser compartida mediante enlace externo y oculta las herramientas nativas de descarga del visor.
 * **Redirección de Acceso Directo por URL:**
-  * Si un usuario o atacante intenta escribir o pegar directamente la URL de un PDF en la barra de direcciones del navegador (ej. `http://localhost:3000/libros/ejemplo.pdf`), el middleware de Express en `server.js` detecta la navegación directa y **lo redirige automáticamente a `/catalogo.html`**, impidiendo abrir o guardar el archivo directamente.
+  * Si un usuario intenta acceder directamente a la URL de un PDF en la barra de direcciones del navegador (por ejemplo: `http://localhost:3000/libros/ejemplo.pdf`), el middleware de Express en `server.js` detecta la navegación directa a nivel de documento y lo redirige automáticamente a `/catalogo.html`, impidiendo abrir o guardar el archivo directamente.
 
 ---
 
-## ⚠️ 3. Restricción sobre Clic Derecho y Atajos de Teclado
-* **REGLA EXPLÍCITA DEL CLIENTE:**
-  * **NO bloquear el clic derecho** (`oncontextmenu="return false;"`).
-  * **NO interceptar ni cancelar combinaciones de teclas** como `Ctrl+S`, `Ctrl+P`, etc.
-* **Razón:** Afecta negativamente la usabilidad y la experiencia del usuario. La protección contra descargas debe sostenerse en la ofuscación de URLs por Blob y la redirección del servidor, nunca en scripts intrusivos que bloquean el navegador.
+## 3. Preservación de Usabilidad: Clic Derecho y Atajos de Teclado
+
+* **Regla Explícita de Experiencia de Usuario:**
+  * No bloquear el menú contextual del clic derecho (`oncontextmenu="return false;"`).
+  * No interceptar ni cancelar combinaciones estándar de teclas como `Ctrl+S`, `Ctrl+P`, etc.
+* **Fundamento:** Bloquear funciones nativas del navegador perjudica la accesibilidad y la experiencia del usuario. La protección contra descargas descansa en la ofuscación de URLs por Blob en memoria y en las redirecciones del servidor, no en scripts intrusivos en el cliente.
 
 ---
 
-## ⚡ 4. Base de Datos Ligera (Archivos en Disco, Rutas en BD)
-* **Regla:** **NUNCA almacenar el contenido binario o Base64 de libros ni imágenes pesadas dentro de CockroachDB / PostgreSQL**.
-* **Estrategia implementada:**
-  * Los archivos PDF se guardan físicamente en el servidor dentro del directorio `/libros/`.
-  * La base de datos almacena exclusivamente un string liviano con la referencia (ej. `/libros/1741234567890-libro.pdf`), pesando apenas unos 35 bytes por fila.
-  * Esto garantiza que las consultas a la base de datos se ejecuten en milisegundos y no se saturen la memoria ni el ancho de banda.
+## 4. Almacenamiento Liviano en Base de Datos
+
+* **Regla:** Nunca almacenar el contenido binario o cadenas Base64 de libros ni imágenes pesadas dentro de CockroachDB / PostgreSQL.
+* **Estrategia Implementada:**
+  * Los archivos PDF se conservan físicamente en el servidor dentro del directorio `/libros/`.
+  * La base de datos almacena exclusivamente una cadena de texto corta con la ruta relativa de referencia (por ejemplo: `/libros/1741234567890-libro.pdf`).
+  * Esto asegura que las consultas a la base de datos se ejecuten en pocos milisegundos y no saturen la memoria ni el ancho de banda de la red.
 
 ---
 
-## 🚀 5. Rendimiento Instantáneo y Estrategia SWR (Stale-While-Revalidate)
-* **Caché en Cliente (0 ms de espera):**
-  * El catálogo (`catalogo.html`), el visor (`libro.html`) y el panel resumen (`admin.html`) cargan inmediatamente los datos desde `sessionStorage` / `localStorage` al abrirse.
-  * En segundo plano, se revalidan los datos contra el backend y se actualizan sin parpadeos ni bloqueos de pantalla.
+## 5. Rendimiento y Estrategia de Caché SWR (Stale-While-Revalidate)
+
+* **Caché en Cliente:**
+  * El catálogo (`catalogo.html`), el visor (`libro.html`) y el panel administrativo (`admin.html`) cargan inmediatamente los datos desde `sessionStorage` o `localStorage` al iniciarse.
+  * En segundo plano, se revalidan los datos contra el backend y se actualizan sin parpadeos ni bloqueos visuales.
 * **Caché en Memoria del Servidor:**
-  * Endpoints de alta concurrencia como `/api/libros` y métricas del admin cuentan con un caché TTL en RAM en Node.js, reduciendo drásticamente las consultas repetitivas a la base de datos.
-* **Carga de Libros sin Espera:**
-  * Al hacer clic en un libro desde el catálogo o panel, el objeto se transfiere a través del caché local para que la página de lectura cargue título, autor, portada y metadatos en 0 ms mientras se inicializa el PDF.
+  * Endpoints de alta concurrencia como `/api/libros`, `/api/ranking` y `/api/stats` cuentan con una caché en memoria RAM con tiempo de vida (TTL) controlado en Node.js, reduciendo drásticamente las consultas repetitivas a la base de datos.
+* **Carga Inmediata de Fichas Bibliográficas:**
+  * Al seleccionar un libro desde el catálogo o panel, el objeto se transfiere a través del almacenamiento local para que la página de lectura cargue título, autor, portada y metadatos en 0 ms mientras se inicializa el flujo del PDF.
 
 ---
 
-## 📊 6. Panel de Administración y Métricas Clave
-* **Métricas Principales (5 KPIs esenciales):**
+## 6. Panel de Administración y Métricas Clave
+
+* **Métricas Principales (KPIs Esenciales):**
   1. Usuarios Registrados
   2. Libros en Catálogo
   3. Préstamos Activos
   4. Reseñas Totales
   5. Valoración Media
-* **Métricas Eliminadas (a solicitud):**
-  * *Restringidos* (eliminado).
-  * *Guardados en Cuenta* (eliminado).
-  * *Logins Hoy* (eliminado).
+* **Métricas Descartadas:**
+  * Restringidos (descartado).
+  * Guardados en Cuenta (descartado de la vista principal).
+  * Logins Hoy (descartado de la vista principal).
 
 ---
 
-## 🌓 7. Botón de Modo Claro / Oscuro (Unificado con Morphicons)
+## 7. Selector de Modo Claro y Oscuro
+
 * **Diseño e Iconografía:**
-  * Debe ser idéntico en todas las páginas al de `index.html`: botón circular (40x40px, `border-radius: 50%`) con micro-interacción de escala (`scale(1.06)` al pasar el cursor, `scale(0.92)` al presionar).
-  * Icono SVG Morphicons (20x20px) con transformación vectorial fluida de sol a luna (`createMorph`).
+  * El botón de cambio de tema debe ser idéntico en todas las páginas: elemento circular (40x40px, `border-radius: 50%`) con micro-interacción de escala (`scale(1.06)` al posar el cursor, `scale(0.92)` al presionar).
+  * Icono SVG interactivo con transición vectorial fluida de sol a luna mediante Morphicons.
   * Colores dinámicos del icono: azul institucional (`#2E7FB3`) para la luna en modo claro y dorado cálido (`#F5D96A`) para el sol en modo oscuro.
 * **Manejo de Scripts:**
-  * Toda la lógica de cambio de tema se gestiona centralizadamente a través de `setupThemeToggle()` en `js/icons.js`.
-  * **Prohibido:** No sobrescribir `themeBtn.onclick` con scripts inline destructivos que reemplacen el SVG por iconos estáticos (`DigiIcons.get("sun"/"moon")`).
+  * La lógica de cambio de tema se gestiona centralizadamente mediante `setupThemeToggle()` en `js/icons.js`.
+  * No debe sobrescribirse `themeBtn.onclick` con scripts inline destructivos.
 
 ---
 
-## 🏫 8. Logo e Insignia Institucional (Unificado)
+## 8. Logotipo e Insignia Institucional
+
 * **Regla de Visualización:**
-  * En **todas** las vistas (públicas y panel de administración), la insignia oficial de la escuela (`img/logo.png`) debe mostrarse como un elemento circular perfecto:
+  * En todas las vistas (públicas y de administración), la insignia oficial de la escuela (`img/logo.png`) debe mostrarse como un elemento circular perfecto:
     * `border-radius: 50% !important;`
-    * `background: #FFFFFF !important;` (fondo blanco limpio para evitar que el fondo oscuro o negro del contenedor se trasluzca en las transparencias).
+    * `background: #FFFFFF !important;` (fondo blanco limpio para evitar transparencias sobre fondos oscuros).
     * `border: 2px solid var(--cel-c);`
     * `box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);`
     * Clase estándar: `.logo-img`.
-  * **Prohibido:** No renderizar el logo como un cuadrado o rectángulo con bordes ligeramente redondeados (`border-radius: 10px / 16px`) ni permitir transparencias que generen fondos oscuros alrededor del escudo.
+  * No renderizar el logo como un rectángulo ni permitir transparencias que generen recortes oscuros alrededor del escudo.
 
 ---
 
-## 🛡️ 9. Prohibición Absoluta de Correos y Credenciales Hardcodeados en el Código
-* **Regla de Oro de Seguridad:**
-  * **Está estrictamente prohibido incluir correos electrónicos, contraseñas, tokens o listas de administradores hardcodeadas** dentro de los archivos HTML, JavaScript o bases de datos de prueba (ej. `ADMIN_EMAILS = [...]` o contraseñas por defecto tipo `"1234"`).
-* **Control de Acceso Basado Exclusivamente en Roles (RBAC):**
-  * La autorización para acceder al panel de administración o realizar operaciones privilegiadas debe evaluarse **únicamente a través del rol del usuario** (`rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor"`) proveniente de la sesión autenticada contra la base de datos CockroachDB.
-  * Nunca otorgar privilegios comparando contra cadenas de texto con correos específicos (`ADMIN_EMAILS.indexOf(email) >= 0`).
-  * En interfaces o prototipos, usar únicamente placeholders o etiquetas genéricas (`usuario@correo.com`, `—`).
+## 9. Prohibición de Correos y Credenciales Hardcodeados
 
+* **Regla de Seguridad:**
+  * Está estrictamente prohibido incluir correos electrónicos, contraseñas, tokens o listas de administradores codificadas de forma estática dentro de los archivos HTML, JavaScript o scripts de prueba.
+* **Control de Acceso Basado en Roles (RBAC):**
+  * La autorización para acceder al panel de administración o realizar operaciones privilegiadas debe evaluarse únicamente a través del rol del usuario (`rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor"`) proveniente de la sesión autenticada en la base de datos CockroachDB.
+  * No deben otorgarse privilegios comparando contra listas de correos específicos.
+  * En interfaces o prototipos, deben utilizarse únicamente marcadores de posición o etiquetas genéricas (`usuario@correo.com`, `—`).
