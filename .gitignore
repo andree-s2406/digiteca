@@ -1,6 +1,8 @@
 # Archivos pesados (PDFs locales)
 libros/
 *.pdf
+img/portadas/*
+!img/portadas/.gitkeep
 
 # Dependencias y entornos
 node_modules/
