@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS libros_portadas (
+    libro_id BIGINT PRIMARY KEY REFERENCES libros(id) ON DELETE CASCADE,
+    mime_type VARCHAR(64) NOT NULL DEFAULT 'image/jpeg',
+    data BYTEA NOT NULL,
+    creado_en TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);

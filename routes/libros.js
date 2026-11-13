@@ -10,6 +10,25 @@ const {
 } = require('../services/librosService');
 const { streamRemotePdf } = require('../services/pdfStreamService');
 
+async function persistDataUrlPortada(libroId, img) {
+  if (typeof img !== 'string' || !img.startsWith('data:image/')) return null;
+  const match = img.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+  if (!match) return null;
+  const mimeType = match[1];
+  const buffer = Buffer.from(match[2], 'base64');
+  await query(
+    `INSERT INTO libros_portadas (libro_id, mime_type, data)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (libro_id) DO UPDATE SET
+       mime_type = EXCLUDED.mime_type,
+       data = EXCLUDED.data`,
+    [libroId, mimeType, buffer]
+  );
+  const portadaApiUrl = `/api/libros/${libroId}/portada`;
+  await query(`UPDATE libros SET portada_url = $1 WHERE id = $2`, [portadaApiUrl, libroId]);
+  return portadaApiUrl;
+}
+
 // GET /api/libros - Listar libros directamente desde CockroachDB
 router.get('/', async (req, res) => {
   try {
@@ -82,6 +101,44 @@ router.get('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error en GET /api/libros/:id (CockroachDB):', err);
     res.status(500).json({ error: 'Error al consultar libro en la base de datos' });
+  }
+});
+
+// GET /api/libros/:id/portada - Servir portada almacenada en CockroachDB
+router.get('/:id/portada', async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    if (!rawId) {
+      return res.status(400).json({ error: 'ID de libro inválido' });
+    }
+
+    const result = await query(
+      `SELECT mime_type, data FROM libros_portadas WHERE libro_id::text = $1::text`,
+      [String(rawId)]
+    );
+
+    if (result.rows.length > 0 && result.rows[0].data) {
+      res.setHeader('Content-Type', result.rows[0].mime_type || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(result.rows[0].data);
+    }
+
+    const fallback = await query(
+      `SELECT portada_url FROM libros WHERE id::text = $1::text`,
+      [String(rawId)]
+    );
+    const portadaUrl = fallback.rows[0]?.portada_url || '';
+    const dataMatch = portadaUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+    if (dataMatch) {
+      res.setHeader('Content-Type', dataMatch[1]);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(Buffer.from(dataMatch[2], 'base64'));
+    }
+
+    return res.status(404).json({ error: 'Portada no encontrada' });
+  } catch (err) {
+    console.error('Error en GET /api/libros/:id/portada:', err);
+    return res.status(500).json({ error: 'Error al consultar portada en CockroachDB' });
   }
 });
 
@@ -178,6 +235,11 @@ router.post('/', async (req, res) => {
       );
     }
 
+    if (img && typeof img === 'string' && img.startsWith('data:image/')) {
+      const apiPortada = await persistDataUrlPortada(result.rows[0].id, img);
+      if (apiPortada) result.rows[0].portada_url = apiPortada;
+    }
+
     invalidateLibrosCache('create', { id: result.rows[0].id });
     res.status(201).json(mapLibroRow(result.rows[0]));
   } catch (err) {
@@ -237,6 +299,11 @@ router.put('/:id', async (req, res) => {
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Libro no encontrado' });
+    }
+
+    if (img && typeof img === 'string' && img.startsWith('data:image/')) {
+      const apiPortada = await persistDataUrlPortada(result.rows[0].id, img);
+      if (apiPortada) result.rows[0].portada_url = apiPortada;
     }
 
     invalidateLibrosCache('update', { id: rawId });
