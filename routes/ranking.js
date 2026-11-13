@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
+const { CACHE_TTLS } = require('../config/constants');
 
 let cachedRanking = null;
 let lastRankingFetch = 0;
-const RANKING_CACHE_TTL_MS = 20 * 1000; // 20 segundos
+const RANKING_CACHE_TTL_MS = CACHE_TTLS.RANKING_MS;
 
 // GET /api/ranking - Obtener Top 8 libros más abiertos / más buscados
 router.get('/', async (req, res) => {
@@ -14,15 +15,28 @@ router.get('/', async (req, res) => {
       return res.json(cachedRanking);
     }
 
-    const result = await query(
+    let result = await query(
       `SELECT l.id AS libro_id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios,
               COUNT(e.id) AS veces_abierto
-       FROM libros l
+       FROM ranking_buscados rb
+       JOIN libros l ON l.id = rb.libro_id
        LEFT JOIN estadisticas_eventos e ON e.referencia_id = l.id AND (e.tipo = 'libro_abierto' OR e.tipo = 'lectura')
-       GROUP BY l.id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios
-       ORDER BY veces_abierto DESC, l.id ASC
+       GROUP BY rb.posicion, l.id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios
+       ORDER BY rb.posicion ASC
        LIMIT 8;`
     );
+
+    if (result.rows.length === 0) {
+      result = await query(
+        `SELECT l.id AS libro_id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios,
+                COUNT(e.id) AS veces_abierto
+         FROM libros l
+         LEFT JOIN estadisticas_eventos e ON e.referencia_id = l.id AND (e.tipo = 'libro_abierto' OR e.tipo = 'lectura')
+         GROUP BY l.id, l.titulo, l.autor, l.emoji, l.portada_url, l.materia, l.tipo, l.anios
+         ORDER BY veces_abierto DESC, l.id ASC
+         LIMIT 8;`
+      );
+    }
 
     const ranking = result.rows.map((row, index) => ({
       posicion: index + 1,

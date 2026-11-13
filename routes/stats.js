@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
+const { CACHE_TTLS } = require('../config/constants');
+const { buildTextReport } = require('../services/reportService');
 
-// In-memory cache para estadísticas con TTL de 20 segundos
+// In-memory cache para estadísticas
 let cachedStats = null;
 let lastStatsFetch = 0;
-const STATS_CACHE_TTL = 20 * 1000; // 20 segundos
+const STATS_CACHE_TTL = CACHE_TTLS.STATS_MS;
 
 function invalidarCacheStats() {
   cachedStats = null;
@@ -229,92 +231,19 @@ router.get('/reporte-texto', async (req, res) => {
              LIMIT 10;`)
     ]);
 
-    const ahora = new Date();
-    const fechaStr = ahora.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const horaStr = ahora.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-    const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-
-    let topStr = "";
-    rTop.forEach((t, i) => {
-      topStr += `  ${i + 1}. ${t.titulo} (${t.autor}) - ${t.veces} veces\n`;
+    const { reporte, fechaStr } = buildTextReport({
+      periodo,
+      rLibros,
+      rUsuarios,
+      rVisitas,
+      rAbiertos,
+      rHoy,
+      rDesc,
+      rDias,
+      rAnios,
+      rTop,
+      rUlt
     });
-
-    let ultStr = "";
-    rUlt.forEach(u => {
-      const f = new Date(u.fecha).toLocaleDateString("es-AR") + " " + new Date(u.fecha).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-      ultStr += `  - ${u.usuario_nombre || u.usuario_email} (${u.usuario_rol || 'alumno'}) — ${f}\n`;
-    });
-
-    let reporte =
-"╔══════════════════════════════════════════════════════════════╗\n" +
-"║         REPORTE DE ESTADÍSTICAS — DigiTeca                  ║\n" +
-"║   Escuela Técnica N° 29 DE 6 — Reconquista de Buenos Aires  ║\n" +
-"╚══════════════════════════════════════════════════════════════╝\n\n" +
-`Generado: ${fechaStr} a las ${horaStr}\n` +
-`Base de Datos: CockroachDB\n` +
-`Período: ${periodo.toUpperCase()}\n\n` +
-"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-"  RESUMEN GENERAL\n" +
-"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-`  Libros en catálogo:       ${rLibros[0].total}\n` +
-`  Usuarios registrados:     ${rUsuarios.length}\n` +
-`    › Activos:              ${rUsuarios.filter(u => u.estado === 'activo').length}\n` +
-`    › Restringidos:         ${rUsuarios.filter(u => u.estado === 'restringido').length}\n` +
-`    › Administradores:      ${rUsuarios.filter(u => u.rol === 'admin').length}\n` +
-`    › Preceptores:          ${rUsuarios.filter(u => u.rol === 'preceptor').length}\n` +
-`    › Profesores:           ${rUsuarios.filter(u => u.rol === 'profesor').length}\n` +
-`    › Alumnos:              ${rUsuarios.filter(u => u.rol === 'alumno').length}\n` +
-`  Visitas totales al sitio: ${rVisitas[0].total}\n` +
-`  Libros abiertos (total):  ${rAbiertos[0].total}\n` +
-`  Libros guardados cuenta:  ${rDesc[0].total}\n` +
-`  Ingresos hoy:             ${rHoy[0].total}\n\n` +
-"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-"  INGRESOS POR DÍA DE LA SEMANA\n" +
-"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-
-    for (let d = 0; d < 7; d++) {
-      const v = ingDia[d] || 0;
-      const max = Math.max(...ingDia, 1);
-      const barLen = Math.round((v / max) * 20);
-      const bar = "█".repeat(barLen) + "░".repeat(20 - barLen);
-      reporte += `  ${dias[d].padEnd(10)} │ ${bar} ${v}\n`;
-    }
-
-    reporte +=
-"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-"  ACTIVIDAD POR AÑO DE CURSADA\n" +
-"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-    const aniosKeys = ["1", "2", "3", "4", "5", "6", "Otro"];
-    const maxA = Math.max(...Object.values(ingAnio), 1);
-    for (const ak of aniosKeys) {
-      const av = ingAnio[ak] || 0;
-      const aLen = Math.round((av / maxA) * 20);
-      const aBar = "█".repeat(aLen) + "░".repeat(20 - aLen);
-      const lbl = (ak === "Otro" ? "Otro      " : `${ak}° Año     `).substring(0, 10);
-      reporte += `  ${lbl} │ ${aBar} ${av}\n`;
-    }
-
-    reporte +=
-"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-"  TOP 10 LIBROS MÁS ABIERTOS\n" +
-"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-(topStr || "  Sin datos aún.\n") +
-"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-"  ÚLTIMOS 10 INGRESOS\n" +
-"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-(ultStr || "  Sin ingresos registrados.\n") +
-"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-"  LISTADO DE USUARIOS\n" +
-"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-
-    rUsuarios.forEach(u => {
-      reporte += `  ${(u.nombre + " " + u.apellido).padEnd(24)} │ ${(u.rol || "alumno").padEnd(10)} │ ${u.email}\n`;
-    });
-
-    reporte +=
-"\n╔══════════════════════════════════════════════════════════════╗\n" +
-"║  Reporte generado automáticamente por DigiTeca Admin Panel  ║\n" +
-"╚══════════════════════════════════════════════════════════════╝\n";
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="DigiTeca_Reporte_${periodo}_${fechaStr.replace(/\//g, '-')}.txt"`);

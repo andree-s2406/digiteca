@@ -1,33 +1,9 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<script>
-(function(){
-  try {
-    var d = localStorage.getItem("digi");
-    var isDark = d === "dark" || (d !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    document.documentElement.classList.add("preload");
-  } catch(e){}
-})();
-</script>
-<script>
-(function(){
-  try {
-    var raw = localStorage.getItem("digi-sesion");
-    if (raw && !window.location.search.includes("logout")) {
-      var s = JSON.parse(raw);
-      if (s && s.email) {
-        window.location.replace("index.html");
-      }
-    }
-  } catch(e){}
-})();
-</script>
+<script src="js/core/auth-guard.js"></script>
+<script src="js/core/constants.js"></script>
+<script src="js/ui/layout.js"></script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>Iniciar sesión – DigiTeca</title>
@@ -181,7 +157,8 @@ async function intentarLogin(){
         mostrarMsgLogin("Credenciales correctas. Ingresando...", "ok");
         btn.innerHTML = DigiIcons.get("check",{size:16,style:"margin-right:6px"})+" Ingresando...";
         try{
-          localStorage.setItem("digi-sesion", JSON.stringify(res.user));
+          const sesionPayload = Object.assign({}, res.user, res.token ? { token: res.token } : {});
+          localStorage.setItem("digi-sesion", JSON.stringify(sesionPayload));
           registrarIngreso(res.user);
         }catch(e){}
         setTimeout(function(){
@@ -321,14 +298,6 @@ function registrarIngreso(usuario){
     localStorage.setItem("digi-stats", JSON.stringify(stats));
   }catch(e){}
 }
-
-// Scroll-top button
-window.addEventListener("scroll", function(){
-  var st = document.getElementById("scroll-top");
-  if(st) st.classList.toggle("visible", window.scrollY > 200);
-});
-var stBtn = document.getElementById("scroll-top");
-if(stBtn) stBtn.onclick = function(){ window.scrollTo({top:0, behavior:"smooth"}); };
 
 </script>
 </body>

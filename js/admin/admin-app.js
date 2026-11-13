@@ -1,0 +1,2724 @@
+// ── LIBROS BASE ──
+var LIBROS_BASE = [];
+
+// ════════════════════════════════════════════════
+// ESTADO
+// ════════════════════════════════════════════════
+var adminActual = null;
+var libroEditando = null;
+var usuarioEditando = null;
+var confirmCallback = null;
+var MEMORIA_LIBROS = null;
+var MEMORIA_USUARIOS = null;
+
+function LS_get(k, def){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
+function LS_set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+function getLibros(){
+  if(Array.isArray(MEMORIA_LIBROS) && MEMORIA_LIBROS.length > 0) return MEMORIA_LIBROS;
+  var cached = LS_get("digi-admin-libros", []);
+  if(Array.isArray(cached) && cached.length > 0){
+    var tieneCorrupcion = cached.some(function(l){
+      return l && l.mat && (l.mat.includes("íAíAí") || l.mat.includes("îíaíl") || l.mat.includes("írí.í"));
+    });
+    if(tieneCorrupcion){
+      try { localStorage.removeItem("digi-admin-libros"); } catch(e){}
+      return [];
+    }
+  }
+  return cached;
+}
+function setLibros(v){
+  if(Array.isArray(v)) MEMORIA_LIBROS = v;
+  LS_set("digi-admin-libros", v);
+}
+
+function getUsuarios(){
+  if(Array.isArray(MEMORIA_USUARIOS) && MEMORIA_USUARIOS.length > 0) return MEMORIA_USUARIOS;
+  var cached = LS_get("digi-admin-usuarios", []);
+  return Array.isArray(cached) ? cached : [];
+}
+function setUsuarios(v){
+  if(Array.isArray(v)){
+    MEMORIA_USUARIOS = v;
+    LS_set("digi-admin-usuarios", v);
+  }
+}
+
+function getRanking(){ return LS_get("digi-admin-ranking", [1,2,3,4,5,6,7,8,9,10,11,12]); }
+function setRanking(v){ LS_set("digi-admin-ranking", v); }
+
+function getStats(){ return LS_get("digi-stats", {
+  visitas: 0, librosAbiertos: {}, sesionesHoy: 0,
+  ingresosPorDia: [0,0,0,0,0,0,0],
+  ingresosPorAnio: {"1":0,"2":0,"3":0,"4":0,"5":0,"6":0},
+  ultimosIngresos: []
+}); }
+function setStats(v){ LS_set("digi-stats", v); }
+
+// Sincronización asíncrona y paralela con CockroachDB
+async function sincronizarConBackend(){
+  try {
+    if (window.API) {
+      const [libs, usrs, rk, st] = await Promise.all([
+        window.API.libros ? API.libros.getAll().catch(function(e){ console.warn("libros sync:", e); return null; }) : Promise.resolve(null),
+        window.API.usuarios ? API.usuarios.getAll().catch(function(e){ console.warn("usuarios sync:", e); return null; }) : Promise.resolve(null),
+        window.API.ranking ? API.ranking.get().catch(function(e){ console.warn("ranking sync:", e); return null; }) : Promise.resolve(null),
+        window.API.stats ? API.stats.get().catch(function(e){ console.warn("stats sync:", e); return null; }) : Promise.resolve(null)
+      ]);
+
+      if (Array.isArray(libs) && libs.length > 0) {
+        MEMORIA_LIBROS = libs;
+        setLibros(libs);
+        renderTablaLibros(libs);
+      }
+      if (Array.isArray(usrs) && usrs.length > 0) {
+        MEMORIA_USUARIOS = usrs;
+        setUsuarios(usrs);
+        renderTablaUsuarios();
+      }
+      if (rk && Array.isArray(rk.ids)) {
+        setRanking(rk.ids);
+      }
+      if (st && st.resumen) {
+        var currentStats = getStats();
+        if (typeof st.resumen.visitas === "number") currentStats.visitas = st.resumen.visitas;
+        if (typeof st.resumen.librosAbiertos === "number") currentStats.totalAbiertos = st.resumen.librosAbiertos;
+        if (Array.isArray(st.topLibros) && st.topLibros.length > 0) {
+          currentStats.librosAbiertos = currentStats.librosAbiertos || {};
+          st.topLibros.forEach(function(item){
+            currentStats.librosAbiertos[item.id] = parseInt(item.veces, 10);
+          });
+        }
+        if (Array.isArray(st.ingresosPorDia)) currentStats.ingresosPorDia = st.ingresosPorDia;
+        if (st.ingresosPorAnio) currentStats.ingresosPorAnio = st.ingresosPorAnio;
+        if (Array.isArray(st.ultimosIngresos)) currentStats.ultimosIngresos = st.ultimosIngresos;
+        setStats(currentStats);
+      }
+
+      actualizarStats();
+      if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
+    }
+  } catch (e) {
+    console.warn("Sincronización con backend falló:", e.message);
+  }
+}
+
+// ════════════════════════════════════════════════
+// ESCUCHADORES DE SINCRONIZACIÓN EN TIEMPO REAL (PUSHER / MULTI-DISPOSITIVO)
+// ════════════════════════════════════════════════
+window.addEventListener('digi:usuarios-updated', async function(e){
+  console.log("[Admin] Cambio detectado en usuarios desde otro dispositivo:", e.detail);
+  try {
+    if(window.API && window.API.usuarios){
+      var usrs = await API.usuarios.getAll({ noCache: true });
+      if(Array.isArray(usrs) && usrs.length > 0){
+        MEMORIA_USUARIOS = usrs;
+        setUsuarios(usrs);
+        if(typeof renderTablaUsuarios === "function") renderTablaUsuarios();
+        if(typeof renderCardsUsuariosMobile === "function") renderCardsUsuariosMobile();
+        if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
+      }
+    }
+  } catch(err){
+    console.warn("Error refrescando usuarios tras evento sync:", err);
+  }
+});
+
+window.addEventListener('digi:libros-updated', async function(e){
+  console.log("[Admin] Cambio detectado en libros desde otro dispositivo:", e.detail);
+  try {
+    if(window.API && window.API.libros){
+      var libs = await API.libros.getAll({ noCache: true });
+      if(Array.isArray(libs) && libs.length > 0){
+        MEMORIA_LIBROS = libs;
+        setLibros(libs);
+        if(typeof renderTablaLibros === "function") renderTablaLibros(libs);
+        if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
+      }
+    }
+  } catch(err){
+    console.warn("Error refrescando libros tras evento sync:", err);
+  }
+});
+
+// ════════════════════════════════════════════════
+// SINCRONIZACIÓN UNIFICADA DE MÓDULOS CON ANIMACIÓN 360°
+// ════════════════════════════════════════════════
+async function sincronizarTodo(seccion){
+  var btnMap = {
+    resumen: document.getElementById("btnSyncResumen"),
+    libros: document.getElementById("btnSyncLibros"),
+    ranking: document.getElementById("btnSyncRanking"),
+    usuarios: document.getElementById("btnSyncUsuarios")
+  };
+  var btn = btnMap[seccion] || null;
+  if(btn) btn.classList.add("is-syncing");
+
+  try {
+    if(seccion === "resumen"){
+      actualizarStats();
+      if(typeof sincronizarConBackend === "function") await sincronizarConBackend();
+      toast("Métricas actualizadas", "ok");
+    } else if(seccion === "libros"){
+      toast("Sincronizando catálogo con base de datos...", "ok");
+      if(!window.API || !window.API.libros){
+        toast("Cliente API no disponible", "err");
+        return;
+      }
+      const libs = await API.libros.getAll();
+      if(Array.isArray(libs) && libs.length > 0){
+        MEMORIA_LIBROS = libs;
+        setLibros(libs);
+        renderTablaLibros(libs);
+        actualizarStats();
+        toast("Catálogo sincronizado: " + libs.length + " libros", "ok");
+      } else {
+        toast("No se encontraron libros en la base de datos", "err");
+      }
+    } else if(seccion === "ranking"){
+      toast("Actualizando métricas de ranking...", "ok");
+      await cargarRankingAutomatico();
+      toast("Ranking actualizado", "ok");
+    } else if(seccion === "usuarios"){
+      toast("Sincronizando usuarios con base de datos...", "ok");
+      if(!window.API || !window.API.usuarios){
+        toast("Cliente API no disponible", "err");
+        return;
+      }
+      const usrs = await API.usuarios.getAll();
+      if(Array.isArray(usrs) && usrs.length > 0){
+        MEMORIA_USUARIOS = usrs;
+        setUsuarios(usrs);
+        renderTablaUsuarios();
+        actualizarStats();
+        toast("Directorio sincronizado: " + usrs.length + " usuarios", "ok");
+      }
+    }
+  } catch(e) {
+    toast("Error de sincronización: " + (e.message || "Fallo de conexión"), "err");
+  } finally {
+    setTimeout(function(){
+      if(btn) btn.classList.remove("is-syncing");
+    }, 750);
+  }
+}
+
+// Aliases para retrocompatibilidad
+function forzarSincronizacionLibros(){ return sincronizarTodo("libros"); }
+window.sincronizarTodo = sincronizarTodo;
+window.forzarSincronizacionLibros = forzarSincronizacionLibros;
+window.refreshStats = refreshStats;
+
+// ════════════════════════════════════════════════
+// SWITCH PÍLDORA DE TEMA (CLARO / OSCURO - MÓVIL Y PC)
+// ════════════════════════════════════════════════
+function toggleThemePill(){
+  var root = document.documentElement;
+  var isDark = root.classList.contains("dark");
+  var newDark = !isDark;
+  if(newDark){
+    root.classList.add("dark");
+    try { localStorage.setItem("digi", "dark"); } catch(e){}
+  } else {
+    root.classList.remove("dark");
+    try { localStorage.setItem("digi", "light"); } catch(e){}
+  }
+  actualizarPillThemeUI();
+  
+  // Sincronizar también con el botón Morphicons de PC si existe
+  var btn = document.getElementById("themeBtn");
+  if(btn){
+    var path = btn.querySelector(".theme-morph-path");
+    var SUN_PATH = 'M 12 8 a 4 4 0 1 0 0.001 0 Z M 12 2 v 2 M 12 20 v 2 M 4.93 4.93 l 1.41 1.41 M 17.66 17.66 l 1.41 1.41 M 2 12 h 2 M 20 12 h 2 M 6.34 17.66 l -1.41 1.41 M 19.07 4.93 l -1.41 1.41';
+    var MOON_PATH = 'M 12 3 a 6 6 0 0 0 9 9 9 9 0 1 1 -9 -9 Z';
+    if(path) path.setAttribute("d", newDark ? SUN_PATH : MOON_PATH);
+  }
+  window.dispatchEvent(new Event("themechange"));
+}
+
+function actualizarPillThemeUI(){
+  var pill = document.getElementById("themeSwitchPill");
+  if(!pill) return;
+  var isDark = document.documentElement.classList.contains("dark");
+  if(isDark){
+    pill.classList.add("dark-mode");
+    pill.setAttribute("title", "Cambiar a modo claro");
+  } else {
+    pill.classList.remove("dark-mode");
+    pill.setAttribute("title", "Cambiar a modo oscuro");
+  }
+}
+
+actualizarPillThemeUI();
+window.addEventListener("themechange", actualizarPillThemeUI);
+
+// ════════════════════════════════════════════════
+// Tema manejado por Morphicons (js/icons.js) para PC
+if(typeof setupThemeToggle==="function") setupThemeToggle();
+
+// ════════════════════════════════════════════════
+// LOGIN
+// ════════════════════════════════════════════════
+function norm(s){ return (s||"").trim().toLowerCase(); }
+
+
+// ── MOSTRAR / OCULTAR CONTRASEÑA EN LOGIN ADMIN ──
+var ptAdmin = document.getElementById("pwdToggleAdmin");
+if (ptAdmin) {
+  ptAdmin.onclick = function() {
+    var inp = document.getElementById("loginPwd");
+    var isPwd = inp.type === "password";
+    inp.type = isPwd ? "text" : "password";
+    if (window.DigiIcons) {
+      ptAdmin.innerHTML = isPwd ? DigiIcons.get("eye-off", {size:18}) : DigiIcons.get("eye", {size:18});
+    }
+  };
+}
+
+// ── AUTO-RESTAURAR SESIÓN DE ADMINISTRADOR ACTIVA ──
+(function(){
+  try {
+    var ses = JSON.parse(localStorage.getItem("digi-sesion") || "null");
+    if (ses && ses.email) {
+      var rol = (ses.rol || "").toLowerCase();
+      var esAdmin = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
+      if (esAdmin) {
+        adminActual = ses;
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("app").style.display = "flex";
+        document.getElementById("sidebarNombre").textContent = ses.nombre || "Admin";
+        var av = document.getElementById("sidebarAvatar"); if(av) av.textContent = (ses.nombre||"A").trim().charAt(0).toUpperCase();
+        document.getElementById("sidebarEmail").textContent = ses.email || "";
+        aplicarRestriccionesPorRol(ses.rol || "admin");
+        initPanel();
+      }
+    }
+  } catch(e) {}
+})();
+
+document.getElementById("btnLoginAdmin").onclick = intentarLogin;
+document.getElementById("loginPwd").onkeydown = function(e){ if(e.key==="Enter") intentarLogin(); };
+
+async function intentarLogin(){
+  var email = document.getElementById("loginEmail").value.trim();
+  var pwd   = document.getElementById("loginPwd").value;
+  var err   = document.getElementById("loginErr");
+  err.style.display = "none";
+
+  var admin = null;
+
+  // 1. Validar a través de la API y CockroachDB
+  if (window.API && window.API.auth) {
+    try {
+      var res = await API.auth.login(email, pwd);
+      if (res && res.user) {
+        var u = res.user;
+        var r = (u.rol || "").toLowerCase();
+        if (r === "admin" || r === "preceptor" || r === "profesor") {
+          admin = u;
+        }
+      }
+    } catch(e) {
+      console.warn("API admin login:", e.message);
+    }
+  }
+
+  // 2. Fallback con usuarios registrados locales
+  if (!admin) {
+    var usuarios = LS_get("digi-admin-usuarios", []);
+    for(var j=0;j<usuarios.length;j++){
+      var u = usuarios[j];
+      if(norm(u.email)===norm(email) && (u.pwd===pwd || u.password===pwd) &&
+         (u.rol==="admin"||u.rol==="preceptor"||u.rol==="profesor") &&
+         u.estado!=="restringido"){
+        admin = {email:u.email, nombre:u.nombre+" "+u.apellido, pwd:u.pwd,
+                 rol:u.rol, cursosACargo:u.cursosACargo||[]};
+        break;
+      }
+    }
+  }
+
+  if(!admin){
+    err.style.display = "block"; return;
+  }
+
+  adminActual = admin;
+  try{ localStorage.setItem("digi-sesion", JSON.stringify({email:admin.email, nombre:admin.nombre, rol:admin.rol||"admin", anio:admin.anio||"", div:admin.div||"", cursosACargo:admin.cursosACargo||[]})); }catch(e){}
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("sidebarNombre").textContent = admin.nombre;
+  document.getElementById("sidebarEmail").textContent  = admin.email;
+  var av = document.getElementById("sidebarAvatar"); if(av) av.textContent = (admin.nombre||"A").trim().charAt(0).toUpperCase();
+  aplicarRestriccionesPorRol(admin.rol||"admin");
+  initPanel();
+}
+
+function cerrarSesion(){
+  adminActual = null;
+  try{ localStorage.removeItem("digi-sesion"); }catch(e){}
+  document.getElementById("app").style.display = "none";
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("loginPwd").value = "";
+}
+
+// ════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════
+function initPanel(){
+  // 1. Render instantáneo (0 ms) con datos en almacenamiento local / caché
+  actualizarStats();
+  renderTablaLibros();
+  renderTablaUsuarios();
+  cargarRankingAutomatico();
+  if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
+
+  // 2. Sincronización concurrente en segundo plano con backend
+  sincronizarConBackend();
+}
+
+// ── ESTADÍSTICAS ──
+function getCleanCover(imgUrl){
+  if(!imgUrl || typeof imgUrl !== "string") return "img/test.jpg";
+  if(imgUrl.startsWith("file:") || imgUrl.includes("test.jpg")) return "img/test.jpg";
+  return imgUrl;
+}
+
+function actualizarStats(){
+  var libros   = getLibros();
+  var usuarios = getUsuarios();
+  var activos  = usuarios.filter(function(u){ return u.estado==="activo"; }).length;
+  var rest     = usuarios.filter(function(u){ return u.estado==="restringido"; }).length;
+  var stats    = getStats();
+
+  // Contar libros guardados en cuenta
+  var descargados = 0;
+  try{ var d=JSON.parse(localStorage.getItem("digi-descargas")||"[]"); descargados=d.length; }catch(e){}
+
+  var elLibros = document.getElementById("statLibros"); 
+  var elUsuarios = document.getElementById("statUsuarios"); 
+  var elActivos = document.getElementById("statActivos"); 
+  var elVisitas = document.getElementById("statVisitas"); 
+
+  // Libros abiertos (suma total)
+  var totalAbiertos = 0;
+  if(typeof stats.totalAbiertos === "number"){
+    totalAbiertos = stats.totalAbiertos;
+  } else {
+    var librosAb = stats.librosAbiertos||{};
+    for(var k in librosAb) totalAbiertos += (librosAb[k]||0);
+  }
+  var elAbiertos = document.getElementById("statLibrosAbiertos"); 
+
+  if(window.DigiMotion && typeof DigiMotion.animateNumber === "function"){
+    if(elLibros) DigiMotion.animateNumber(elLibros, libros.length, 900);
+    if(elUsuarios) DigiMotion.animateNumber(elUsuarios, usuarios.length, 900);
+    if(elActivos) DigiMotion.animateNumber(elActivos, activos, 900);
+    if(elVisitas) DigiMotion.animateNumber(elVisitas, stats.visitas||0, 900);
+    if(elAbiertos) DigiMotion.animateNumber(elAbiertos, totalAbiertos, 900);
+  } else {
+    if(elLibros) elLibros.textContent = libros.length;
+    if(elUsuarios) elUsuarios.textContent = usuarios.length;
+    if(elActivos) elActivos.textContent = activos;
+    if(elVisitas) elVisitas.textContent = stats.visitas||0;
+    if(elAbiertos) elAbiertos.textContent = totalAbiertos;
+  }
+
+  renderChartDias(stats);
+  renderChartAnios(stats);
+  renderTopLibros(stats, libros);
+  renderUltimosIngresos(stats);
+  renderChartRoles(usuarios);
+}
+
+function renderChartDias(stats){
+  var dias = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  var datos = stats.ingresosPorDia || [0,0,0,0,0,0,0];
+  var max = Math.max.apply(null, datos) || 1;
+  var hoy = new Date().getDay();
+  var wrap = document.getElementById("chartDias");
+  var lbls = document.getElementById("chartDiasLabels");
+  wrap.innerHTML = ""; lbls.innerHTML = "";
+  for(var i=0;i<7;i++){
+    (function(idx){
+      var pct = Math.round((datos[idx]/max)*100);
+      var bar = document.createElement("div");
+      bar.style.cssText = "flex:1;background:"+(idx===hoy?"var(--cel-o)":"var(--cel-c)")+";border-radius:6px 6px 0 0;height:4%;transition:height 0.6s cubic-bezier(0.16, 1, 0.3, 1);position:relative;cursor:default";
+      bar.title = dias[idx]+": "+datos[idx]+" ingresos";
+      var num = document.createElement("div");
+      num.style.cssText = "position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:.7rem;font-weight:700;color:var(--txt-m);white-space:nowrap";
+      num.textContent = datos[idx]||"";
+      bar.appendChild(num);
+      wrap.appendChild(bar);
+      
+      requestAnimationFrame(function(){
+        setTimeout(function(){
+          bar.style.height = Math.max(pct, 4) + "%";
+        }, idx * 50);
+      });
+
+      var lbl = document.createElement("div");
+      lbl.style.cssText = "flex:1;text-align:center;font-size:.7rem;color:"+(idx===hoy?"var(--cel-o)":"var(--txt-m)")+";font-weight:"+(idx===hoy?"700":"400");
+      lbl.textContent = dias[idx];
+      lbls.appendChild(lbl);
+    })(i);
+  }
+}
+
+function renderChartAnios(stats){
+  var anios = ["1","2","3","4","5","6"];
+  var datos = stats.ingresosPorAnio || {};
+  var max = 1;
+  for(var a in datos) if((datos[a]||0)>max) max=datos[a];
+  var wrap = document.getElementById("chartAnios");
+  wrap.innerHTML = "";
+  for(var i=0;i<anios.length;i++){
+    var k = anios[i];
+    var val = datos[k]||0;
+    var pct = Math.round((val/max)*100);
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:10px";
+    var lbl = document.createElement("span");
+    lbl.style.cssText = "font-size:.8rem;color:var(--txt-m);width:36px;flex-shrink:0;font-weight:600";
+    lbl.textContent = k==="Otro" ? "Otro" : k+"° Año";
+    var barWrap = document.createElement("div");
+    barWrap.style.cssText = "flex:1;background:var(--bg-alt);border-radius:6px;height:16px;overflow:hidden";
+    var bar = document.createElement("div");
+    bar.style.cssText = "height:100%;width:"+Math.max(pct,2)+"%;background:var(--am);border-radius:6px;transition:width .4s";
+    barWrap.appendChild(bar);
+    var num = document.createElement("span");
+    num.style.cssText = "font-size:.78rem;font-weight:700;color:var(--txt-m);width:24px;text-align:right;flex-shrink:0";
+    num.textContent = val;
+    row.appendChild(lbl); row.appendChild(barWrap); row.appendChild(num);
+    wrap.appendChild(row);
+  }
+}
+
+function renderTopLibros(stats, libros){
+  var librosAb = stats.librosAbiertos||{};
+  var arr = [];
+  for(var k in librosAb) arr.push({id:parseInt(k), count:librosAb[k]});
+  arr.sort(function(a,b){ return b.count-a.count; });
+  arr = arr.slice(0,5);
+  var wrap = document.getElementById("topLibros");
+  if(!wrap) return;
+  if(!arr.length){ wrap.innerHTML='<p style="color:var(--txt-m);font-size:.88rem">Sin datos aún.</p>'; return; }
+  var h = "";
+  for(var i=0;i<arr.length;i++){
+    var l = null;
+    for(var j=0;j<libros.length;j++){ if(String(libros[j].id)===String(arr[i].id)){ l=libros[j]; break; } }
+    var nombre = l ? l.t : "Libro #"+arr[i].id;
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--borde)">';
+    h += '<span style="width:22px;height:22px;border-radius:50%;background:var(--cel-o);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;flex-shrink:0">'+(i+1)+'</span>';
+    h += '<span style="flex:1;font-size:.88rem;color:var(--txt);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nombre+'</span>';
+    h += '<span style="font-size:.82rem;font-weight:700;color:var(--cel-o)">'+arr[i].count+'x</span>';
+    h += '</div>';
+  }
+  wrap.innerHTML = h;
+}
+
+function renderUltimosIngresos(stats){
+  var ingresos = (stats.ultimosIngresos||[]).slice().reverse().slice(0,5);
+  var wrap = document.getElementById("ultimosIngresos");
+  if(!ingresos.length){ wrap.innerHTML='<p style="color:var(--txt-m);font-size:.88rem">Sin ingresos registrados.</p>'; return; }
+  var h = "";
+  for(var i=0;i<ingresos.length;i++){
+    var ing = ingresos[i];
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--borde)">';
+    h += '<i data-lucide="book" style="width:14px;height:14px"></i>';
+    h += '<div style="flex:1;min-width:0"><div style="font-size:.88rem;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ing.nombre||ing.email||"Usuario")+'</div>';
+    h += '<div style="font-size:.75rem;color:var(--txt-m)">'+(ing.fecha||"")+'</div></div>';
+    h += '<span class="badge badge-'+(ing.rol==="admin"?"rojo":ing.rol==="preceptor"?"am":"cel")+'" style="font-size:.7rem">'+(ing.rol||"alumno")+'</span>';
+    h += '</div>';
+  }
+  wrap.innerHTML = h;
+}
+
+function renderChartRoles(usuarios){
+  var roles = {admin:0, preceptor:0, profesor:0, alumno:0};
+  for(var i=0;i<usuarios.length;i++){
+    var r = (usuarios[i].rol||"alumno").toLowerCase();
+    if(roles[r]!==undefined) roles[r]++; else roles.alumno++;
+  }
+  var total = usuarios.length || 1;
+  var colors = {admin:"var(--rojo)", preceptor:"var(--am2)", profesor:"var(--verde)", alumno:"var(--cel-o)"};
+  var bgColors = {admin:"rgba(192,57,43,0.12)", preceptor:"rgba(232,184,20,0.15)", profesor:"rgba(46,125,82,0.12)", alumno:"rgba(46,127,179,0.12)"};
+  var labels = {admin:"Administradores", preceptor:"Preceptores", profesor:"Profesores", alumno:"Alumnos"};
+  var iconNames = {admin:"shield", preceptor:"clipboard-check", profesor:"user-check", alumno:"graduation-cap"};
+  var wrap = document.getElementById("chartRoles");
+  if(!wrap) return;
+  wrap.innerHTML = "";
+  for(var r in roles){
+    var pct = Math.round((roles[r]/total)*100);
+    var div = document.createElement("div");
+    div.style.cssText = "display:flex;align-items:center;gap:14px;background:var(--bg-alt);border:1px solid var(--borde);border-radius:14px;padding:14px 18px;flex:1;min-width:180px";
+    var iconSvg = window.DigiIcons ? DigiIcons.get(iconNames[r]||"user", {size:20, style:"color:"+colors[r]}) : '<i data-lucide="'+(iconNames[r]||"user")+'"></i>';
+    div.innerHTML = '<div style="width:42px;height:42px;border-radius:12px;background:'+bgColors[r]+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+iconSvg+'</div>' +
+      '<div><div style="font-family:\'Source Sans 3\',sans-serif;font-size:1.5rem;font-weight:900;color:var(--txt);line-height:1.1">'+roles[r]+'</div><div style="font-size:.8rem;color:var(--txt-m);font-weight:700">'+labels[r]+'</div><div style="font-size:.72rem;color:var(--txt-m)">'+pct+'% del total</div></div>';
+    wrap.appendChild(div);
+  }
+}
+
+function resetearStats(){
+  if(!confirm("¿Resetear todas las estadísticas? Esta acción no se puede deshacer.")) return;
+  LS_set("digi-stats", {visitas:0, librosAbiertos:{}, sesionesHoy:0, ingresosPorDia:[0,0,0,0,0,0,0], ingresosPorAnio:{"1":0,"2":0,"3":0,"4":0,"5":0,"6":0}, ultimosIngresos:[]});
+  actualizarStats();
+  toast("Estadísticas reseteadas");
+}
+
+// ════════════════════════════════════════════════
+// PANEL NAV
+// ════════════════════════════════════════════════
+var PANEL_TITLES = {
+  panelResumen:"Resumen", panelLibros:"Libros",
+  panelMasBuscados:"Más Buscados", panelUsuarios:"Usuarios"
+};
+
+function cambiarPanel(el){
+  document.querySelectorAll(".nav-item").forEach(function(n){ n.classList.remove("active"); });
+  el.classList.add("active");
+  var id = el.getAttribute("data-panel");
+  document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("active"); });
+  var target = document.getElementById(id);
+  if(target) target.classList.add("active");
+  var topTitle = document.getElementById("topbarTitle");
+  if(topTitle) topTitle.textContent = PANEL_TITLES[id]||"";
+  if(id === "panelMasBuscados") cargarRankingAutomatico();
+  if(id === "panelResumen") actualizarStats();
+  if(id === "panelLibros") {
+    renderTablaLibros();
+    sincronizarConBackend();
+  }
+  if(id === "panelUsuarios") {
+    renderTablaUsuarios();
+    sincronizarConBackend();
+  }
+  // Sincronizar estado con TabBar móvil y botón flotante
+  document.querySelectorAll(".mobile-tabbar .tab-item").forEach(function(ti){
+    if(ti.getAttribute("data-panel") === id){
+      ti.classList.add("active");
+    } else {
+      ti.classList.remove("active");
+    }
+  });
+  actualizarMobileFab(id);
+
+  if(window.lucide && window.lucide.createIcons) { lucide.createIcons(); }
+  if(window.innerWidth <= 768 && document.getElementById("sidebar") && document.getElementById("sidebar").classList.contains("open")){
+    toggleSidebar();
+  }
+}
+
+function cambiarPanelMobile(id, btn){
+  var navItem = document.querySelector('.sidebar-nav .nav-item[data-panel="'+id+'"]');
+  if(navItem){
+    cambiarPanel(navItem);
+  } else {
+    document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("active"); });
+    var target = document.getElementById(id);
+    if(target) target.classList.add("active");
+    var topTitle = document.getElementById("topbarTitle");
+    if(topTitle) topTitle.textContent = PANEL_TITLES[id]||"";
+    if(id === "panelMasBuscados") cargarRankingAutomatico();
+    if(id === "panelResumen") actualizarStats();
+    if(id === "panelLibros") { renderTablaLibros(); sincronizarConBackend(); }
+    if(id === "panelUsuarios") { renderTablaUsuarios(); sincronizarConBackend(); }
+    if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+  }
+  document.querySelectorAll(".mobile-tabbar .tab-item").forEach(function(ti){ ti.classList.remove("active"); });
+  if(btn) btn.classList.add("active");
+  actualizarMobileFab(id);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function actualizarMobileFab(panelId){
+  var fab = document.getElementById("mobileFab");
+  if(!fab) return;
+  var rol = (adminActual ? (adminActual.rol||"admin") : "admin").toLowerCase();
+  if(!panelId){
+    var activePanel = document.querySelector(".panel.active");
+    panelId = activePanel ? activePanel.id : "panelResumen";
+  }
+
+  if(panelId === "panelResumen"){
+    fab.style.display = "flex";
+    fab.innerHTML = '<i data-lucide="download" style="width:18px;height:18px"></i><span>Exportar informe</span>';
+  } else if(panelId === "panelLibros"){
+    if(rol === "alumno"){
+      fab.style.display = "none";
+    } else {
+      fab.style.display = "flex";
+      fab.innerHTML = '<i data-lucide="plus" style="width:18px;height:18px"></i><span>Agregar Libro</span>';
+    }
+  } else if(panelId === "panelUsuarios"){
+    if(rol === "profesor" || rol === "alumno"){
+      fab.style.display = "none";
+    } else {
+      fab.style.display = "flex";
+      fab.innerHTML = '<i data-lucide="user-plus" style="width:18px;height:18px"></i><span>Nuevo Usuario</span>';
+    }
+  } else if(panelId === "panelMasBuscados"){
+    fab.style.display = "none";
+  } else {
+    fab.style.display = "none";
+  }
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+function handleMobileFabClick(){
+  var activePanel = document.querySelector(".panel.active");
+  var panelId = activePanel ? activePanel.id : "panelResumen";
+  if(panelId === "panelResumen"){
+    descargarReporte();
+  } else if(panelId === "panelLibros"){
+    abrirModalLibro(null);
+  } else if(panelId === "panelUsuarios"){
+    abrirModalUsuario(null);
+  } else if(panelId === "panelMasBuscados"){
+    sincronizarTodo("ranking");
+  }
+}
+
+function toggleSidebar(){
+  var sb = document.getElementById("sidebar");
+  var ov = document.getElementById("sidebarOverlay");
+  var btn = document.querySelector(".hamburger-admin");
+  if(sb) {
+    var isOpen = sb.classList.toggle("open");
+    if(ov) ov.classList.toggle("open", isOpen);
+    if(btn) btn.classList.toggle("open", isOpen);
+  }
+}
+
+// ════════════════════════════════════════════════
+// LIBROS
+// ════════════════════════════════════════════════
+function matToC(mat){
+  var map = {"Matemática":"matematica","Física":"ciencias","Química":"ciencias","Biología":"ciencias",
+    "Historia":"historia","Geografía":"ciencias","Lengua y Literatura":"lengua","Inglés":"lengua",
+    "Informática":"tecnologia","Ciencias Naturales":"ciencias"};
+  return map[mat]||"ciencias";
+}
+function matToL(mat){
+  var map = {"Matemática":"Matemática","Física":"Ciencias","Química":"Ciencias","Biología":"Ciencias",
+    "Historia":"Historia","Geografía":"Ciencias","Lengua y Literatura":"Lengua","Inglés":"Lengua",
+    "Informática":"Tecnología","Ciencias Naturales":"Ciencias"};
+  return map[mat]||"General";
+}
+
+function libroPerteneceCursos(libro, cursos){
+  // REQUIERE divisiones especificas — sin ellas el libro no se muestra a preceptor/profesor
+  if(!cursos || cursos.length === 0) return false;
+  if(!libro.divisiones || libro.divisiones.length === 0) return false;
+  for(var ci=0;ci<cursos.length;ci++){
+    for(var di=0;di<libro.divisiones.length;di++){
+      if(String(libro.divisiones[di].anio)===String(cursos[ci].anio) &&
+         String(libro.divisiones[di].div) ===String(cursos[ci].div)) return true;
+    }
+  }
+  return false;
+}
+
+var pagLibrosAdmin = 1;
+var POR_PAG_ADMIN = 12;
+
+function cambiarPaginaLibrosAdmin(p){
+  pagLibrosAdmin = p;
+  renderTablaLibros();
+  var pnl = document.getElementById("panelLibros");
+  if(pnl){
+    pnl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function renderTablaLibros(librosParam){
+  var rol   = (adminActual ? (adminActual.rol||"admin") : "admin").toLowerCase();
+  var email = (adminActual ? (adminActual.email||"") : "").toLowerCase();
+  var esSuperAdmin = rol === "admin" || rol === "administrador";
+  var cursos = adminActual ? (adminActual.cursosACargo||[]) : [];
+  var q   = norm(document.getElementById("buscarLibroAdmin") ? document.getElementById("buscarLibroAdmin").value : "");
+  var mat = (window.filtroLibros && window.filtroLibros.mat) || (document.getElementById("filtroMatAdmin") ? document.getElementById("filtroMatAdmin").value : "");
+  var tipo = (window.filtroLibros && window.filtroLibros.tipo) || "";
+  var anio = (window.filtroLibros && window.filtroLibros.anio) || "";
+  var todosLibros = (Array.isArray(librosParam) && librosParam.length > 0) ? librosParam : getLibros();
+  actualizarOpcionesMateriasAdmin(todosLibros);
+
+  // Filtrar según rol y filtros activos
+  var libros = todosLibros.filter(function(l){
+    var mq = !q || norm(l.t).indexOf(q)>=0 || norm(l.a).indexOf(q)>=0;
+    var mm = !mat || l.mat===mat;
+    var mt = !tipo || (l.tipo && norm(l.tipo) === norm(tipo));
+    var ma = !anio || (typeof libroTieneAnio === "function" ? libroTieneAnio(l, anio) : (l.anios && String(l.anios).indexOf(String(anio))>=0));
+    if(!mq || !mm || !mt || !ma) return false;
+    if(esSuperAdmin) return true;
+    if(rol === "preceptor") return libroPerteneceCursos(l, cursos);
+    if(rol === "profesor"){
+      // Libros subidos por él o compartidos por el sistema
+      var esMio = !l.subioPor || l.subioPor === "sistema" || norm(l.subioPor) === norm(email);
+      if(!esMio) return false;
+      if(!libroPerteneceCursos(l, cursos)) return false;
+      // Verificar que la materia del libro coincida con la materia del profesor en ese curso
+      if(cursos && cursos.length > 0 && l.mat){
+        var tieneMateria = false;
+        for(var mi=0;mi<cursos.length;mi++){
+          var cuMat = cursos[mi].materia||"";
+          if(!cuMat || norm(cuMat)===norm(l.mat)) tieneMateria = true;
+        }
+        if(!tieneMateria) return false;
+      }
+      return true;
+    }
+    return true;
+  });
+
+  // Botón agregar — ocultar para profesor si no cumple condición
+  var btnAgregar = document.querySelector('[onclick="abrirModalLibro(null)"]');
+  if(btnAgregar){
+    btnAgregar.style.display = (rol === "alumno") ? "none" : "";
+  }
+
+  // Paginación inteligente
+  var totalLibros = libros.length;
+  var totalPags = Math.ceil(totalLibros / POR_PAG_ADMIN);
+  if(pagLibrosAdmin > totalPags) pagLibrosAdmin = Math.max(1, totalPags);
+  if(pagLibrosAdmin < 1) pagLibrosAdmin = 1;
+  var ini = (pagLibrosAdmin - 1) * POR_PAG_ADMIN;
+  var fin = ini + POR_PAG_ADMIN;
+  var sliceLibros = libros.slice(ini, fin);
+
+  var h = "";
+  for(var i=0;i<sliceLibros.length;i++){
+    try {
+      var l = sliceLibros[i];
+      var cleanCover = (l.img && !l.img.startsWith("file:")) ? getCleanCover(l.img) : (l.img && l.img.includes("test.jpg") ? "img/test.jpg" : "");
+      var imgH = cleanCover ? '<img class="tbl-img" src="'+cleanCover+'" alt="" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=\\\'tbl-img-placeholder\\\'>📖</div>\'"/>' :
+                 '<div class="tbl-img-placeholder">'+(l.e||"📚")+'</div>';
+      var aniosArr = Array.isArray(l.anios) ? l.anios : [];
+      var aniosStr = aniosArr.length > 0 ? aniosArr.join(", ") : "Gral.";
+      var pdfH = l.pdf ? '<span class="badge badge-verde">'+DigiIcons.get("check",{size:11,style:"margin-right:3px"})+'Sí</span>' :
+                         '<span class="badge badge-gray">No</span>';
+      var puedeEditar = true;
+      var puedeEliminar = true;
+      if(!esSuperAdmin && rol === "profesor"){
+        puedeEditar   = !!(l.subioPor && norm(l.subioPor)===norm(email));
+        puedeEliminar = puedeEditar;
+      }
+      var divStr = '<span style="color:var(--txt-m);font-size:.78rem;font-style:italic">General</span>';
+      if(l.divisiones && Array.isArray(l.divisiones) && l.divisiones.length > 0){
+        divStr = l.divisiones.map(function(d){
+          if(typeof d === "string" || typeof d === "number") return String(d);
+          if(d && typeof d === "object"){
+            var an = d.anio || "";
+            var di = d.div || "";
+            if(an && di) return an + "°" + di;
+            if(an) return an + "°";
+            if(di) return di;
+          }
+          return "General";
+        }).join(", ");
+      }
+      h += '<tr>';
+      h += '<td><span style="color:var(--txt-m);font-size:.8rem">#'+l.id+'</span></td>';
+      h += '<td>'+imgH+'</td>';
+      h += '<td style="font-weight:700;max-width:200px">'+(l.t||"Sin título")+'</td>';
+      h += '<td style="color:var(--txt-m)">'+(l.a||"Autor no especificado")+'</td>';
+      h += '<td><span class="badge badge-cel">'+(l.mat||"General")+'</span></td>';
+      h += '<td style="color:var(--txt-m);font-size:.82rem">'+aniosStr+'</td>';
+      h += '<td style="font-size:.8rem;color:var(--txt-m)">'+divStr+'</td>';
+      h += '<td><span class="badge badge-gray">'+(l.tipo||"Libro")+'</span></td>';
+      h += '<td>'+pdfH+'</td>';
+      h += '<td><div style="display:flex;gap:6px">';
+      if(puedeEditar)   h += '<button class="btn btn-warning btn-sm" onclick="editarLibro(\''+l.id+'\')" title="Editar">'+DigiIcons.get("pencil",{size:13})+'</button>';
+      if(puedeEliminar) h += '<button class="btn btn-danger btn-sm" onclick="confirmarEliminarLibro(\''+l.id+'\')" title="Eliminar">'+DigiIcons.get("trash-2",{size:13})+'</button>';
+      if(!puedeEditar && !puedeEliminar) h += '<span style="font-size:.78rem;color:var(--txt-m)">Solo lectura</span>';
+      h += '</div></td>';
+      h += '</tr>';
+    } catch(rowErr) {
+      console.warn("Error renderizando fila de libro en admin:", rowErr);
+    }
+  }
+  var tbody = document.getElementById("tbodyLibros");
+  if(tbody) tbody.innerHTML = h || '<tr><td colspan="10" style="text-align:center;color:var(--txt-m);padding:32px">Sin resultados para tu rol</td></tr>';
+
+  // Renderizar Tarjetas Móviles (Mobile-First)
+  var cardsHtml = "";
+  for(var ci=0; ci<sliceLibros.length; ci++){
+    try {
+      var lb = sliceLibros[ci];
+      var aniosArrC = Array.isArray(lb.anios) ? lb.anios : [];
+      var aniosStrC = aniosArrC.length > 0 ? aniosArrC.join(", ")+"° Año" : "General";
+      var pEdit = true;
+      var pElim = true;
+      if(!esSuperAdmin && rol === "profesor"){
+        pEdit = !!(lb.subioPor && norm(lb.subioPor)===norm(email));
+        pElim = pEdit;
+      }
+      var coverSrc = getCleanCover(lb.img);
+      cardsHtml += '<div class="mobile-book-card" onclick="editarLibro(\''+lb.id+'\')">';
+      cardsHtml += '  <img class="book-card-cover" src="'+coverSrc+'" alt="Portada" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'img/test.jpg\'"/>';
+      cardsHtml += '  <div class="book-card-info">';
+      cardsHtml += '    <span class="book-card-tag">'+(lb.mat||"General")+'</span>';
+      cardsHtml += '    <h3 class="book-card-title">'+(lb.t||"Sin título")+'</h3>';
+      cardsHtml += '    <p class="book-card-author">'+(lb.a||"Autor no especificado")+'</p>';
+      cardsHtml += '    <div class="book-card-meta">';
+      cardsHtml += '      <span><i data-lucide="layers" style="width:12px;height:12px;vertical-align:-2px"></i> '+aniosStrC+'</span>';
+      cardsHtml += '      <span>• '+(lb.pdf ? '<span style="color:var(--verde);font-weight:700">PDF listo</span>' : '<span style="color:var(--txt-m)">Sin PDF</span>')+'</span>';
+      cardsHtml += '    </div>';
+      cardsHtml += '  </div>';
+      cardsHtml += '  <div class="book-card-actions" onclick="event.stopPropagation()">';
+      if(pEdit) cardsHtml += '    <button class="action-btn-circle" title="Editar" onclick="editarLibro(\''+lb.id+'\')">'+DigiIcons.get("pencil",{size:14})+'</button>';
+      if(pElim) cardsHtml += '    <button class="action-btn-circle danger" title="Eliminar" onclick="confirmarEliminarLibro(\''+lb.id+'\')">'+DigiIcons.get("trash-2",{size:14})+'</button>';
+      cardsHtml += '  </div>';
+      cardsHtml += '</div>';
+    } catch(cErr){
+      console.warn("Error renderizando card de libro móvil:", cErr);
+    }
+  }
+  var cardsWrap = document.getElementById("mobileCardsLibros");
+  if(cardsWrap){
+    cardsWrap.innerHTML = cardsHtml || '<div style="text-align:center;padding:30px;color:var(--txt-m);background:var(--bg-card);border:1px solid var(--borde);border-radius:16px"><p style="margin:0;font-weight:600">No se encontraron libros</p></div>';
+  }
+
+  // Renderizar controles de Paginación Inteligente
+  var pagBox = document.getElementById("paginacionLibrosAdmin");
+  if(pagBox){
+    if(totalPags <= 1){
+      pagBox.innerHTML = "";
+    } else {
+      var pg = "";
+      pg += '<button class="pag-btn pag-prev" onclick="cambiarPaginaLibrosAdmin(' + (pagLibrosAdmin - 1) + ')" ' + (pagLibrosAdmin === 1 ? 'disabled' : '') + ' aria-label="Página anterior">&lsaquo;</button>';
+
+      var paginas = [];
+      if (totalPags <= 7) {
+        for (var p = 1; p <= totalPags; p++) paginas.push(p);
+      } else if (pagLibrosAdmin <= 4) {
+        for (var p = 1; p <= 5; p++) paginas.push(p);
+        paginas.push("...");
+        paginas.push(totalPags);
+      } else if (pagLibrosAdmin >= totalPags - 3) {
+        paginas.push(1);
+        paginas.push("...");
+        for (var p = totalPags - 4; p <= totalPags; p++) paginas.push(p);
+      } else {
+        paginas.push(1);
+        paginas.push("...");
+        paginas.push(pagLibrosAdmin - 2);
+        paginas.push(pagLibrosAdmin - 1);
+        paginas.push(pagLibrosAdmin);
+        paginas.push(pagLibrosAdmin + 1);
+        paginas.push("...");
+        paginas.push(totalPags);
+      }
+
+      for (var pi = 0; pi < paginas.length; pi++) {
+        var num = paginas[pi];
+        if (num === "...") {
+          pg += '<span class="pag-ellipsis">…</span>';
+        } else {
+          var act = num === pagLibrosAdmin ? " activa" : "";
+          pg += '<button class="pag-btn' + act + '" onclick="cambiarPaginaLibrosAdmin(' + num + ')">' + num + '</button>';
+        }
+      }
+
+      pg += '<button class="pag-btn pag-next" onclick="cambiarPaginaLibrosAdmin(' + (pagLibrosAdmin + 1) + ')" ' + (pagLibrosAdmin === totalPags ? 'disabled' : '') + ' aria-label="Página siguiente">&rsaquo;</button>';
+      pagBox.innerHTML = pg;
+    }
+  }
+
+  // Actualizar indicador de filtros activos
+  actualizarBarraFiltrosLibros(mat, tipo, anio);
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+// ── FILTROS POPUP: LIBROS ──
+var filtroLibros = { mat: "", tipo: "", anio: "" };
+var filtroLibrosDraft = { mat: "", tipo: "", anio: "" };
+
+function actualizarBarraFiltrosLibros(mat, tipo, anio){
+  var btn = document.getElementById("btnFiltrosLibros");
+  var badge = document.getElementById("badgeFiltrosLibros");
+  var bar = document.getElementById("activeFilterBarLibros");
+  var activeCount = (mat ? 1 : 0) + (tipo ? 1 : 0) + (anio ? 1 : 0);
+
+  if(badge){
+    badge.style.display = activeCount > 0 ? "inline-flex" : "none";
+    badge.textContent = activeCount;
+  }
+  if(btn){
+    if(activeCount > 0) btn.classList.add("active");
+    else btn.classList.remove("active");
+  }
+
+  if(bar){
+    if(activeCount > 0){
+      var h = "";
+      if(mat) h += '<span class="active-filter-chip">Materia: '+mat+' <span class="chip-remove" onclick="removerFiltroLibro(\'mat\')">&times;</span></span>';
+      if(tipo) h += '<span class="active-filter-chip">Tipo: '+tipo+' <span class="chip-remove" onclick="removerFiltroLibro(\'tipo\')">&times;</span></span>';
+      if(anio) h += '<span class="active-filter-chip">'+anio+'° Año <span class="chip-remove" onclick="removerFiltroLibro(\'anio\')">&times;</span></span>';
+      h += '<button type="button" class="btn-clear-all-filters" onclick="limpiarFiltrosLibrosModal()">Limpiar todo</button>';
+      bar.innerHTML = h;
+      bar.style.display = "flex";
+    } else {
+      bar.innerHTML = "";
+      bar.style.display = "none";
+    }
+  }
+}
+
+function abrirModalFiltrosLibros(){
+  filtroLibrosDraft = { mat: filtroLibros.mat||"", tipo: filtroLibros.tipo||"", anio: filtroLibros.anio||"" };
+  renderModalPillsLibros();
+  abrirModal('modalFiltrosLibros');
+}
+
+function renderModalPillsLibros(){
+  var todos = getLibros();
+  // 1. Materias (dinámicas basadas en los libros cargados)
+  var baseMaterias = [
+    "Matemática", "Física", "Química", "Biología", 
+    "Historia", "Geografía", "Lengua y Literatura", "Literatura Infantil / Cuentos",
+    "Inglés", "Informática", "Ciencias Naturales"
+  ];
+  var counts = { "Todas": todos.length };
+  var materiasEnUso = [];
+  for(var i=0; i<todos.length; i++){
+    var m = todos[i].mat || "General";
+    counts[m] = (counts[m]||0) + 1;
+    if(materiasEnUso.indexOf(m) < 0) materiasEnUso.push(m);
+  }
+  for(var bm=0; bm<baseMaterias.length; bm++){
+    if(materiasEnUso.indexOf(baseMaterias[bm]) < 0) materiasEnUso.push(baseMaterias[bm]);
+  }
+  materiasEnUso.sort();
+  var materias = ["Todas"].concat(materiasEnUso);
+  var hMat = "";
+  for(var j=0; j<materias.length; j++){
+    var mName = materias[j];
+    var isTodas = mName === "Todas";
+    var isActive = isTodas ? (!filtroLibrosDraft.mat) : (filtroLibrosDraft.mat === mName);
+    var count = isTodas ? todos.length : (counts[mName] || 0);
+    hMat += '<button type="button" class="filter-pill-btn '+(isActive?'active':'')+'" onclick="seleccionarPillLibro(\'mat\', \''+(isTodas?'':mName)+'\')">'+mName+' <span class="pill-count">('+count+')</span></button>';
+  }
+  var wrapMat = document.getElementById("modalPillsMaterias");
+  if(wrapMat) wrapMat.innerHTML = hMat;
+
+  // 2. Tipos
+  var tipos = ["Todos", "Libro", "Manual", "Revista", "Simulador", "Artículo", "Guía"];
+  var hTipo = "";
+  for(var k=0; k<tipos.length; k++){
+    var tName = tipos[k];
+    var isTodosT = tName === "Todos";
+    var isActiveT = isTodosT ? (!filtroLibrosDraft.tipo) : (norm(filtroLibrosDraft.tipo) === norm(tName));
+    hTipo += '<button type="button" class="filter-pill-btn '+(isActiveT?'active':'')+'" onclick="seleccionarPillLibro(\'tipo\', \''+(isTodosT?'':tName)+'\')">'+tName+'</button>';
+  }
+  var wrapTipo = document.getElementById("modalPillsTipos");
+  if(wrapTipo) wrapTipo.innerHTML = hTipo;
+
+  // 3. Años
+  var anios = ["Todos", "1", "2", "3", "4", "5", "6"];
+  var hAnio = "";
+  for(var a=0; a<anios.length; a++){
+    var anVal = anios[a];
+    var isTodosA = anVal === "Todos";
+    var isActiveA = isTodosA ? (!filtroLibrosDraft.anio) : (filtroLibrosDraft.anio === anVal);
+    var labelA = isTodosA ? "Todos" : anVal + "° Año";
+    hAnio += '<button type="button" class="filter-pill-btn '+(isActiveA?'active':'')+'" onclick="seleccionarPillLibro(\'anio\', \''+(isTodosA?'':anVal)+'\')">'+labelA+'</button>';
+  }
+  var wrapAnio = document.getElementById("modalPillsAnios");
+  if(wrapAnio) wrapAnio.innerHTML = hAnio;
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+function seleccionarPillLibro(tipo, val){
+  filtroLibrosDraft[tipo] = val;
+  renderModalPillsLibros();
+}
+
+function aplicarFiltrosLibrosModal(){
+  filtroLibros.mat = filtroLibrosDraft.mat || "";
+  filtroLibros.tipo = filtroLibrosDraft.tipo || "";
+  filtroLibros.anio = filtroLibrosDraft.anio || "";
+  var selMat = document.getElementById("filtroMatAdmin");
+  if(selMat) selMat.value = filtroLibros.mat || "";
+  pagLibrosAdmin = 1;
+  cerrarModal('modalFiltrosLibros');
+  renderTablaLibros();
+}
+
+function limpiarFiltrosLibrosModal(){
+  filtroLibrosDraft = { mat: "", tipo: "", anio: "" };
+  filtroLibros = { mat: "", tipo: "", anio: "" };
+  var selMat = document.getElementById("filtroMatAdmin");
+  if(selMat) selMat.value = "";
+  pagLibrosAdmin = 1;
+  cerrarModal('modalFiltrosLibros');
+  renderTablaLibros();
+}
+
+function removerFiltroLibro(campo){
+  if(campo in filtroLibros){
+    filtroLibros[campo] = "";
+    if(campo === "mat"){
+      var selMat = document.getElementById("filtroMatAdmin");
+      if(selMat) selMat.value = "";
+    }
+    pagLibrosAdmin = 1;
+    renderTablaLibros();
+  }
+}
+
+function actualizarOpcionesMateriasAdmin(todos){
+  var selMat = document.getElementById("filtroMatAdmin");
+  var dlMat = document.getElementById("listaMaterias");
+  if(!todos || !Array.isArray(todos)) return;
+
+  var baseMats = [
+    "Matemática", "Física", "Química", "Biología", "Historia", 
+    "Geografía", "Lengua y Literatura", "Literatura Infantil / Cuentos",
+    "Educación Sexual Integral (ESI)", "Inglés", "Informática", 
+    "Ciencias Naturales", "Tecnología", "Robótica", "Arte", "Música"
+  ];
+  var matSet = {};
+  for(var b=0; b<baseMats.length; b++){ matSet[baseMats[b]] = true; }
+  for(var i=0; i<todos.length; i++){
+    if(todos[i].mat && todos[i].mat.trim()) matSet[todos[i].mat.trim()] = true;
+  }
+  var list = Object.keys(matSet).sort();
+
+  if(selMat){
+    var prevVal = selMat.value;
+    var optH = '<option value="">Todas las materias</option>';
+    for(var j=0; j<list.length; j++){
+      optH += '<option value="' + list[j] + '"' + (list[j] === prevVal ? ' selected' : '') + '>' + list[j] + '</option>';
+    }
+    selMat.innerHTML = optH;
+  }
+
+  if(dlMat){
+    var dlH = '';
+    for(var k=0; k<list.length; k++){
+      dlH += '<option>' + list[k] + '</option>';
+    }
+    dlMat.innerHTML = dlH;
+  }
+}
+
+function sincronizarSelectLibroADesktop(){
+  var selMat = document.getElementById("filtroMatAdmin");
+  filtroLibros.mat = selMat ? selMat.value : "";
+  pagLibrosAdmin = 1;
+  renderTablaLibros();
+}
+
+function abrirModalLibro(id){
+  libroEditando = id !== null && id !== undefined ? String(id) : null;
+  var titulo = libroEditando === null ? "Agregar libro" : "Editar libro";
+  document.getElementById("modalLibroTitle").textContent = titulo;
+  
+  // Limpiar campos
+  ["lTitulo","lAutor","lDesc","lImg","lPdf","lAnios"].forEach(function(f){ document.getElementById(f).value=""; });
+  var lDiv=document.getElementById("libroDiv"); if(lDiv) lDiv.innerHTML="";
+  
+  // Reset estados temporales
+  window._pendingPdfFile = null;
+  window._pendingImgFile = null;
+  window._pdfDataUrl = null;
+  window._imgDataUrl = null;
+  window._autoCoverDataUrl = null;
+
+  var pdfFile = document.getElementById("lPdfFile"); if(pdfFile) pdfFile.value="";
+  var pdfLbl  = document.getElementById("pdfPreviewLabel"); if(pdfLbl){ pdfLbl.style.display="none"; pdfLbl.textContent=""; }
+  var pdfDZ = document.getElementById("pdfDropZone");
+  if(pdfDZ){ pdfDZ.style.borderColor="var(--borde)"; pdfDZ.style.background="var(--bg-alt)"; }
+
+  var imgFile = document.getElementById("lImgFile"); if(imgFile) imgFile.value="";
+  var coverWrap = document.getElementById("coverPreviewWrap"); if(coverWrap) coverWrap.style.display="none";
+  var imgDZ = document.getElementById("imgDropZone"); if(imgDZ) imgDZ.style.display="flex";
+
+  document.getElementById("lMat").value = "";
+  document.getElementById("lTipo").value = "Libro";
+
+  if(id !== null){
+    var libros = getLibros();
+    var l = null;
+    for(var i=0;i<libros.length;i++){ if(String(libros[i].id)===String(id)){ l=libros[i]; break; } }
+    if(l){
+      document.getElementById("lTitulo").value = l.t;
+      document.getElementById("lAutor").value  = l.a;
+      document.getElementById("lDesc").value   = l.x;
+      document.getElementById("lImg").value    = l.img||"";
+
+      if(l.img && l.img.trim() !== "" && !l.img.startsWith("img/portada_auto_")){
+        mostrarCoverPreview(l.img, "Portada asignada", l.img.substring(0, 45));
+      }
+
+      var pdfVal = (l.pdf && !l.pdf.startsWith("data:")) ? l.pdf : (l.pdf ? "(PDF cargado)" : "");
+      document.getElementById("lPdf").value = l.pdf||"";
+      window._pdfDataUrl = l.pdf&&l.pdf.startsWith("data:") ? l.pdf : null;
+      var pdfLbl = document.getElementById("pdfPreviewLabel");
+      var pdfDZ  = document.getElementById("pdfDropZone");
+      if(l.pdf && l.pdf !== ""){
+        if(pdfLbl){
+          pdfLbl.style.display="block";
+          var icCheck = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("check", {size:14, style:"margin-right:4px"}) : "";
+          var icGlobe = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("globe", {size:14, style:"margin-right:4px"}) : "";
+          pdfLbl.innerHTML = l.pdf.startsWith("data:") ? (icCheck + " PDF cargado (archivo)") : (icGlobe + " " + l.pdf.substring(0,60)+(l.pdf.length>60?"...":""));
+        }
+        if(pdfDZ){ pdfDZ.style.borderColor="var(--verde)"; pdfDZ.style.background="var(--verde-c)"; }
+        
+        // Si no tiene imagen previa o tenía una ruta local rota, auto-generar la portada desde la página 1 del PDF
+        if(!l.img || l.img.trim() === "" || l.img.startsWith("img/portada_auto_")){
+          autoGenerarPortadaDesdePdf(l.pdf);
+        }
+      }
+      document.getElementById("lMat").value    = l.mat||"";
+      document.getElementById("lTipo").value   = l.tipo||"Libro";
+      document.getElementById("lAnios").value  = l.anios ? l.anios.join(",") : "";
+      setLibroDivs(l.divisiones||[]);
+    }
+  }
+  abrirModal("modalLibro");
+}
+
+function editarLibro(id){ abrirModalLibro(id); }
+
+async function guardarLibro(){
+  var t    = document.getElementById("lTitulo").value.trim();
+  var a    = document.getElementById("lAutor").value.trim();
+  var mat  = document.getElementById("lMat").value;
+  var tipo = document.getElementById("lTipo").value.trim() || "Libro";
+  var desc = document.getElementById("lDesc").value.trim();
+  var img  = document.getElementById("lImg").value.trim();
+  var pdfRaw = document.getElementById("lPdf").value.trim();
+  var pdf = pdfRaw;
+
+  // 1. Procesamiento de imagen de portada persistente (Optimizada a Data URL para la nube)
+  if (window._pendingImgFile) {
+    try {
+      var optImg = await optimizarImagenPortada(window._pendingImgFile, 400, 560, 0.82);
+      if (optImg) {
+        img = optImg;
+        window._imgDataUrl = optImg;
+      }
+      // Subida de respaldo a disco en segundo plano si el backend está activo
+      if (window.API && window.API.upload) {
+        API.upload.portada(window._pendingImgFile).catch(function(){});
+      }
+      window._pendingImgFile = null;
+    } catch(iErr) {
+      if (window._imgDataUrl) img = window._imgDataUrl;
+    }
+  } else if (window._imgDataUrl && (!img || img === "" || img.startsWith("img/portada_auto_"))) {
+    img = window._imgDataUrl;
+  }
+
+  // 2. Procesamiento de archivo PDF
+  if (window._pendingPdfFile && window.API && window.API.upload) {
+    try {
+      toast("Subiendo archivo PDF al servidor...", "info");
+      var uploadRes = await API.upload.pdf(window._pendingPdfFile);
+      if (uploadRes && uploadRes.url) {
+        pdf = uploadRes.url;
+        window._pendingPdfFile = null;
+      }
+    } catch(uErr) {
+      console.warn("Subida a disco falló, usando respaldo:", uErr.message);
+      if (window._pdfDataUrl) pdf = window._pdfDataUrl;
+    }
+  } else if (pdfRaw.startsWith("archivo:") && window._pdfDataUrl) {
+    pdf = window._pdfDataUrl;
+  }
+
+  // 3. Si NO se especificó portada (o la ruta actual es una ruta local rota) pero hay PDF, tomar la página 1 del PDF
+  if ((!img || img === "" || img.startsWith("img/portada_auto_")) && (pdf || window._pdfDataUrl || window._autoCoverDataUrl)) {
+    try {
+      var autoCoverDataUrl = window._autoCoverDataUrl || await extraerPortadaDePdf(pdf || window._pdfDataUrl);
+      if (autoCoverDataUrl) {
+        img = autoCoverDataUrl;
+      }
+    } catch(covErr) {
+      console.warn("Extracción de portada automática falló:", covErr.message);
+    }
+  }
+
+  var aniosRaw = document.getElementById("lAnios").value.trim();
+
+  if(!t||!a||!mat){ toast("Completá título, autor y materia","err"); return; }
+
+  var anios = aniosRaw ? aniosRaw.split(",").map(function(x){ return parseInt(x.trim()); }).filter(function(n){ return !isNaN(n); }) : [];
+  var divisiones = getLibroDivs();
+  var libros = getLibros();
+  var EMOJIS = {
+    "Matemática":"matematica","Física":"fisica","Educación Física":"edufisica","Biofísica":"biofisica","Química":"quimica","Biología":"biologia","Historia":"historia",
+    "Geografía":"geografia","Lengua y Literatura":"lengua","Inglés":"ingles","Informática":"informatica","Ciencias Naturales":"ciencias",
+    "Educación Sexual Integral (ESI)":"esi","Literatura Infantil / Cuentos":"libro","Literatura":"literatura"
+  };
+  var e = EMOJIS[mat] || "libro";
+
+  if(libroEditando === null){
+    var numericIds = libros.map(function(l){ return parseInt(l.id, 10); }).filter(function(n){ return !isNaN(n) && n < 1000000; });
+    var newId = numericIds.length > 0 ? Math.max.apply(null, numericIds) + 1 : 1;
+    var uploader = adminActual ? adminActual.email : "";
+    var libroObj = {
+      id: newId, img: img, e: e, t: t, a: a,
+      c: matToC(mat), l: matToL(mat), tipo: tipo,
+      anios: anios, divisiones: divisiones, pdf: pdf, mat: mat,
+      x: desc, subioPor: uploader
+    };
+
+    // Actualización inmediata en UI
+    libros.push(libroObj);
+    setLibros(libros);
+    cerrarModal("modalLibro");
+    renderTablaLibros();
+    actualizarStats();
+    toast("Libro agregado exitosamente","ok");
+
+    // Guardado asíncrono en CockroachDB
+    if(window.API && window.API.libros){
+      try {
+        var dbRes = await API.libros.create(libroObj);
+        if(dbRes && dbRes.id){
+          libroObj.id = dbRes.id;
+          setLibros(libros);
+          renderTablaLibros();
+        }
+      } catch(err) {
+        console.warn("Fallo guardado en BD:", err.message);
+      }
+    }
+  } else {
+    var libroMod = null;
+    for(var i=0;i<libros.length;i++){
+      if(String(libros[i].id)===String(libroEditando)){
+        libros[i].t=t; libros[i].a=a; libros[i].mat=mat; libros[i].tipo=tipo;
+        libros[i].x=desc; libros[i].img=img; libros[i].pdf=pdf; libros[i].anios=anios;
+        libros[i].divisiones=divisiones;
+        libros[i].c=matToC(mat); libros[i].l=matToL(mat); libros[i].e=e;
+        libroMod = libros[i];
+        break;
+      }
+    }
+
+    // Actualización inmediata en UI
+    setLibros(libros);
+    cerrarModal("modalLibro");
+    renderTablaLibros();
+    actualizarStats();
+    toast("Libro actualizado exitosamente","ok");
+
+    // Guardado asíncrono en CockroachDB
+    if(window.API && window.API.libros && libroMod){
+      try {
+        await API.libros.update(libroEditando, libroMod);
+      } catch(err) {
+        console.warn("Fallo actualización en BD:", err.message);
+      }
+    }
+  }
+}
+
+function confirmarEliminarLibro(id){
+  var libros = getLibros();
+  var l = null;
+  for(var i=0;i<libros.length;i++){
+    if(String(libros[i].id)===String(id)){ l=libros[i]; break; }
+  }
+  var titulo = l ? ('\"' + l.t + '\"') : "este libro";
+
+  abrirConfirm(DigiIcons.get("trash-2",{size:36,color:"var(--rojo)"}),"Eliminar libro","¿Estás seguro de que deseas eliminar permanentemente "+titulo+"? Se borrará de la base de datos de DigiTeca.", async function(){
+    // 1. Actualización inmediata (Instant / Optimistic UI) sin parpadeo
+    var librosActualizados = getLibros().filter(function(x){ return String(x.id) !== String(id); });
+    setLibros(librosActualizados);
+
+    var rankingActualizado = getRanking().filter(function(x){ return String(x) !== String(id); });
+    setRanking(rankingActualizado);
+
+    renderTablaLibros();
+    renderRanking();
+    actualizarStats();
+    toast("Libro eliminado de la base de datos","ok");
+
+    // 2. Ejecutar eliminación en CockroachDB en segundo plano
+    if(window.API && window.API.libros){
+      try {
+        await API.libros.delete(id);
+      } catch(e){
+        console.warn("Error eliminando en BD:", e.message);
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════════
+// TOP 5 MÁS BUSCADOS (AUTOMÁTICO POR LECTURAS)
+// ════════════════════════════════════════════════
+var RANKING_TOP5_DATA = [];
+
+async function cargarRankingAutomatico(){
+  var rkEl = document.getElementById("rankingActual");
+  if(rkEl) rkEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--txt-m)"><div class="spin" style="display:inline-block;margin-bottom:8px">' + DigiIcons.get("loader-2",{size:24}) + '</div><p>Cargando ranking de lecturas...</p></div>';
+
+  try {
+    if(window.API && window.API.ranking){
+      const res = await API.ranking.get();
+      if(res && Array.isArray(res.ranking)){
+        RANKING_TOP5_DATA = res.ranking;
+      }
+    }
+  } catch(err){
+    console.warn("Error cargando ranking:", err);
+  }
+
+  renderRanking();
+}
+
+function renderRanking(){
+  var rkEl = document.getElementById("rankingActual");
+  if(!rkEl) return;
+
+  var stats = getStats();
+  var librosAb = stats.librosAbiertos || {};
+  var libros = getLibros();
+
+  var lista = [];
+
+  for(var li=0; li<libros.length; li++){
+    var l = libros[li];
+    var vecesApi = 0;
+    if(RANKING_TOP5_DATA && RANKING_TOP5_DATA.length){
+      var rkItem = RANKING_TOP5_DATA.find(function(x){ return String(x.libro_id) === String(l.id); });
+      if(rkItem && rkItem.veces_abierto) vecesApi = parseInt(rkItem.veces_abierto, 10) || 0;
+    }
+    var vecesLocal = parseInt(librosAb[l.id] || librosAb[String(l.id)] || 0, 10);
+    var totalVeces = Math.max(vecesApi, vecesLocal);
+
+    lista.push({
+      libro_id: l.id,
+      titulo: l.t,
+      autor: l.a,
+      materia: l.mat || l.l || "General",
+      portada_url: getCleanCover(l.img),
+      veces_abierto: totalVeces
+    });
+  }
+
+  lista.sort(function(a, b){
+    if(b.veces_abierto !== a.veces_abierto) return b.veces_abierto - a.veces_abierto;
+    return a.libro_id - b.libro_id;
+  });
+
+  var ranking = lista.slice(0, 8);
+
+  if(ranking.length === 0){
+    rkEl.innerHTML = '<div class="empty-state">' +
+      '<div class="empty-icon"><i data-lucide="book-open" style="width:48px;height:48px"></i></div>' +
+      '<h3>No hay libros registrados</h3>' +
+      '<p>Cuando agregues libros y los usuarios comiencen a leerlos, el Top 8 aparecerá automáticamente aquí.</p>' +
+      '</div>';
+    return;
+  }
+
+  var h = "";
+
+  for(var i=0; i<ranking.length && i<8; i++){
+    var item = ranking[i];
+    var pos = i + 1;
+    var veces = item.veces_abierto || 0;
+    var badgeHtml = '<span class="rank-badge">' + DigiIcons.get("flame", {size:13, color:"var(--cel-o)"}) + ' <span>' + veces + '</span><span class="desktop-only" style="margin-left:3px"> lecturas</span></span>';
+
+    h += '<div class="rank-card">';
+    h += '  <div class="rank-card-main">';
+    h += '    <span class="rank-pos">#' + pos + '</span>';
+    h += '    <img src="' + item.portada_url + '" class="rank-cover" alt="" loading="lazy" decoding="async" onerror="this.src=\'img/test.jpg\'">';
+    h += '    <div class="rank-info">';
+    h += '      <p class="rank-title" title="' + (item.titulo || "") + '">' + (item.titulo || "Sin título") + '</p>';
+    h += '      <p class="rank-meta">' + (item.autor || "Autor no especificado") + ' • <span class="rank-materia">' + (item.materia || "General") + '</span></p>';
+    h += '    </div>';
+    h += '  </div>';
+    h += '  <div class="rank-card-actions">';
+    h += '    ' + badgeHtml;
+    h += '    <a href="libro.html?id=' + item.libro_id + '" target="_blank" class="action-btn-circle" title="Ver en visor"><i data-lucide="external-link" style="width:13px;height:13px"></i></a>';
+    h += '  </div>';
+    h += '</div>';
+  }
+
+  rkEl.innerHTML = h;
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+// ════════════════════════════════════════════════
+// USUARIOS
+// ════════════════════════════════════════════════
+function usuarioPerteneceACursos(usuario, cursos){
+  if(!cursos || cursos.length === 0) return false; // sin cursos = sin acceso
+  // Verificar por año y division sin importar el rol
+  for(var ci=0; ci<cursos.length; ci++){
+    if(String(cursos[ci].anio) === String(usuario.anio) &&
+       String(cursos[ci].div)  === String(usuario.div)) return true;
+  }
+  return false;
+}
+
+function renderTablaUsuarios(){
+  var rolAdmin = adminActual ? (adminActual.rol||"admin") : "admin";
+  var cursos   = adminActual ? (adminActual.cursosACargo||[]) : [];
+  var q    = norm(document.getElementById("buscarUsuAdmin").value);
+  var rolF = (window.filtroUsuarios && window.filtroUsuarios.rol !== undefined) ? window.filtroUsuarios.rol : (document.getElementById("filtroRolAdmin") ? document.getElementById("filtroRolAdmin").value : "");
+  var est  = (window.filtroUsuarios && window.filtroUsuarios.estado !== undefined) ? window.filtroUsuarios.estado : (document.getElementById("filtroEstAdmin") ? document.getElementById("filtroEstAdmin").value : "");
+  var todosUsuarios = getUsuarios();
+
+  var usuarios = [];
+  for(var ti=0; ti<todosUsuarios.length; ti++){
+    var u = todosUsuarios[ti];
+    var mq = !q   || norm(u.nombre+" "+u.apellido).indexOf(q)>=0 || norm(u.email).indexOf(q)>=0;
+    var mr = !rolF || (u.rol||"").toLowerCase() === rolF.toLowerCase();
+    var me = !est  || (u.estado||"").toLowerCase() === est.toLowerCase();
+    if(!mq || !mr || !me) continue;
+    if(rolAdmin === "preceptor" || rolAdmin === "profesor"){
+      if(!usuarioPerteneceACursos(u, cursos)) continue;
+    }
+    u._idx = ti;
+    usuarios.push(u);
+  }
+
+  var ROLE_BADGE = {admin:"badge-rojo",preceptor:"badge-am",profesor:"badge-verde",alumno:"badge-cel"};
+  var ROLE_LABEL = {admin:"Administrador",preceptor:"Preceptor",profesor:"Profesor",alumno:"Alumno"};
+  var h = "";
+  for(var i=0; i<usuarios.length; i++){
+    var u   = usuarios[i];
+    var idx = u._idx !== undefined ? u._idx : i;
+    var estBadge = u.estado==="activo" ?
+      '<span class="badge badge-verde">Activo</span>' :
+      '<span class="badge badge-rojo">Restringido</span>';
+    var anioDiv = (u.anio||u.div) ? (u.anio||"—")+"° / Div "+(u.div||"—") : "—";
+    var puedeEditar     = rolAdmin !== "profesor"; // profesor solo ve, no edita
+    var puedeRestringir = rolAdmin !== "profesor";
+    var puedeEliminar   = rolAdmin !== "profesor";
+    h += '<tr>';
+    h += '<td style="font-weight:700">'+u.nombre+' '+u.apellido+'</td>';
+    h += '<td style="color:var(--txt-m);font-size:.85rem">'+u.email+'</td>';
+    h += '<td><span class="badge '+(ROLE_BADGE[u.rol]||"badge-gray")+'">'+(ROLE_LABEL[u.rol]||u.rol)+'</span></td>';
+    h += '<td style="color:var(--txt-m);font-size:.85rem">'+anioDiv+'</td>';
+    h += '<td>'+estBadge+'</td>';
+    h += '<td><div style="display:flex;gap:6px">';
+    if(puedeEditar)     h += '<button class="btn btn-warning btn-sm" onclick="editarUsuario('+idx+')" title="Editar">'+DigiIcons.get("pencil",{size:13})+'</button>';
+    if(puedeRestringir) h += '<button class="btn '+(u.estado==="activo"?"btn-ghost":"btn-success")+' btn-sm" onclick="toggleEstadoUsuario('+idx+')">'+( u.estado==="activo"?DigiIcons.get("lock",{size:12,style:"margin-right:4px"})+"Restringir":DigiIcons.get("unlock",{size:12,style:"margin-right:4px"})+"Activar")+'</button>';
+    if(puedeEliminar)   h += '<button class="btn btn-danger btn-sm" onclick="confirmarEliminarUsuario('+idx+')" title="Eliminar">'+DigiIcons.get("trash-2",{size:13})+'</button>';
+    h += '</div></td>';
+    h += '</tr>';
+  }
+  var tbodyU = document.getElementById("tbodyUsuarios");
+  if(tbodyU) tbodyU.innerHTML = h || '<tr><td colspan="6" style="text-align:center;color:var(--txt-m);padding:32px">Sin usuarios en tus cursos</td></tr>';
+
+  // Renderizar Tarjetas Móviles (Mobile-First)
+  var uCardsHtml = "";
+  for(var ui=0; ui<usuarios.length; ui++){
+    try {
+      var usr = usuarios[ui];
+      var uIdx = usr._idx !== undefined ? usr._idx : ui;
+      var uAnioDiv = (usr.anio||usr.div) ? (usr.anio||"—")+"° ("+(usr.div||"—")+")" : "General";
+      var initials = ((usr.nombre ? usr.nombre[0] : "") + (usr.apellido ? usr.apellido[0] : "")).toUpperCase() || "U";
+      var pEditU = rolAdmin !== "profesor";
+      var pRestU = rolAdmin !== "profesor";
+      var pElimU = rolAdmin !== "profesor";
+
+      var rolNorm = (usr.rol || "alumno").toLowerCase();
+      var isAd = rolNorm === "admin" || rolNorm === "administrador";
+      var isAlu = rolNorm === "alumno";
+      var badgeClass = isAd ? "badge-rojo badge-rojo-bold" : (isAlu ? "badge-cel badge-alu" : (ROLE_BADGE[usr.rol]||"badge-gray"));
+      var badgeLabel = isAd ? "admin" : (isAlu ? "alu" : (ROLE_LABEL[usr.rol]||usr.rol));
+      var avatarClass = isAd ? "admin" : rolNorm;
+
+      uCardsHtml += '<div class="mobile-user-card" onclick="editarUsuario('+uIdx+')">';
+      uCardsHtml += '  <div class="user-card-avatar '+avatarClass+'">'+initials+'</div>';
+      uCardsHtml += '  <div class="book-card-info">';
+      uCardsHtml += '    <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">';
+      uCardsHtml += '      <h3 class="book-card-title">'+usr.nombre+' '+usr.apellido+'</h3>';
+      uCardsHtml += '      <span class="badge '+badgeClass+'">'+badgeLabel+'</span>';
+      uCardsHtml += '    </div>';
+      uCardsHtml += '    <p class="book-card-author" style="font-family:var(--font-mono);font-size:.75rem;margin:0 0 3px">'+usr.email+'</p>';
+      uCardsHtml += '    <div class="book-card-meta">';
+      uCardsHtml += '      <span><i data-lucide="layers" style="width:12px;height:12px;vertical-align:-2px"></i> '+uAnioDiv+'</span>';
+      uCardsHtml += '      <span>• '+(usr.estado==="activo" ? '<span style="color:var(--verde);font-weight:700">Activo</span>' : '<span style="color:var(--rojo);font-weight:700">Restringido</span>')+'</span>';
+      uCardsHtml += '    </div>';
+      uCardsHtml += '  </div>';
+      uCardsHtml += '  <div class="book-card-actions" onclick="event.stopPropagation()">';
+      if(pEditU) uCardsHtml += '    <button class="action-btn-circle" title="Editar" onclick="editarUsuario('+uIdx+')">'+DigiIcons.get("pencil",{size:14})+'</button>';
+      if(pRestU) uCardsHtml += '    <button class="action-btn-circle '+(usr.estado==="activo"?"":"danger")+'" title="'+(usr.estado==="activo"?"Restringir":"Activar")+'" onclick="toggleEstadoUsuario('+uIdx+')">'+(usr.estado==="activo"?DigiIcons.get("lock",{size:14}):DigiIcons.get("unlock",{size:14}))+'</button>';
+      if(pElimU) uCardsHtml += '    <button class="action-btn-circle danger" title="Eliminar" onclick="confirmarEliminarUsuario('+uIdx+')">'+DigiIcons.get("trash-2",{size:14})+'</button>';
+      uCardsHtml += '  </div>';
+      uCardsHtml += '</div>';
+    } catch(uErr){
+      console.warn("Error renderizando card de usuario móvil:", uErr);
+    }
+  }
+  var uCardsWrap = document.getElementById("mobileCardsUsuarios");
+  if(uCardsWrap){
+    uCardsWrap.innerHTML = uCardsHtml || '<div style="text-align:center;padding:30px;color:var(--txt-m);background:var(--bg-card);border:1px solid var(--borde);border-radius:16px"><p style="margin:0;font-weight:600">Sin usuarios en tus cursos</p></div>';
+  }
+
+  // Actualizar indicador de filtros activos de usuarios
+  actualizarBarraFiltrosUsuarios(rolF, est);
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+  actualizarStats();
+}
+
+// ── FILTROS POPUP: USUARIOS ──
+var filtroUsuarios = { rol: "", estado: "" };
+var filtroUsuariosDraft = { rol: "", estado: "" };
+
+function actualizarBarraFiltrosUsuarios(rolF, est){
+  var btn = document.getElementById("btnFiltrosUsuarios");
+  var badge = document.getElementById("badgeFiltrosUsuarios");
+  var bar = document.getElementById("activeFilterBarUsuarios");
+  var activeCount = (rolF ? 1 : 0) + (est ? 1 : 0);
+
+  if(badge){
+    badge.style.display = activeCount > 0 ? "inline-flex" : "none";
+    badge.textContent = activeCount;
+  }
+  if(btn){
+    if(activeCount > 0) btn.classList.add("active");
+    else btn.classList.remove("active");
+  }
+
+  if(bar){
+    if(activeCount > 0){
+      var h = "";
+      var ROLE_NAME = { admin: "admin", preceptor: "Preceptor", profesor: "Profesor", alumno: "alu" };
+      if(rolF) h += '<span class="active-filter-chip">Rol: '+(ROLE_NAME[rolF]||rolF)+' <span class="chip-remove" onclick="removerFiltroUsuario(\'rol\')">&times;</span></span>';
+      if(est) h += '<span class="active-filter-chip">Estado: '+(est==="activo"?"Activo":"Restringido")+' <span class="chip-remove" onclick="removerFiltroUsuario(\'estado\')">&times;</span></span>';
+      h += '<button type="button" class="btn-clear-all-filters" onclick="limpiarFiltrosUsuariosModal()">Limpiar todo</button>';
+      bar.innerHTML = h;
+      bar.style.display = "flex";
+    } else {
+      bar.innerHTML = "";
+      bar.style.display = "none";
+    }
+  }
+}
+
+function abrirModalFiltrosUsuarios(){
+  filtroUsuariosDraft = { rol: filtroUsuarios.rol||"", estado: filtroUsuarios.estado||"" };
+  renderModalPillsUsuarios();
+  abrirModal('modalFiltrosUsuarios');
+}
+
+function renderModalPillsUsuarios(){
+  var todos = getUsuarios();
+  var roles = [
+    { key: "", label: "Todos" },
+    { key: "admin", label: "admin", cls: "pill-admin" },
+    { key: "preceptor", label: "Preceptores" },
+    { key: "profesor", label: "Profesores" },
+    { key: "alumno", label: "alu", cls: "pill-alu" }
+  ];
+  var counts = { "": todos.length };
+  for(var i=0; i<todos.length; i++){
+    var r = (todos[i].rol || "alumno").toLowerCase();
+    counts[r] = (counts[r]||0) + 1;
+  }
+  var hRol = "";
+  for(var j=0; j<roles.length; j++){
+    var ro = roles[j];
+    var isActive = (filtroUsuariosDraft.rol === ro.key) || (!filtroUsuariosDraft.rol && !ro.key);
+    var count = counts[ro.key] || 0;
+    var extraCls = ro.cls ? " " + ro.cls : "";
+    hRol += '<button type="button" class="filter-pill-btn' + extraCls + ' '+(isActive?'active':'')+'" onclick="seleccionarPillUsuario(\'rol\', \''+ro.key+'\')">'+ro.label+' <span class="pill-count">('+count+')</span></button>';
+  }
+  var wrapRol = document.getElementById("modalPillsRoles");
+  if(wrapRol) wrapRol.innerHTML = hRol;
+
+  var estados = [
+    { key: "", label: "Todos" },
+    { key: "activo", label: "Activo" },
+    { key: "restringido", label: "Restringido" }
+  ];
+  var hEst = "";
+  for(var k=0; k<estados.length; k++){
+    var es = estados[k];
+    var isActiveE = (filtroUsuariosDraft.estado === es.key) || (!filtroUsuariosDraft.estado && !es.key);
+    hEst += '<button type="button" class="filter-pill-btn '+(isActiveE?'active':'')+'" onclick="seleccionarPillUsuario(\'estado\', \''+es.key+'\')">'+es.label+'</button>';
+  }
+  var wrapEst = document.getElementById("modalPillsEstados");
+  if(wrapEst) wrapEst.innerHTML = hEst;
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+function seleccionarPillUsuario(tipo, val){
+  filtroUsuariosDraft[tipo] = val;
+  renderModalPillsUsuarios();
+}
+
+function aplicarFiltrosUsuariosModal(){
+  filtroUsuarios.rol = filtroUsuariosDraft.rol || "";
+  filtroUsuarios.estado = filtroUsuariosDraft.estado || "";
+  var selRol = document.getElementById("filtroRolAdmin");
+  if(selRol) selRol.value = filtroUsuarios.rol || "";
+  var selEst = document.getElementById("filtroEstAdmin");
+  if(selEst) selEst.value = filtroUsuarios.estado || "";
+  cerrarModal('modalFiltrosUsuarios');
+  renderTablaUsuarios();
+}
+
+function limpiarFiltrosUsuariosModal(){
+  filtroUsuariosDraft = { rol: "", estado: "" };
+  filtroUsuarios = { rol: "", estado: "" };
+  var selRol = document.getElementById("filtroRolAdmin");
+  if(selRol) selRol.value = "";
+  var selEst = document.getElementById("filtroEstAdmin");
+  if(selEst) selEst.value = "";
+  cerrarModal('modalFiltrosUsuarios');
+  renderTablaUsuarios();
+}
+
+function removerFiltroUsuario(campo){
+  if(campo in filtroUsuarios){
+    filtroUsuarios[campo] = "";
+    var sel = document.getElementById(campo === "rol" ? "filtroRolAdmin" : "filtroEstAdmin");
+    if(sel) sel.value = "";
+    renderTablaUsuarios();
+  }
+}
+
+function sincronizarSelectUsuarioADesktop(){
+  var selRol = document.getElementById("filtroRolAdmin");
+  var selEst = document.getElementById("filtroEstAdmin");
+  filtroUsuarios.rol = selRol ? selRol.value : "";
+  filtroUsuarios.estado = selEst ? selEst.value : "";
+  renderTablaUsuarios();
+}
+
+function abrirModalUsuario(idx){
+  usuarioEditando = idx;
+  document.getElementById("modalUsuarioTitle").textContent = idx===null ? "Registrar usuario" : "Editar usuario";
+  ["uNombre","uApellido","uEmail","uPwd"].forEach(function(f){ document.getElementById(f).value=""; });
+  document.getElementById("uRol").value = "alumno";
+  document.getElementById("uEstado").value = "activo";
+  actualizarCamposRol();
+
+  if(idx !== null){
+    var usuarios = getUsuarios();
+    var u = usuarios[idx];
+    if(u){
+      document.getElementById("uNombre").value  = u.nombre;
+      document.getElementById("uApellido").value= u.apellido;
+      document.getElementById("uEmail").value   = u.email;
+      document.getElementById("uRol").value     = u.rol;
+      document.getElementById("uEstado").value  = u.estado;
+      actualizarCamposRol();
+      if(u.rol === "alumno"){
+        var ae = document.getElementById("uAnio"); if(ae) ae.value = u.anio||"";
+        var de = document.getElementById("uDiv");  if(de) de.value = u.div||"";
+      } else if((u.rol === "preceptor" || u.rol === "profesor") && u.cursosACargo){
+        setCursosPreceptor(u.cursosACargo);
+      }
+    }
+  }
+  abrirModal("modalUsuario");
+}
+
+function editarUsuario(idx){ abrirModalUsuario(idx); }
+
+async function guardarUsuario(){
+  var nombre   = document.getElementById("uNombre").value.trim();
+  var apellido = document.getElementById("uApellido").value.trim();
+  var email    = document.getElementById("uEmail").value.trim();
+  var pwd      = document.getElementById("uPwd").value;
+  var rol      = document.getElementById("uRol").value;
+  var estado   = document.getElementById("uEstado").value;
+  // Leer campos según rol
+  var anio = "", div = "", cursosACargo = [];
+  if(rol === "alumno"){
+    var anioEl = document.getElementById("uAnio");
+    var divEl  = document.getElementById("uDiv");
+    anio = anioEl ? anioEl.value : "";
+    div  = divEl  ? divEl.value  : "";
+  } else if(rol === "preceptor" || rol === "profesor"){
+    cursosACargo = getCursosPreceptor();
+  }
+
+  if(!nombre||!apellido||!email){ toast("Completá nombre, apellido y correo","err"); return; }
+
+  var usuarios = getUsuarios();
+  if(usuarioEditando === null){
+    if(!pwd){ toast("Ingresá una contraseña inicial","err"); return; }
+    var uObj = {nombre:nombre,apellido:apellido,email:email,pwd:pwd,rol:rol,anio:anio,div:div,cursosACargo:cursosACargo,estado:estado,fechaCreacion:new Date().toISOString()};
+    if(window.API && window.API.usuarios){
+      try {
+        var dbRes = await API.usuarios.create(uObj);
+        if(dbRes && dbRes.id) uObj.id = dbRes.id;
+      } catch(e){
+        console.warn("Fallo guardado usuario en BD:", e.message);
+      }
+    }
+    usuarios.push(uObj);
+    toast("Usuario registrado exitosamente","ok");
+  } else {
+    var u = usuarios[usuarioEditando];
+    u.nombre=nombre; u.apellido=apellido; u.email=email; u.rol=rol;
+    u.anio=anio; u.div=div; u.estado=estado;
+    if(pwd) u.pwd=pwd;
+    if(window.API && window.API.usuarios && u.id){
+      try {
+        await API.usuarios.update(u.id, u);
+      } catch(e){
+        console.warn("Fallo actualización usuario en BD:", e.message);
+      }
+    }
+    toast("Usuario actualizado exitosamente","ok");
+  }
+  setUsuarios(usuarios);
+  cerrarModal("modalUsuario");
+  renderTablaUsuarios();
+}
+
+async function toggleEstadoUsuario(idx){
+  var usuarios = getUsuarios();
+  var u = usuarios[idx];
+  var nuevoEstado = u.estado==="activo" ? "restringido" : "activo";
+  u.estado = nuevoEstado;
+  if(window.API && window.API.usuarios && (u.id || u.email)){
+    try {
+      var idTarget = u.id || u.email;
+      await API.usuarios.setEstado(idTarget, nuevoEstado);
+    } catch(e){
+      console.warn("Error al actualizar estado en BD:", e.message);
+      if(u.email && u.id && String(idTarget) === String(u.id)){
+        try { await API.usuarios.setEstado(u.email, nuevoEstado); } catch(e2){}
+      }
+    }
+  }
+  setUsuarios(usuarios);
+  renderTablaUsuarios();
+  actualizarStats();
+  toast("Estado actualizado a " + nuevoEstado, "ok");
+}
+
+function confirmarEliminarUsuario(idx){
+  var usuarios = getUsuarios();
+  var u = usuarios[idx];
+  if(!u) return;
+  abrirConfirm(DigiIcons.get("trash-2",{size:36,color:"var(--rojo)"}),"Eliminar usuario","¿Estás seguro de que deseas eliminar la cuenta de "+u.nombre+" "+u.apellido+"?", async function(){
+    if(window.API && window.API.usuarios && (u.id || u.email)){
+      try {
+        var idTarget = u.id || u.email;
+        await API.usuarios.delete(idTarget);
+      } catch(e){
+        console.warn("Error al eliminar usuario en BD:", e.message);
+        if(u.email && u.id && String(idTarget) === String(u.id)){
+          try { await API.usuarios.delete(u.email); } catch(e2){}
+        }
+      }
+    }
+    var usuarios2 = getUsuarios();
+    usuarios2.splice(idx,1);
+    setUsuarios(usuarios2);
+    renderTablaUsuarios();
+    actualizarStats();
+    toast("Usuario eliminado de la base de datos","ok");
+  });
+}
+
+// ════════════════════════════════════════════════
+// MODALES
+// ════════════════════════════════════════════════
+function abrirModal(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.classList.add("open");
+  el.classList.add("active");
+  document.body.style.overflow="hidden";
+  if(window.lucide && typeof lucide.createIcons === "function") lucide.createIcons();
+}
+function cerrarModal(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.classList.remove("open");
+  el.classList.remove("active");
+  document.body.style.overflow="";
+}
+document.querySelectorAll(".modal-overlay").forEach(function(m){
+  m.onclick=function(e){ if(e.target===this) cerrarModal(this.id); };
+});
+document.addEventListener("keydown",function(e){
+  if(e.key==="Escape"){
+    document.querySelectorAll(".modal-overlay.open, .modal-overlay.active, .confirm-overlay.open").forEach(function(m){
+      m.classList.remove("open");
+      m.classList.remove("active");
+    });
+    document.body.style.overflow="";
+  }
+});
+
+// ════════════════════════════════════════════════
+// CONFIRM
+// ════════════════════════════════════════════════
+function abrirConfirm(icon, title, msg, cb){
+  document.getElementById("confirmIcon").innerHTML  = icon;
+  document.getElementById("confirmTitle").textContent = title;
+  document.getElementById("confirmMsg").textContent   = msg;
+  confirmCallback = cb;
+  var el = document.getElementById("confirmOverlay");
+  if(el){
+    el.classList.add("open");
+    el.classList.add("active");
+  }
+  document.body.style.overflow="hidden";
+}
+function cerrarConfirm(){
+  var el = document.getElementById("confirmOverlay");
+  if(el){
+    el.classList.remove("open");
+    el.classList.remove("active");
+  }
+  confirmCallback = null;
+  document.body.style.overflow="";
+}
+document.getElementById("confirmBtn").onclick = function(){
+  if(confirmCallback) confirmCallback();
+  cerrarConfirm();
+};
+document.getElementById("confirmOverlay").onclick = function(e){ if(e.target===this) cerrarConfirm(); };
+
+// ════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════
+function toast(msg, tipo){
+  var t=document.getElementById("toast");
+  t.textContent=msg;
+  t.className="toast "+(tipo==="err"?"err":tipo==="ok"?"ok":"")+" show";
+  clearTimeout(t._t);
+  t._t=setTimeout(function(){ t.classList.remove("show"); }, 3000);
+}
+
+function descargarReporte(){
+  var stats    = getStats();
+  var libros   = getLibros();
+  var usuarios = getUsuarios();
+  var activos  = usuarios.filter(function(u){ return u.estado==="activo"; }).length;
+  var rest     = usuarios.filter(function(u){ return u.estado==="restringido"; }).length;
+  var ahora    = new Date();
+  var fechaStr = ahora.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"});
+  var horaStr  = ahora.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+  var dias     = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+  var ingDia   = stats.ingresosPorDia||[0,0,0,0,0,0,0];
+  var ingAnio  = stats.ingresosPorAnio||{};
+
+  // Top libros
+  var librosAb = stats.librosAbiertos||{};
+  var arrTop = [];
+  for(var k in librosAb) arrTop.push({id:parseInt(k), count:librosAb[k]});
+  arrTop.sort(function(a,b){ return b.count-a.count; });
+  var topStr = "";
+  for(var i=0;i<Math.min(arrTop.length,10);i++){
+    var l=null; for(var j=0;j<libros.length;j++){ if(libros[j].id===arrTop[i].id){l=libros[j];break;} }
+    topStr += "  "+(i+1)+". "+(l?l.t:"Libro #"+arrTop[i].id)+" - "+arrTop[i].count+" veces\n";
+  }
+
+  // Últimos ingresos
+  var ultStr = "";
+  var ult = (stats.ultimosIngresos||[]).slice().reverse().slice(0,10);
+  for(var u=0;u<ult.length;u++){
+    ultStr += "  - "+(ult[u].nombre||ult[u].email||"Usuario")+" ("+( ult[u].rol||"alumno")+") — "+ult[u].fecha+"\n";
+  }
+
+  // Roles
+  var roles = {admin:0,preceptor:0,profesor:0,alumno:0};
+  for(var ui=0;ui<usuarios.length;ui++){
+    var r=usuarios[ui].rol||"alumno";
+    if(roles[r]!==undefined) roles[r]++; else roles.alumno++;
+  }
+
+  // Total libros abiertos
+  var totalAb = 0;
+  for(var kk in librosAb) totalAb += (librosAb[kk]||0);
+
+  // Descargas guardadas
+  var descCount = 0;
+  try{ descCount = JSON.parse(localStorage.getItem("digi-descargas")||"[]").length; }catch(e){}
+
+  var reporte =
+"╔══════════════════════════════════════════════════════════════╗\n" +
+"║         REPORTE DE ESTADÍSTICAS — DigiTeca                  ║\n" +
+"║   Escuela Técnica N° 29 DE 6 — Reconquista de Buenos Aires  ║\n" +
+"╚══════════════════════════════════════════════════════════════╝\n" +
+"\nGenerado: "+fechaStr+" a las "+horaStr+"\n" +
+(periodoActual!=="todo" ? "Período:  "+document.getElementById("periodoLabel").textContent+"\n" : "") +
+"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+"  RESUMEN GENERAL\n" +
+"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+"  Libros en catálogo:       "+libros.length+"\n" +
+"  Usuarios registrados:     "+usuarios.length+"\n" +
+"    › Activos:              "+activos+"\n" +
+"    › Restringidos:         "+rest+"\n" +
+"    › Administradores:      "+roles.admin+"\n" +
+"    › Preceptores:          "+roles.preceptor+"\n" +
+"    › Alumnos:              "+roles.alumno+"\n" +
+"  Visitas totales al sitio: "+(stats.visitas||0)+"\n" +
+"  Libros abiertos (total):  "+totalAb+"\n" +
+"  Libros guardados cuenta:  "+descCount+"\n" +
+"  Ingresos hoy:             "+(stats.sesionesHoy||0)+"\n" +
+"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+"  INGRESOS POR DÍA DE LA SEMANA\n" +
+"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+  for(var d=0;d<7;d++){
+    var bar=""; var v=ingDia[d]||0; var max=Math.max.apply(null,ingDia)||1;
+    var barLen=Math.round((v/max)*20);
+    for(var b=0;b<barLen;b++) bar+="█";
+    for(var b=barLen;b<20;b++) bar+="░";
+    reporte += "  "+dias[d].padEnd(10)+" │ "+bar+" "+v+"\n";
+  }
+  reporte +=
+"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+"  ACTIVIDAD POR AÑO DE CURSADA\n" +
+"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+  var aniosKeys=["1","2","3","4","5","6"];
+  var maxA=1; for(var ak in ingAnio) if((ingAnio[ak]||0)>maxA) maxA=ingAnio[ak];
+  for(var ai=0;ai<aniosKeys.length;ai++){
+    var ak=aniosKeys[ai]; var av=ingAnio[ak]||0;
+    var aBar=""; var aLen=Math.round((av/maxA)*20);
+    for(var b=0;b<aLen;b++) aBar+="█";
+    for(var b=aLen;b<20;b++) aBar+="░";
+    var lbl=(ak==="Otro"?"Otro      ":(ak+"° Año     ")).substring(0,10);
+    reporte += "  "+lbl+" │ "+aBar+" "+av+"\n";
+  }
+  reporte +=
+"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+"  TOP 10 LIBROS MÁS ABIERTOS\n" +
+"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+(topStr||"  Sin datos aún.\n") +
+"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+"  ÚLTIMOS 10 INGRESOS\n" +
+"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+(ultStr||"  Sin ingresos registrados.\n") +
+"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+"  LISTADO DE USUARIOS\n" +
+"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+  for(var ui=0;ui<usuarios.length;ui++){
+    var u=usuarios[ui];
+    reporte += "  "+( u.nombre+" "+u.apellido).padEnd(24)+" │ "+(u.rol||"alumno").padEnd(10)+" │ "+u.email+"\n";
+  }
+  reporte +=
+"\n╔══════════════════════════════════════════════════════════════╗\n" +
+"║  Reporte generado automáticamente por DigiTeca Admin Panel  ║\n" +
+"╚══════════════════════════════════════════════════════════════╝\n";
+
+  // Descargar como .txt — usar data URI para no navegar ni cerrar sesión
+  var encoded = encodeURIComponent(reporte);
+  var a    = document.createElement("a");
+  a.href   = "data:text/plain;charset=utf-8," + encoded;
+  // Armar nombre según período seleccionado
+  var fGen = fechaStr.replace(/\//g,"-"); // fecha generacion
+  var nombreArchivo;
+  if(periodoActual === "todo"){
+    nombreArchivo = "DigiTeca_Reporte_Historico_"+fGen+".txt";
+  } else if(periodoActual === "custom"){
+    var dv = document.getElementById("fechaDesde").value.replace(/-/g,"");
+    var hv = document.getElementById("fechaHasta").value.replace(/-/g,"");
+    nombreArchivo = "DigiTeca_Reporte_" + (dv||"inicio") + "-" + (hv||"hoy") + "_gen"+fGen+".txt";
+  } else {
+    var labels = {"24h":"Ultimas24hs","semana":"UltimaSemana","mes":"UltimoMes","anio":"UltimoAnio"};
+    nombreArchivo = "DigiTeca_Reporte_" + (labels[periodoActual]||periodoActual) + "_"+fGen+".txt";
+  }
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ a.remove(); }, 500);
+  toast("Reporte descargado correctamente","ok");
+}
+
+// ── FILTRO DE PERÍODO (VENTANA EMERGENTE) ──
+var periodoActual = "todo";
+var periodoModalTemporal = "todo";
+
+function abrirModalFiltroPeriodo(){
+  periodoModalTemporal = periodoActual || "todo";
+  actualizarVisualPeriodoModal(periodoModalTemporal);
+  abrirModal("modalPeriodo");
+}
+
+function actualizarVisualPeriodoModal(p){
+  document.querySelectorAll(".periodo-option-btn").forEach(function(b){
+    if(b.getAttribute("data-periodo") === p){
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
+    }
+  });
+  var customWrap = document.getElementById("customDateWrapModal");
+  if(customWrap){
+    customWrap.style.display = (p === "custom") ? "block" : "none";
+  }
+}
+
+function seleccionarPeriodoModal(p){
+  periodoModalTemporal = p;
+  actualizarVisualPeriodoModal(p);
+}
+
+function confirmarFiltroPeriodoModal(){
+  periodoActual = periodoModalTemporal;
+  cerrarModal("modalPeriodo");
+  aplicarFiltro();
+}
+
+function resetPeriodoFiltro(){
+  periodoActual = "todo";
+  periodoModalTemporal = "todo";
+  actualizarVisualPeriodoModal("todo");
+  aplicarFiltro();
+}
+
+function setPeriodo(btn, periodo){
+  periodoActual = periodo;
+  aplicarFiltro();
+}
+
+function getPeriodoRange(){
+  var ahora = new Date();
+  var desde = null;
+  if(periodoActual === "24h"){
+    desde = new Date(ahora.getTime() - 24*60*60*1000);
+  } else if(periodoActual === "semana"){
+    desde = new Date(ahora.getTime() - 7*24*60*60*1000);
+  } else if(periodoActual === "mes"){
+    desde = new Date(ahora.getTime() - 30*24*60*60*1000);
+  } else if(periodoActual === "anio"){
+    desde = new Date(ahora.getTime() - 365*24*60*60*1000);
+  } else if(periodoActual === "custom"){
+    var dv = document.getElementById("fechaDesde") ? document.getElementById("fechaDesde").value : "";
+    var hv = document.getElementById("fechaHasta") ? document.getElementById("fechaHasta").value : "";
+    desde = dv ? new Date(dv) : null;
+    var hasta = hv ? new Date(hv+"T23:59:59") : ahora;
+    return {desde: desde, hasta: hasta};
+  }
+  return {desde: desde, hasta: ahora};
+}
+
+function onDesdeChange(){
+  var dv = document.getElementById("fechaDesde") ? document.getElementById("fechaDesde").value : "";
+  if(dv){
+    var d = new Date(dv);
+    d.setDate(d.getDate() + 1);
+    var yyyy = d.getFullYear();
+    var mm   = String(d.getMonth()+1).padStart(2,"0");
+    var dd   = String(d.getDate()).padStart(2,"0");
+    var hastaInput = document.getElementById("fechaHasta");
+    if(hastaInput) hastaInput.value = yyyy+"-"+mm+"-"+dd;
+    try{ hastaInput.showPicker(); }catch(e){}
+  }
+}
+
+function parseFechaIngreso(fechaStr){
+  // format: DD/MM/YYYY HH:MM
+  try{
+    var parts = fechaStr.split(" ");
+    var dp = parts[0].split("/");
+    var tp = parts[1] ? parts[1].split(":") : ["0","0"];
+    return new Date(parseInt(dp[2]), parseInt(dp[1])-1, parseInt(dp[0]),
+                    parseInt(tp[0]), parseInt(tp[1]));
+  }catch(e){ return null; }
+}
+
+async function aplicarFiltro(){
+  var range    = getPeriodoRange();
+  var stats    = getStats();
+  var usuarios = getUsuarios();
+  var label    = document.getElementById("periodoLabel");
+  var hasFilter = range.desde !== null;
+
+  // ── Actualizar labels e indicadores ──
+  var shortLabels = {todo:"Histórico","24h":"24 Horas",semana:"Semana",mes:"Mes",anio:"Año",custom:"Personalizado"};
+  var longLabels  = {todo:"Histórico","24h":"Últimas 24 horas",semana:"Última semana",mes:"Último mes",anio:"Último año",custom:"Personalizado"};
+  
+  if(label){
+    if(periodoActual === "custom"){
+      var dv = document.getElementById("fechaDesde") ? document.getElementById("fechaDesde").value : "";
+      var hv = document.getElementById("fechaHasta") ? document.getElementById("fechaHasta").value : "";
+      label.textContent = "Filtrado: " + (dv ? dv.split("-").reverse().join("/") : "inicio") +
+        " → " + (hv ? hv.split("-").reverse().join("/") : "hoy");
+    } else {
+      label.textContent = "Filtrado: " + (longLabels[periodoActual] || periodoActual);
+    }
+  }
+
+  var btnLbl = document.getElementById("periodoBtnLabel");
+  if(btnLbl){
+    btnLbl.textContent = (shortLabels[periodoActual] || periodoActual);
+  }
+
+  var ind = document.getElementById("periodoActiveIndicator");
+  if(ind){
+    ind.style.display = (periodoActual === "todo") ? "none" : "inline-flex";
+  }
+
+  // ── 1. Obtener datos reales filtrados del backend CockroachDB ──
+  if(window.API && window.API.stats){
+    try {
+      var dvStr = (periodoActual === "custom" && document.getElementById("fechaDesde")) ? document.getElementById("fechaDesde").value : "";
+      var hvStr = (periodoActual === "custom" && document.getElementById("fechaHasta")) ? document.getElementById("fechaHasta").value : "";
+      var stRes = await API.stats.get(periodoActual, dvStr, hvStr);
+      if(stRes && stRes.resumen){
+        var statVisEl = document.getElementById("statVisitas");
+        var statLibAbEl = document.getElementById("statLibrosAbiertos");
+        if(statVisEl && typeof stRes.resumen.visitas === "number") statVisEl.textContent = stRes.resumen.visitas;
+        if(statLibAbEl && typeof stRes.resumen.librosAbiertos === "number") statLibAbEl.textContent = stRes.resumen.librosAbiertos;
+        if(Array.isArray(stRes.ingresosPorDia)) renderChartDias(stRes);
+        if(stRes.ingresosPorAnio) renderChartAnios(stRes);
+        if(Array.isArray(stRes.ultimosIngresos)) renderUltimosIngresos(stRes);
+        if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+        return;
+      }
+    } catch(err){
+      console.warn("Fallo en telemetría backend filtrada:", err.message);
+    }
+  }
+
+  // ── Fallback local si backend offline ──
+  var allIngresos = stats.ultimosIngresos || [];
+  var ingresosFiltrados = hasFilter ? allIngresos.filter(function(ing){
+    var d = parseFechaIngreso(ing.fecha);
+    return d && d >= range.desde && d <= range.hasta;
+  }) : allIngresos;
+
+  var statsTemp = JSON.parse(JSON.stringify(stats));
+  statsTemp.ultimosIngresos = ingresosFiltrados;
+
+  if(hasFilter && ingresosFiltrados.length === 0){
+    statsTemp.ingresosPorDia  = [0,0,0,0,0,0,0];
+    statsTemp.ingresosPorAnio = {"1":0,"2":0,"3":0,"4":0,"5":0,"6":0};
+  }
+
+  renderChartDias(statsTemp);
+  renderChartAnios(statsTemp);
+  renderUltimosIngresos(statsTemp);
+  if(window.lucide && window.lucide.createIcons) lucide.createIcons();
+}
+
+function refreshStats(){
+  var btn = document.getElementById("btnRefreshStats");
+  if(btn){
+    btn.classList.remove("is-refreshing");
+    void btn.offsetWidth;
+    btn.classList.add("is-refreshing");
+    setTimeout(function(){
+      btn.classList.remove("is-refreshing");
+    }, 650);
+  }
+  actualizarStats();
+  aplicarFiltro();
+  toast("Estadísticas actualizadas","ok");
+}
+
+// ── CAMPOS DINÁMICOS POR ROL ──
+function anioSelect(id, label){
+  return '<div class="fg"><label>'+label+'</label><select id="'+id+'" style="width:100%"><option value="">—</option><option value="1">1° Año</option><option value="2">2° Año</option><option value="3">3° Año</option><option value="4">4° Año</option><option value="5">5° Año</option><option value="6">6° Año</option></select></div>';
+}
+function divSelect(id, label){
+  return '<div class="fg"><label>'+label+'</label><select id="'+id+'" style="width:100%"><option value="">—</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div>';
+}
+
+function actualizarCamposRol(){
+  var rol = document.getElementById("uRol").value;
+  var wrap = document.getElementById("camposRol");
+  if(rol === "admin"){
+    wrap.innerHTML = "";
+  } else if(rol === "preceptor" || rol === "profesor"){
+    wrap.innerHTML =
+      '<p style="font-size:.82rem;font-weight:700;color:var(--txt-m);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Cursos a cargo</p>'+
+      '<div id="cursosWrap" style="display:flex;flex-direction:column;gap:10px"></div>'+
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="agregarCurso()" style="margin-top:10px;width:100%">+ Agregar curso</button>';
+    agregarCurso();
+  } else {
+    // alumno
+    wrap.innerHTML = '<div class="form-grid">'+anioSelect("uAnio","Año de cursada")+divSelect("uDiv","División")+'</div>';
+  }
+}
+
+function agregarCurso(){
+  var wrap = document.getElementById("cursosWrap");
+  if(!wrap) return;
+  var idx = wrap.children.length;
+  var rol = document.getElementById("uRol") ? document.getElementById("uRol").value : "preceptor";
+  var row = document.createElement("div");
+  row.style.background = "var(--bg-alt)";
+  row.style.borderRadius = "10px";
+  row.style.padding = "10px 12px";
+  row.style.position = "relative";
+  row.style.display = "grid";
+  row.style.gap = "8px";
+  row.style.gridTemplateColumns = rol === "profesor" ? "1fr 1fr 2fr auto" : "1fr 1fr auto";
+  var materiaSel = rol === "profesor" ?
+    '<div class="fg"><label>Materia</label><input type="text" list="listaMaterias" placeholder="Ej: Matemática" style="border:2px solid var(--borde);border-radius:8px;padding:8px;font-family:inherit;color:var(--txt);background:var(--inp)" class="curso-mat"/></div>' : '';
+  row.innerHTML =
+    '<div class="fg"><label>Año</label>' + anioSelect("uAnio_"+idx,"").replace('<select id="uAnio_'+idx+'"','<select class="curso-anio"') + '</div>' +
+    '<div class="fg"><label>División</label>' + divSelect("uDiv_"+idx,"").replace('<select id="uDiv_'+idx+'"','<select class="curso-div"') + '</div>' +
+    materiaSel +
+    '<div style="display:flex;align-items:flex-end;padding-bottom:4px"><button type="button" class="rm-curso-btn" style="background:none;border:none;cursor:pointer;color:var(--rojo);font-size:1.1rem;font-weight:700" title="Quitar"><i data-lucide="x" style="width:14px;height:14px"></i></button></div>';
+  wrap.appendChild(row);
+}
+
+function getCursosPreceptor(){
+  var wrap = document.getElementById("cursosWrap");
+  if(!wrap) return [];
+  var cursos = [];
+  for(var i=0; i<wrap.children.length; i++){
+    var row = wrap.children[i];
+    var anioEl = row.querySelector(".curso-anio");
+    var divEl  = row.querySelector(".curso-div");
+    var matEl  = row.querySelector(".curso-mat");
+    if(anioEl && divEl && anioEl.value && divEl.value){
+      var curso = {anio: anioEl.value, div: divEl.value};
+      if(matEl && matEl.value) curso.materia = matEl.value.trim();
+      cursos.push(curso);
+    }
+  }
+  return cursos;
+}
+
+function setCursosPreceptor(cursos){
+  var wrap = document.getElementById("cursosWrap");
+  if(!wrap || !cursos || !cursos.length) return;
+  wrap.innerHTML = "";
+  for(var i=0; i<cursos.length; i++){
+    agregarCurso();
+    var row = wrap.children[wrap.children.length-1];
+    var anioEl = row.querySelector(".curso-anio");
+    var divEl  = row.querySelector(".curso-div");
+    var matEl  = row.querySelector(".curso-mat");
+    if(anioEl) anioEl.value = cursos[i].anio||"";
+    if(divEl)  divEl.value  = cursos[i].div||"";
+    if(matEl && cursos[i].materia) matEl.value = cursos[i].materia;
+  }
+}
+
+function aplicarRestriccionesPorRol(rol){
+  var normRol = (rol || "").toLowerCase();
+  var esSuperAdmin = normRol === "admin" || normRol === "administrador";
+  if(esSuperAdmin) return;
+  var esRestringido = (rol === "preceptor" || rol === "profesor");
+  // Ocultar Resumen y Más buscados en sidebar solo para preceptor/profesor
+  document.querySelectorAll(".nav-item").forEach(function(el){
+    var panel = el.getAttribute("data-panel");
+    if(esRestringido && (panel === "panelResumen" || panel === "panelMasBuscados")){
+      el.style.display = "none";
+    }
+  });
+  // Ocultar nav-section "General" si es restringido
+  if(esRestringido){
+    document.querySelectorAll(".nav-section").forEach(function(el){
+      if(el.textContent.trim() === "General") el.style.display = "none";
+    });
+    // Ir directo a libros
+    var librosItem = document.querySelector('[data-panel="panelLibros"]');
+    if(librosItem) cambiarPanel(librosItem);
+  }
+  // Profesor: ocultar botón Registrar usuario
+  if(rol === "profesor"){
+    var btnRegUser = document.querySelector('[onclick="abrirModalUsuario(null)"]');
+    if(btnRegUser) btnRegUser.style.display = "none";
+  }
+  // Filtrar libros y usuarios por cursos a cargo
+  if(esRestringido && adminActual.cursosACargo && adminActual.cursosACargo.length > 0){
+    // Store for later use in render functions
+    window._cursosACargo = adminActual.cursosACargo;
+  } else {
+    window._cursosACargo = null;
+  }
+}
+
+// Variables globales para archivos y portadas temporales
+window._pendingPdfFile = null;
+window._pendingImgFile = null;
+window._pdfDataUrl = null;
+window._imgDataUrl = null;
+window._autoCoverDataUrl = null;
+
+// Convertir Data URL a Blob de forma segura
+function dataURLtoBlob(dataurl) {
+  try {
+    var parts = dataurl.split(',');
+    var mime = parts[0].match(/:(.*?);/)[1] || 'image/jpeg';
+    var bstr = atob(parts[1]);
+    var n = bstr.length;
+    var u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch(e) {
+    return null;
+  }
+}
+
+// Optimizar y comprimir cualquier imagen a un tamaño estándar de portada de libro (~30 KB)
+function optimizarImagenPortada(fileOrDataUrl, maxW, maxH, quality) {
+  maxW = maxW || 400;
+  maxH = maxH || 560;
+  quality = quality || 0.82;
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      var ratio = Math.min(maxW / w, maxH / h, 1);
+      var targetW = Math.max(Math.round(w * ratio), 100);
+      var targetH = Math.max(Math.round(h * ratio), 140);
+
+      var canvas = document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+      var ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      var optimizedDataUrl = canvas.toDataURL("image/jpeg", quality);
+      resolve(optimizedDataUrl);
+    };
+    img.onerror = function() { resolve(null); };
+
+    if (typeof fileOrDataUrl === "string") {
+      img.src = fileOrDataUrl;
+    } else if (fileOrDataUrl instanceof File || fileOrDataUrl instanceof Blob) {
+      var reader = new FileReader();
+      reader.onload = function(e) { img.src = e.target.result; };
+      reader.onerror = function() { resolve(null); };
+      reader.readAsDataURL(fileOrDataUrl);
+    } else {
+      resolve(null);
+    }
+  });
+}
+
+// ── EXTRAER PORTADA DESDE PÁGINA 1 DEL PDF CON PDF.JS ──
+async function extraerPortadaDePdf(fileOrUrl){
+  if(!fileOrUrl) return null;
+  try {
+    if(!window.pdfjsLib) return null;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+
+    var loadingTask;
+    if(fileOrUrl instanceof File || fileOrUrl instanceof Blob){
+      var arrayBuf = await fileOrUrl.arrayBuffer();
+      loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
+    } else if(typeof fileOrUrl === "string" && fileOrUrl.startsWith("data:")){
+      var blob = dataURLtoBlob(fileOrUrl);
+      if(!blob) return null;
+      var arrayBuf = await blob.arrayBuffer();
+      loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) });
+    } else if(typeof fileOrUrl === "string"){
+      loadingTask = pdfjsLib.getDocument(fileOrUrl);
+    } else {
+      return null;
+    }
+
+    var pdfDoc = await loadingTask.promise;
+    var page = await pdfDoc.getPage(1);
+    var unscaledVp = page.getViewport({ scale: 1.0 });
+    var targetW = 400;
+    var scale = targetW / unscaledVp.width;
+    var viewport = page.getViewport({ scale: scale });
+
+    var canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } catch(e) {
+    console.warn("No se pudo extraer portada del PDF:", e.message);
+    return null;
+  }
+}
+
+// Auto-generar portada desde PDF silenciosamente
+async function autoGenerarPortadaDesdePdf(source){
+  try {
+    var coverDataUrl = await extraerPortadaDePdf(source);
+    if(coverDataUrl){
+      window._autoCoverDataUrl = coverDataUrl;
+      var curManualImg = document.getElementById("lImg").value.trim();
+      if(!window._pendingImgFile && (!curManualImg || curManualImg.startsWith("img/portada_auto_")) && !window._imgDataUrl){
+        mostrarCoverPreview(coverDataUrl, "📄 Auto: Página 1 del PDF", "Generada desde el archivo PDF");
+      }
+    }
+  } catch(e){}
+}
+
+// ── MANEJO DE IMAGEN DE PORTADA ──
+function mostrarCoverPreview(src, badgeText, filenameText){
+  var wrap = document.getElementById("coverPreviewWrap");
+  var drop = document.getElementById("imgDropZone");
+  var imgEl = document.getElementById("coverPreviewImg");
+  var badge = document.getElementById("coverPreviewBadge");
+  var fname = document.getElementById("coverPreviewFilename");
+  if(imgEl) imgEl.src = src;
+  if(badge) badge.textContent = badgeText || "Portada seleccionada";
+  if(fname) fname.textContent = filenameText || "portada.jpg";
+  if(wrap) wrap.style.display = "flex";
+  if(drop) drop.style.display = "none";
+}
+
+async function handleImgFile(input){
+  if(!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  window._pendingImgFile = file;
+  var optDataUrl = await optimizarImagenPortada(file, 400, 560, 0.82);
+  if (optDataUrl) {
+    window._imgDataUrl = optDataUrl;
+    mostrarCoverPreview(optDataUrl, "Imagen optimizada", file.name + " (" + (optDataUrl.length/1024).toFixed(0) + " KB)");
+  } else {
+    var reader = new FileReader();
+    reader.onload = function(e){
+      window._imgDataUrl = e.target.result;
+      mostrarCoverPreview(e.target.result, "Imagen seleccionada", file.name);
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function handleImgDrop(e){
+  e.preventDefault();
+  var dz = document.getElementById("imgDropZone");
+  if(dz) dz.classList.remove("drag-active");
+  var file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith("image/")){
+    document.getElementById("lImgFile").files = e.dataTransfer.files;
+    handleImgFile(document.getElementById("lImgFile"));
+  }
+}
+
+function actualizarImgPreview(){
+  var val = document.getElementById("lImg").value.trim();
+  if(val){
+    window._pendingImgFile = null;
+    window._imgDataUrl = null;
+    mostrarCoverPreview(val, "Enlace URL", val.substring(0, 45) + (val.length > 45 ? "..." : ""));
+  } else {
+    quitarPortadaSeleccionada();
+  }
+}
+
+function quitarPortadaSeleccionada(){
+  window._pendingImgFile = null;
+  window._imgDataUrl = null;
+  document.getElementById("lImg").value = "";
+  var imgInput = document.getElementById("lImgFile");
+  if(imgInput) imgInput.value = "";
+
+  if(window._autoCoverDataUrl){
+    mostrarCoverPreview(window._autoCoverDataUrl, "📄 Auto: Página 1 del PDF", "Generada desde el archivo PDF");
+  } else {
+    var wrap = document.getElementById("coverPreviewWrap");
+    var drop = document.getElementById("imgDropZone");
+    if(wrap) wrap.style.display = "none";
+    if(drop) drop.style.display = "flex";
+  }
+}
+
+// ── MANEJO PDF ──
+function handlePdfFile(input){
+  if(!input.files||!input.files[0]) return;
+  var file = input.files[0];
+  window._pendingPdfFile = file;
+  var lbl = document.getElementById("pdfPreviewLabel");
+  var dz  = document.getElementById("pdfDropZone");
+  document.getElementById("lPdf").value = "archivo:" + file.name;
+  var mb = (file.size / (1024 * 1024)).toFixed(1);
+  if(lbl){
+    lbl.style.display="block";
+    var icChk = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("check", {size:14, style:"margin-right:4px"}) : "";
+    lbl.innerHTML = icChk + ' Archivo listo para subir: ' + file.name + ' (' + mb + ' MB)';
+  }
+  if(dz){
+    dz.style.borderColor="var(--verde)"; dz.style.background="var(--verde-c)";
+    dz.innerHTML = '<div style="font-size:1.5rem"><i data-lucide="file-text" style="width:14px;height:14px"></i></div><p style="font-size:.88rem;font-weight:700;color:var(--verde)">'+file.name+' ('+mb+' MB)</p><p style="font-size:.75rem;color:var(--txt-m)">Se guardará en el disco del servidor · Hacé clic para cambiar</p>';
+  }
+  // Auto-extraer página 1 como portada si no hay portada manual
+  autoGenerarPortadaDesdePdf(file);
+}
+
+function handlePdfDrop(e){
+  e.preventDefault();
+  var dz = document.getElementById("pdfDropZone");
+  dz.style.borderColor = "var(--borde)";
+  dz.style.background  = "var(--bg-alt)";
+  var file = e.dataTransfer.files[0];
+  if(file && file.type === "application/pdf"){
+    document.getElementById("lPdfFile").files = e.dataTransfer.files;
+    handlePdfFile(document.getElementById("lPdfFile"));
+  }
+}
+
+function actualizarPdfPreview(){
+  var val = document.getElementById("lPdf").value.trim();
+  var lbl = document.getElementById("pdfPreviewLabel");
+  if(!lbl) return;
+  if(val && !val.startsWith("archivo:")){
+    lbl.style.display = "block";
+    var icGlb = (window.DigiIcons && typeof DigiIcons.get === "function") ? DigiIcons.get("globe", {size:14, style:"margin-right:4px"}) : "";
+    lbl.innerHTML = icGlb + ' URL: ' + val.substring(0,60) + (val.length>60?"...":"");
+    if(val.toLowerCase().endsWith(".pdf") || val.indexOf("drive.google.com") < 0){
+      autoGenerarPortadaDesdePdf(val);
+    }
+  } else if(!val){
+    lbl.style.display = "none";
+  }
+}
+
+// ── CURSOS RESTRINGIDOS SEGÚN ROL ──
+// Para preceptor/profesor: solo sus cursos. Para admin: todos.
+function getCursosDisponibles(){
+  if(!adminActual) return null; // null = sin restriccion
+  var rol = adminActual.rol||"admin";
+  if(rol === "admin") return null;
+  return adminActual.cursosACargo || [];
+}
+
+function getMateriasCurso(cursos){
+  // Devuelve materias de los cursos a cargo del profesor
+  if(!cursos) return null;
+  var mats = [];
+  for(var i=0;i<cursos.length;i++){
+    if(cursos[i].materia && mats.indexOf(cursos[i].materia)<0) mats.push(cursos[i].materia);
+  }
+  return mats;
+}
+
+function agregarDivLibro(){
+  var wrap  = document.getElementById("libroDiv");
+  if(!wrap) return;
+  var cursos = getCursosDisponibles(); // null = sin restriccion
+  var matSel = document.getElementById("lMat") ? document.getElementById("lMat").value : "";
+  var row = document.createElement("div");
+  row.style.cssText = "display:flex;gap:8px;align-items:center;background:var(--bg-alt);border-radius:8px;padding:8px;margin-bottom:4px";
+
+  if(cursos && cursos.length > 0){
+    // Filtrar cursos que coincidan con materia seleccionada (para profesor)
+    var rol = adminActual ? (adminActual.rol||"admin") : "admin";
+    var cursosFiltrados = cursos;
+    if(rol === "profesor" && matSel){
+      cursosFiltrados = cursos.filter(function(cu){ return !cu.materia || norm(cu.materia)===norm(matSel); });
+    }
+    var optsHtml = '<option value="">Seleccioná</option>';
+    for(var ci=0;ci<cursosFiltrados.length;ci++){
+      var cu = cursosFiltrados[ci];
+      var label = cu.anio+"° Año / Div "+cu.div+(cu.materia?" ("+cu.materia+")":"");
+      optsHtml += '<option value="'+cu.anio+"|"+cu.div+'">' + label + '</option>';
+    }
+    row.innerHTML =
+      '<select style="flex:1;border:2px solid var(--borde);border-radius:8px;padding:8px;font-family:inherit;color:var(--txt);background:var(--inp)" onchange="onCursoSelect(this)">' +
+      optsHtml + '</select>' +
+      '<input type="hidden" class="div-anio" value=""/>' +
+      '<input type="hidden" class="div-div" value=""/>' +
+      '<button type="button" onclick="this.parentNode.remove()" style="background:none;border:none;color:var(--rojo);cursor:pointer"><i data-lucide="x" style="width:14px;height:14px"></i></button>';
+  } else {
+    // Admin: selectores libres
+    row.innerHTML =
+      '<select class="div-anio" style="flex:1;border:2px solid var(--borde);border-radius:8px;padding:8px;font-family:inherit;color:var(--txt);background:var(--inp)">' +
+      '<option value="">Año</option><option value="1">1°</option><option value="2">2°</option>' +
+      '<option value="3">3°</option><option value="4">4°</option><option value="5">5°</option><option value="6">6°</option>' +
+      '</select>' +
+      '<select class="div-div" style="flex:1;border:2px solid var(--borde);border-radius:8px;padding:8px;font-family:inherit;color:var(--txt);background:var(--inp)">' +
+      '<option value="">Div.</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>' +
+      '<option value="4">4</option><option value="5">5</option><option value="6">6</option>' +
+      '<option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>' +
+      '</select>' +
+      '<button type="button" onclick="this.parentNode.remove()" style="background:none;border:none;color:var(--rojo);cursor:pointer"><i data-lucide="x" style="width:14px;height:14px"></i></button>';
+  }
+  wrap.appendChild(row);
+}
+
+function onCursoSelect(sel){
+  var val  = sel.value; // "anio|div"
+  var row  = sel.parentNode;
+  var parts = val.split("|");
+  var hidAnio = row.querySelector(".div-anio");
+  var hidDiv  = row.querySelector(".div-div");
+  if(hidAnio) hidAnio.value = parts[0]||"";
+  if(hidDiv)  hidDiv.value  = parts[1]||"";
+}
+
+function getLibroDivs(){
+  var wrap = document.getElementById("libroDiv");
+  if(!wrap) return [];
+  var divs = [];
+  for(var i=0;i<wrap.children.length;i++){
+    var row = wrap.children[i];
+    var cursos = getCursosDisponibles();
+    if(cursos && cursos.length > 0){
+      // Leer del select combinado
+      var sel = row.querySelector("select");
+      if(sel && sel.value){
+        var parts = sel.value.split("|");
+        if(parts.length>=2) divs.push({anio:parts[0], div:parts[1]});
+      }
+    } else {
+      // Leer de selectores separados
+      var anioEl = row.querySelector(".div-anio");
+      var divEl  = row.querySelector(".div-div");
+      if(anioEl && divEl && anioEl.value && divEl.value){
+        divs.push({anio:anioEl.value, div:divEl.value});
+      }
+    }
+  }
+  return divs;
+}
+
+function setLibroDivs(divs){
+  var wrap = document.getElementById("libroDiv");
+  if(!wrap) return;
+  wrap.innerHTML = "";
+  if(!divs||!divs.length) return;
+  for(var i=0;i<divs.length;i++){
+    agregarDivLibro();
+    var row = wrap.children[i];
+    var cursos = getCursosDisponibles();
+    if(cursos && cursos.length > 0){
+      var sel = row.querySelector("select");
+      if(sel) sel.value = divs[i].anio+"|"+divs[i].div;
+    } else {
+      var anioEl = row.querySelector(".div-anio");
+      var divEl  = row.querySelector(".div-div");
+      if(anioEl) anioEl.value = divs[i].anio||"";
+      if(divEl)  divEl.value  = divs[i].div||"";
+    }
+  }
+}
+
+// Re-render divs when materia changes (for profesor)
+document.addEventListener("DOMContentLoaded", function(){
+  var matEl = document.getElementById("lMat");
+  if(matEl) matEl.addEventListener("input", function(){
+    var wrap = document.getElementById("libroDiv");
+    if(wrap && wrap.children.length > 0){
+      var saved = getLibroDivs();
+      wrap.innerHTML = "";
+      for(var i=0;i<saved.length;i++) agregarDivLibro();
+    }
+  });
+});
+
+// Remove curso row via event delegation
+document.addEventListener("click", function(e){
+  if(e.target.classList.contains("rm-curso-btn")){
+    var row = e.target.parentNode;
+    while(row && row.parentNode && row.parentNode.id !== "cursosWrap") row = row.parentNode;
+    if(row && row.parentNode) row.parentNode.removeChild(row);
+  }
+});
+
+// Disparar sincronización inmediata con CockroachDB en segundo plano
+if(typeof sincronizarConBackend === "function"){
+  sincronizarConBackend();
+}
+
+// Inicializar FAB móvil con el panel activo por defecto (Resumen)
+if(typeof actualizarMobileFab === "function"){
+  var curActive = document.querySelector(".panel.active");
+  actualizarMobileFab(curActive ? curActive.id : "panelResumen");
+}

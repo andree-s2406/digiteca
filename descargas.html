@@ -1,35 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<script>
-(function(){
-  try {
-    var d = localStorage.getItem("digi");
-    var isDark = d === "dark" || (d !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    document.documentElement.classList.add("preload");
-  } catch(e){}
-})();
-</script>
 <style id="auth-guard-css">html { visibility: hidden !important; opacity: 0 !important; }</style>
-<script>
-(function(){
-  try {
-    var raw = localStorage.getItem("digi-sesion");
-    if (!raw) { window.location.replace("login.html"); return; }
-    var s = JSON.parse(raw);
-    if (!s || !s.email) { window.location.replace("login.html"); return; }
-    var el = document.getElementById("auth-guard-css");
-    if (el) el.remove();
-  } catch(e) {
-    window.location.replace("login.html");
-  }
-})();
-</script>
+<script src="js/core/auth-guard.js"></script>
+<script src="js/core/constants.js"></script>
+<script src="js/core/utils.js"></script>
+<script src="js/ui/toast.js"></script>
+<script src="js/ui/layout.js"></script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Mis Descargas – DigiTeca</title>
@@ -268,13 +245,24 @@ async function cargarDescargas(){
 
 /* ── ELIMINAR UN LIBRO ── */
 function eliminarLibro(id){
-  var _sesD=JSON.parse(localStorage.getItem("digi-sesion")||"{}"); var _keyDesc="digi-descargas-"+((_sesD.email)||"guest"); var lista = [];
-  try{ lista = JSON.parse(localStorage.getItem(_keyDesc)||"[]"); }catch(e){}
+  var _sesD = {};
+  try { _sesD = JSON.parse(localStorage.getItem("digi-sesion") || "{}"); } catch(e) {}
+  var _email = _sesD.email || "guest";
+  var _keyDesc = "digi-descargas-" + _email;
+  var lista = [];
+  try { lista = JSON.parse(localStorage.getItem(_keyDesc) || "[]"); } catch(e) {}
   lista = lista.filter(function(l){ return l.id !== id; });
-  try{
-    var _sesDel=JSON.parse(localStorage.getItem("digi-sesion")||"{}"); var _keyDel="digi-descargas-"+((_sesDel.email)||"guest"); localStorage.setItem(_keyDel, JSON.stringify(lista));
-    localStorage.removeItem("libro-"+id+"-guardado");
-  }catch(e){}
+  try {
+    localStorage.setItem(_keyDesc, JSON.stringify(lista));
+    localStorage.removeItem("libro-" + id + "-guardado-" + _email);
+    localStorage.removeItem("libro-" + id + "-guardado");
+  } catch(e) {}
+
+  if (window.API && window.API.descargas && _sesD.email) {
+    API.descargas.remove(_sesD.email, id).catch(function(err){
+      console.warn("Error eliminando descarga en servidor:", err.message);
+    });
+  }
   toast("Libro eliminado de tus descargas");
   cargarDescargas();
 }
@@ -282,62 +270,28 @@ function eliminarLibro(id){
 /* ── ELIMINAR TODOS ── */
 document.getElementById("btnLimpiar").onclick = function(){
   if(!confirm("¿Eliminar todos los libros guardados? Esta acción no se puede deshacer.")) return;
-  var _sesD=JSON.parse(localStorage.getItem("digi-sesion")||"{}"); var _keyDesc="digi-descargas-"+((_sesD.email)||"guest"); var lista = [];
-  try{ lista = JSON.parse(localStorage.getItem(_keyDesc)||"[]"); }catch(e){}
-  var _sesCA=JSON.parse(localStorage.getItem("digi-sesion")||"{}");
-  var _email=(_sesCA.email)||"guest";
+  var _sesCA = {};
+  try { _sesCA = JSON.parse(localStorage.getItem("digi-sesion") || "{}"); } catch(e) {}
+  var _email = _sesCA.email || "guest";
+  var _keyDesc = "digi-descargas-" + _email;
+  var lista = [];
+  try { lista = JSON.parse(localStorage.getItem(_keyDesc) || "[]"); } catch(e) {}
   lista.forEach(function(l){
-    try{ localStorage.removeItem("libro-"+l.id+"-guardado-"+_email); }catch(e){}
+    try { localStorage.removeItem("libro-" + l.id + "-guardado-" + _email); } catch(e) {}
   });
-  try{ localStorage.removeItem("digi-descargas-"+_email); }catch(e){}
+  try { localStorage.removeItem(_keyDesc); } catch(e) {}
+
+  if (window.API && window.API.descargas && _sesCA.email) {
+    API.descargas.clear(_sesCA.email).catch(function(err){
+      console.warn("Error vaciando descargas en servidor:", err.message);
+    });
+  }
   toast("Se eliminaron todos los libros guardados");
   cargarDescargas();
 };
 
-/* ── TOAST ── */
-function toast(msg){
-  var t = document.getElementById("toast");
-  t.textContent = msg; t.classList.add("show");
-  clearTimeout(t._t);
-  t._t = setTimeout(function(){ t.classList.remove("show"); }, 3000);
-}
-
-/* ── SCROLL / NAV ── */
-window.onscroll = function(){
-  document.getElementById("navbar").classList.toggle("scrolled", window.scrollY>30);
-  document.getElementById("scroll-top").classList.toggle("visible", window.scrollY > 200);
-};
-document.getElementById("scroll-top").onclick = function(){ window.scrollTo({top:0,behavior:"smooth"}); };
-if(typeof initHamburger === "function") { initHamburger(); }
-else {
-  var hb = document.getElementById("hamburger");
-  if(hb) hb.onclick = function(){
-    var isOpen = document.getElementById("navLinks").classList.toggle("open");
-    this.classList.toggle("open", isOpen);
-    this.setAttribute("aria-expanded", isOpen);
-  };
-}
-
 /* ── INIT ── */
 cargarDescargas();
-
-// Panel de control — visible para admin, preceptor y profesor
-(function(){
-  try{
-    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
-    var rol    = (sesion.rol||"").trim().toLowerCase();
-    var tieneAcceso = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
-    if(tieneAcceso){
-      var link = document.createElement("a");
-      link.href = "admin.html";
-      link.innerHTML = DigiIcons.get("settings", {size:14, style:"margin-right:4px"}) + " Panel";
-      link.style.cssText = "font-weight:700;color:var(--rojo,#C0392B)!important;background:rgba(192,57,43,.1);border-radius:8px;padding:8px 14px";
-      var navLinks = document.getElementById("navLinks");
-      if(navLinks) navLinks.appendChild(link);
-    }
-  }catch(e){}
-})();
-
 </script>
 </body>
 </html>

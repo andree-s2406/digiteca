@@ -10,7 +10,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
     apellido VARCHAR(100) NOT NULL,
     rol VARCHAR(30) NOT NULL DEFAULT 'alumno',
     anio VARCHAR(20) DEFAULT 'Otro',
+    division VARCHAR(20) DEFAULT '',
+    cursos_a_cargo JSONB DEFAULT '[]'::jsonb,
     estado VARCHAR(20) DEFAULT 'activo',
+    restringido BOOLEAN DEFAULT FALSE,
     avatar TEXT,
     creado_en TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { UPLOAD_LIMITS } = require('../config/constants');
 
 // Configuración de almacenamiento para PDFs
 const pdfStorage = multer.diskStorage({
@@ -34,7 +35,7 @@ const imgStorage = multer.diskStorage({
 
 const uploadPdf = multer({
   storage: pdfStorage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  limits: { fileSize: UPLOAD_LIMITS.PDF_MAX_BYTES },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')) {
       cb(null, true);
@@ -46,7 +47,7 @@ const uploadPdf = multer({
 
 const uploadImg = multer({
   storage: imgStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: UPLOAD_LIMITS.IMAGE_MAX_BYTES },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(file.originalname)) {
       cb(null, true);

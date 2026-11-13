@@ -1,13 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
+const { ADMIN_ROLES } = require('../middleware/auth');
+const { mapLibroRow } = require('../services/librosService');
+
+function assertOwnerOrAdmin(req, targetEmail) {
+  if (!req.user) return false;
+  if (ADMIN_ROLES.has((req.user.rol || '').toLowerCase())) return true;
+  return String(req.user.email || '').toLowerCase() === String(targetEmail || '').toLowerCase().trim();
+}
 
 // GET /api/descargas - Listar libros guardados por usuario
 router.get('/', async (req, res) => {
   try {
-    const { email } = req.query;
+    const email = req.query.email || (req.user && req.user.email);
     if (!email) {
       return res.status(400).json({ error: 'Email de usuario requerido' });
+    }
+    if (!assertOwnerOrAdmin(req, email)) {
+      return res.status(403).json({ error: 'No autorizado para consultar las lecturas de otro usuario' });
     }
 
     const trimmedEmail = email.trim().toLowerCase();
@@ -21,19 +32,8 @@ router.get('/', async (req, res) => {
     );
 
     const descargas = result.rows.map(row => ({
-      id: row.id,
+      ...mapLibroRow(row, true),
       descargaId: row.descarga_id,
-      t: row.titulo,
-      a: row.autor,
-      mat: row.materia,
-      tipo: row.tipo || 'Libro',
-      anios: Array.isArray(row.anios) ? row.anios : (typeof row.anios === 'string' ? JSON.parse(row.anios || '[]') : []),
-      img: row.portada_url || '',
-      pdf: row.pdf_url || '',
-      e: row.emoji || '📚',
-      c: row.categoria_c || 'ciencias',
-      l: row.categoria_l || row.materia,
-      x: row.descripcion || '',
       fechaGuardado: row.fecha_guardado
     }));
 
@@ -47,9 +47,13 @@ router.get('/', async (req, res) => {
 // POST /api/descargas - Guardar libro
 router.post('/', async (req, res) => {
   try {
-    const { email, libroId } = req.body;
+    const email = (req.body && req.body.email) || (req.user && req.user.email);
+    const { libroId } = req.body;
     if (!email || !libroId) {
       return res.status(400).json({ error: 'Email y libroId requeridos' });
+    }
+    if (!assertOwnerOrAdmin(req, email)) {
+      return res.status(403).json({ error: 'No autorizado para modificar lecturas de otro usuario' });
     }
 
     const trimmedEmail = email.trim().toLowerCase();
@@ -82,11 +86,14 @@ router.post('/', async (req, res) => {
 // DELETE /api/descargas/:libroId - Quitar libro guardado
 router.delete('/:libroId', async (req, res) => {
   try {
-    const { email } = req.query;
+    const email = req.query.email || (req.user && req.user.email);
     const libroId = parseInt(req.params.libroId, 10);
 
     if (!email || isNaN(libroId)) {
       return res.status(400).json({ error: 'Email y libroId requeridos' });
+    }
+    if (!assertOwnerOrAdmin(req, email)) {
+      return res.status(403).json({ error: 'No autorizado para eliminar lecturas de otro usuario' });
     }
 
     const trimmedEmail = email.trim().toLowerCase();
@@ -105,9 +112,12 @@ router.delete('/:libroId', async (req, res) => {
 // DELETE /api/descargas/limpiar/todo - Vaciar colección de un usuario
 router.delete('/limpiar/todo', async (req, res) => {
   try {
-    const { email } = req.query;
+    const email = req.query.email || (req.user && req.user.email);
     if (!email) {
       return res.status(400).json({ error: 'Email requerido' });
+    }
+    if (!assertOwnerOrAdmin(req, email)) {
+      return res.status(403).json({ error: 'No autorizado para vaciar lecturas de otro usuario' });
     }
 
     const trimmedEmail = email.trim().toLowerCase();

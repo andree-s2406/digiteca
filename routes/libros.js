@@ -1,48 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
-const syncService = require('../services/sync');
-
-// Helper para convertir el formato de la BD al formato frontend esperado
-function mapLibroRow(row, isDetail = false) {
-  let pdfVal = row.pdf_url || '';
-  if (!isDetail && typeof pdfVal === 'string' && pdfVal.startsWith('data:') && pdfVal.length > 256) {
-    pdfVal = 'archivo:cargado';
-  }
-
-  let portadaVal = row.portada_url || '';
-  if (typeof portadaVal === 'string' && (portadaVal.startsWith('file:') || portadaVal.includes('test.jpg'))) {
-    portadaVal = 'img/test.jpg';
-  }
-
-  return {
-    id: row.id,
-    t: row.titulo,
-    titulo: row.titulo,
-    a: row.autor,
-    autor: row.autor,
-    mat: row.materia,
-    materia: row.materia,
-    tipo: row.tipo || 'Libro',
-    anios: Array.isArray(row.anios) ? row.anios : (typeof row.anios === 'string' ? JSON.parse(row.anios || '[]') : []),
-    divisiones: Array.isArray(row.divisiones) ? row.divisiones : (typeof row.divisiones === 'string' ? JSON.parse(row.divisiones || '[]') : []),
-    img: portadaVal,
-    portada_url: portadaVal,
-    pdf: pdfVal,
-    pdf_url: pdfVal,
-    hasPdf: !!(row.pdf_url && row.pdf_url.length > 0) || row.tiene_pdf === true,
-    e: row.emoji || '📚',
-    emoji: row.emoji || '📚',
-    c: row.categoria_c || 'ciencias',
-    categoria_c: row.categoria_c || 'ciencias',
-    l: row.categoria_l || row.materia || 'Ciencias',
-    categoria_l: row.categoria_l || row.materia || 'Ciencias',
-    x: row.descripcion || '',
-    descripcion: row.descripcion || '',
-    subioPor: row.subido_por || '',
-    subido_por: row.subido_por || ''
-  };
-}
+const {
+  mapLibroRow,
+  resolveLibroMetadata,
+  getCachedPdfMeta,
+  setCachedPdfMeta,
+  invalidateLibrosCache
+} = require('../services/librosService');
+const { streamRemotePdf } = require('../services/pdfStreamService');
 
 // GET /api/libros - Listar libros directamente desde CockroachDB
 router.get('/', async (req, res) => {
@@ -119,7 +85,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// GET /api/libros/:id/pdf - Streaming nativo directo desde GitHub Releases mediante URL en CockroachDB
+// GET /api/libros/:id/pdf - Streaming nativo directo desde GitHub Releases o Google Drive
 router.get('/:id/pdf', async (req, res) => {
   try {
     const rawId = req.params.id;
@@ -127,74 +93,20 @@ router.get('/:id/pdf', async (req, res) => {
       return res.status(400).send('ID de libro inválido');
     }
 
-    // 1. Consultar CockroachDB directamente para obtener el enlace de GitHub Releases y título
-    const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [String(rawId)]);
-    if (result.rows.length === 0 || !result.rows[0].pdf_url) {
-      return res.status(404).send('PDF no disponible en la base de datos');
-    }
-
-    const pdfUrl = result.rows[0].pdf_url.trim();
-    const titulo = result.rows[0].titulo || 'libro';
-
-    // 2. Conectar y retransmitir directamente desde GitHub Releases (o URL almacenada)
-    let downloadUrl = pdfUrl;
-    if (pdfUrl.includes('drive.google.com')) {
-      const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
-      if (driveMatch && driveMatch[1]) {
-        downloadUrl = `https://drive.usercontent.google.com/download?id=${driveMatch[1]}&export=download&confirm=t`;
+    let cachedPdf = getCachedPdfMeta(rawId);
+    if (!cachedPdf) {
+      const result = await query(`SELECT pdf_url, titulo FROM libros WHERE id::text = $1::text`, [String(rawId)]);
+      if (result.rows.length === 0 || !result.rows[0].pdf_url) {
+        return res.status(404).send('PDF no disponible en la base de datos');
       }
+      cachedPdf = {
+        pdfUrl: result.rows[0].pdf_url.trim(),
+        titulo: result.rows[0].titulo || 'libro'
+      };
+      setCachedPdfMeta(rawId, cachedPdf);
     }
 
-    const fetchHeaders = {};
-    if (req.headers.range) {
-      fetchHeaders['Range'] = req.headers.range;
-    }
-
-    let upstream;
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 35000);
-      upstream = await fetch(downloadUrl, { headers: fetchHeaders, redirect: 'follow', signal: controller.signal });
-      clearTimeout(timer);
-    } catch (fetchErr) {
-      console.warn(`[PDF Stream] Timeout o fallo en fetch a GitHub (${downloadUrl}):`, fetchErr.message);
-      return res.status(504).send('Tiempo de espera agotado al conectar con GitHub');
-    }
-
-    if (!upstream.ok && downloadUrl !== pdfUrl) {
-      const driveMatch = pdfUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || pdfUrl.match(/id=([a-zA-Z0-9_-]+)/);
-      if (driveMatch && driveMatch[1]) {
-        try {
-          upstream = await fetch(`https://drive.google.com/uc?export=download&id=${driveMatch[1]}`, { headers: fetchHeaders, redirect: 'follow' });
-        } catch(e){}
-      }
-    }
-    if (!upstream || !upstream.ok) {
-      return res.status(upstream ? upstream.status : 502).send('No se pudo obtener el PDF desde GitHub');
-    }
-
-    if (upstream.status === 206) {
-      res.status(206);
-      const cr = upstream.headers.get('content-range');
-      if (cr) res.setHeader('Content-Range', cr);
-    }
-
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(titulo)}.pdf"`);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    
-    const contentLength = upstream.headers.get('content-length');
-    if (contentLength) res.setHeader('Content-Length', contentLength);
-
-    const { Readable } = require('stream');
-    if (upstream.body && typeof Readable.fromWeb === 'function') {
-      const nodeStream = Readable.fromWeb(upstream.body);
-      nodeStream.pipe(res);
-    } else {
-      const buffer = Buffer.from(await upstream.arrayBuffer());
-      res.send(buffer);
-    }
+    await streamRemotePdf(req, res, cachedPdf.pdfUrl, cachedPdf.titulo);
   } catch (err) {
     console.error('Error en /api/libros/:id/pdf:', err);
     res.status(500).send('Error interno al transmitir PDF');
@@ -212,19 +124,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Título, autor y materia son obligatorios' });
     }
 
-    const EMOJIS = {
-      "Matemática": "📐", "Física": "⚡", "Química": "⚗️", "Biología": "🧬",
-      "Historia": "🏛️", "Geografía": "🌍", "Lengua y Literatura": "📖",
-      "Inglés": "🗣️", "Informática": "💻", "Ciencias Naturales": "🔬",
-      "Educación Sexual Integral (ESI)": "🌱", "Literatura Infantil / Cuentos": "📚",
-      "Tecnología": "⚙️", "Robótica": "🤖", "Arte": "🎨", "Música": "🎵",
-      "Filosofía": "🏛️", "Economía": "📈", "Derecho y Ciudadanía": "⚖️",
-      "Historietas": ""
-    };
-
-    const emojiFinal = e !== undefined ? e : (EMOJIS[mat] || "");
-    const categoriaC = c || mat.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const categoriaL = l || mat;
+    const { emojiFinal, categoriaC, categoriaL } = resolveLibroMetadata(mat, e, c, l);
 
     let result;
     if (req.body.id && !isNaN(parseInt(req.body.id, 10))) {
@@ -278,7 +178,7 @@ router.post('/', async (req, res) => {
       );
     }
 
-    invalidateCache('create', { id: result.rows[0].id });
+    invalidateLibrosCache('create', { id: result.rows[0].id });
     res.status(201).json(mapLibroRow(result.rows[0]));
   } catch (err) {
     console.error('Error en POST /api/libros:', err);
@@ -300,19 +200,7 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Título, autor y materia son obligatorios' });
     }
 
-    const EMOJIS = {
-      "Matemática": "📐", "Física": "⚡", "Química": "⚗️", "Biología": "🧬",
-      "Historia": "🏛️", "Geografía": "🌍", "Lengua y Literatura": "📖",
-      "Inglés": "🗣️", "Informática": "💻", "Ciencias Naturales": "🔬",
-      "Educación Sexual Integral (ESI)": "🌱", "Literatura Infantil / Cuentos": "📚",
-      "Tecnología": "⚙️", "Robótica": "🤖", "Arte": "🎨", "Música": "🎵",
-      "Filosofía": "🏛️", "Economía": "📈", "Derecho y Ciudadanía": "⚖️",
-      "Historietas": ""
-    };
-
-    const emojiFinal = e !== undefined ? e : (EMOJIS[mat] || "");
-    const categoriaC = c || mat.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const categoriaL = l || mat;
+    const { emojiFinal, categoriaC, categoriaL } = resolveLibroMetadata(mat, e, c, l);
 
     const result = await query(
       `UPDATE libros SET
@@ -351,7 +239,7 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Libro no encontrado' });
     }
 
-    invalidateCache('update', { id: rawId });
+    invalidateLibrosCache('update', { id: rawId });
     res.json(mapLibroRow(result.rows[0]));
   } catch (err) {
     console.error('Error en PUT /api/libros/:id:', err);
@@ -372,7 +260,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Libro no encontrado' });
     }
 
-    invalidateCache('delete', { id: rawId });
+    invalidateLibrosCache('delete', { id: rawId });
     res.json({ message: 'Libro eliminado exitosamente', id: result.rows[0].id });
   } catch (err) {
     console.error('Error en DELETE /api/libros/:id:', err);

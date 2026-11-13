@@ -12,11 +12,26 @@ async function seedDatabase() {
   console.log("Inicializando base de datos CockroachDB...");
 
   try {
-    // 1. Ejecutar DDL (init.sql)
+    // 1. Ejecutar DDL (init.sql) y migraciones idempotentes
     const sqlPath = path.join(__dirname, 'init.sql');
     const sqlInit = fs.readFileSync(sqlPath, 'utf8');
     await query(sqlInit);
-    console.log("Tablas creadas / verificadas en CockroachDB.");
+
+    const migrationsDir = path.join(__dirname, 'migrations');
+    if (fs.existsSync(migrationsDir)) {
+      const migrationFiles = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+      for (const mf of migrationFiles) {
+        const rawSql = fs.readFileSync(path.join(migrationsDir, mf), 'utf8');
+        const statements = rawSql
+          .split(';')
+          .map(s => s.split('\n').filter(line => !line.trim().startsWith('--')).join('\n').trim())
+          .filter(Boolean);
+        for (const stmt of statements) {
+          await query(stmt + ';');
+        }
+      }
+    }
+    console.log("Tablas y migraciones verificadas en CockroachDB.");
 
     // 2. Insertar usuarios administradores por defecto
     for (const admin of DEFAULT_ADMINS) {

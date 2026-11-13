@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
+const config = require('./config');
+const { ALLOWED_HTML_PAGES } = require('./config/constants');
+const { errorHandler } = require('./middleware/errorHandler');
 
 const { seedDatabase } = require('./db/seed');
 
@@ -18,7 +20,7 @@ const syncRoutes = require('./routes/sync');
 const compression = require('compression');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.port;
 
 // Ocultar cabecera del servidor por seguridad
 app.disable('x-powered-by');
@@ -94,58 +96,21 @@ app.use('/img', express.static(path.join(__dirname, 'img'), staticOptions));
 app.use('/favicon', express.static(path.join(__dirname, 'favicon'), staticOptions));
 app.use('/css', express.static(path.join(__dirname, 'css'), { maxAge: 0, etag: true }));
 app.use('/js', express.static(path.join(__dirname, 'js'), { maxAge: 0, etag: true }));
-app.use(express.static(path.join(__dirname), { maxAge: 0, etag: true }));
 
-// Middleware de seguridad de autenticación para la API REST
-function apiAuthGuard(req, res, next) {
-  // 1. Métodos GET y HEAD para catálogo, libros, ranking y salud son públicos
-  if ((req.method === 'GET' || req.method === 'HEAD') && (
-    req.path.startsWith('/libros') ||
-    req.path.startsWith('/ranking') ||
-    req.path === '/health'
-  )) {
-    return next();
+// Servir únicamente las vistas HTML públicas (evita exponer .env, package.json, routes/, db/, data/, scripts/)
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/:page.html', (req, res, next) => {
+  const filename = `${req.params.page}.html`;
+  if (ALLOWED_HTML_PAGES.has(filename)) {
+    return res.sendFile(path.join(__dirname, filename));
   }
-
-  // 2. Endpoints públicos de autenticación, contacto y estadísticas
-  const publicPaths = [
-    '/auth/login',
-    '/auth/reset-password',
-    '/contacto',
-    '/stats/visita',
-    '/stats/lectura',
-    '/stats/libro-abierto',
-    '/sync',
-    '/health'
-  ];
-  if (publicPaths.some(p => req.path === p || req.path.startsWith(p))) {
-    return next();
-  }
-
-  // 3. Para el resto de operaciones (crear/editar libros, panel usuarios, etc.) validar sesión
-  const userEmail = req.headers['x-user-email'];
-  if (!userEmail) {
-    return res.status(401).json({ error: 'Acceso no autorizado. Debe iniciar sesión en DigiTeca.' });
-  }
-
-  // Rutas administrativas restringidas
-  const adminEndpoints = ['/usuarios', '/stats', '/upload'];
-  const userRole = (req.headers['x-user-rol'] || '').toLowerCase();
-  const isAdmin = userRole === 'admin' || userRole === 'administrador' || userRole === 'preceptor' || userRole === 'profesor';
-
-  if (req.method !== 'GET' && req.path.startsWith('/libros') && !isAdmin) {
-    return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
-  }
-
-  // Permitir que cualquier usuario autenticado vea y edite su propio perfil
-  const isSelfProfile = req.path === '/usuarios/perfil' || req.path === '/usuarios/me';
-
-  if (adminEndpoints.some(p => req.path.startsWith(p)) && !isAdmin && !isSelfProfile) {
-    return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
-  }
-
   next();
-}
+});
+
+const { apiAuthGuard } = require('./middleware/auth');
 
 app.use('/api', apiAuthGuard);
 
@@ -170,10 +135,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Manejo de errores global
-app.use((err, req, res, next) => {
-  console.error('Error no capturado:', err.stack);
-  res.status(500).json({ error: 'Error interno del servidor', detalle: err.message });
-});
+app.use(errorHandler);
 
 // Red de seguridad global para evitar caídas del proceso
 process.on('uncaughtException', (err) => {

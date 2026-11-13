@@ -2,16 +2,26 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../db/connection');
 const syncService = require('../services/sync');
+const { hashPassword, verifyPassword } = require('../services/authService');
+
+function mapUsuarioRow(r) {
+  return {
+    ...r,
+    div: r.division || '',
+    cursos_a_cargo: Array.isArray(r.cursos_a_cargo) ? r.cursos_a_cargo : [],
+    restringido: r.restringido === true || r.estado === 'restringido'
+  };
+}
 
 // GET /api/usuarios/me - Obtener el perfil actualizado del usuario autenticado
 router.get('/me', async (req, res) => {
   try {
-    const userEmail = req.headers['x-user-email'];
+    const userEmail = (req.user && req.user.email) || req.headers['x-user-email'];
     if (!userEmail) {
       return res.status(401).json({ error: 'No autenticado' });
     }
     const result = await query(
-      `SELECT id::text AS id, email, nombre, apellido, rol, anio, estado, avatar, creado_en 
+      `SELECT id::text AS id, email, nombre, apellido, rol, anio, division, cursos_a_cargo, estado, restringido, avatar, creado_en 
        FROM usuarios 
        WHERE LOWER(email) = $1 LIMIT 1;`,
       [userEmail.toLowerCase().trim()]
@@ -19,7 +29,7 @@ router.get('/me', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    res.json(result.rows[0]);
+    res.json(mapUsuarioRow(result.rows[0]));
   } catch (err) {
     console.error('Error en GET /api/usuarios/me:', err);
     res.status(500).json({ error: 'Error al obtener perfil' });
@@ -40,11 +50,11 @@ router.get('/', async (req, res) => {
     }
 
     const result = await query(
-      `SELECT id::text AS id, email, nombre, apellido, rol, anio, estado, avatar, creado_en 
+      `SELECT id::text AS id, email, nombre, apellido, rol, anio, division, cursos_a_cargo, estado, restringido, avatar, creado_en 
        FROM usuarios 
        ORDER BY id ASC;`
     );
-    res.json(result.rows);
+    res.json(result.rows.map(mapUsuarioRow));
   } catch (err) {
     console.error('Error en GET /api/usuarios:', err);
     res.status(500).json({ error: 'Error al obtener usuarios' });
@@ -54,7 +64,7 @@ router.get('/', async (req, res) => {
 // POST /api/usuarios - Crear nuevo usuario
 router.post('/', async (req, res) => {
   try {
-    const { email, pwd, password, nombre, apellido, rol, anio, estado } = req.body;
+    const { email, pwd, password, nombre, apellido, rol, anio, div, division, cursos_a_cargo, estado, restringido } = req.body;
     const finalPwd = pwd || password;
 
     if (!email || !finalPwd || !nombre || !apellido) {
@@ -69,7 +79,7 @@ router.post('/', async (req, res) => {
       return res.status(409).json({ error: 'Ya existe un usuario con ese correo electrónico' });
     }
 
-        // Obtener siguiente ID seguro secuencial
+    // Obtener siguiente ID seguro secuencial
     const maxRes = await query(`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM usuarios WHERE id < 1000000000;`);
     let nextId = parseInt(maxRes.rows[0].next_id, 10);
     if (isNaN(nextId) || nextId < 1) nextId = 1;
@@ -80,23 +90,30 @@ router.post('/', async (req, res) => {
       nextId++;
     }
 
+    const finalEstado = restringido ? 'restringido' : (estado || 'activo');
+    const finalRestringido = finalEstado === 'restringido' || restringido === true;
+    const hashedPwd = hashPassword(finalPwd);
+
     const result = await query(
-      `INSERT INTO usuarios (id, email, password, nombre, apellido, rol, anio, estado)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, email, nombre, apellido, rol, anio, estado, avatar, creado_en;`,
+      `INSERT INTO usuarios (id, email, password, nombre, apellido, rol, anio, division, cursos_a_cargo, estado, restringido)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, email, nombre, apellido, rol, anio, division, cursos_a_cargo, estado, restringido, avatar, creado_en;`,
       [
         nextId,
         trimmedEmail,
-        finalPwd,
+        hashedPwd,
         nombre.trim(),
         apellido.trim(),
         rol || 'alumno',
         anio || 'Otro',
-        estado || 'activo'
+        div || division || '',
+        JSON.stringify(Array.isArray(cursos_a_cargo) ? cursos_a_cargo : []),
+        finalEstado,
+        finalRestringido
       ]
     );
 
-    const nuevoUsuario = result.rows[0];
+    const nuevoUsuario = mapUsuarioRow(result.rows[0]);
     syncService.notifyDataChange('usuarios', { action: 'create', id: nuevoUsuario.id, email: nuevoUsuario.email });
     res.status(201).json(nuevoUsuario);
   } catch (err) {
@@ -108,15 +125,14 @@ router.post('/', async (req, res) => {
 // PUT /api/usuarios/perfil - Actualizar perfil propio (desde Mi Cuenta)
 router.put('/perfil', async (req, res) => {
   try {
-    const { email, nombre, apellido, anio, avatar, currentPwd, newPwd } = req.body;
+    const { email, nombre, apellido, anio, div, division, avatar, currentPwd, newPwd } = req.body;
+    const targetEmail = ((req.user && req.user.email) || email || '').trim().toLowerCase();
 
-    if (!email) {
+    if (!targetEmail) {
       return res.status(400).json({ error: 'Email de usuario requerido' });
     }
 
-    const trimmedEmail = email.trim().toLowerCase();
-    const userRes = await query(`SELECT * FROM usuarios WHERE LOWER(email) = $1`, [trimmedEmail]);
-
+    const userRes = await query(`SELECT * FROM usuarios WHERE LOWER(email) = $1`, [targetEmail]);
     if (userRes.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
@@ -126,32 +142,37 @@ router.put('/perfil', async (req, res) => {
     // Si se quiere cambiar la contraseña, validar la contraseña actual
     let finalPwd = user.password;
     if (newPwd) {
-      if (user.password !== currentPwd) {
+      const { valid } = verifyPassword(currentPwd, user.password);
+      if (!valid) {
         return res.status(401).json({ error: 'La contraseña actual ingresada es incorrecta' });
       }
-      finalPwd = newPwd;
+      finalPwd = hashPassword(newPwd);
     }
+
+    const nextDivision = div !== undefined ? div : (division !== undefined ? division : user.division);
 
     const result = await query(
       `UPDATE usuarios SET
          nombre = COALESCE($1, nombre),
          apellido = COALESCE($2, apellido),
          anio = COALESCE($3, anio),
-         avatar = COALESCE($4, avatar),
-         password = $5
-       WHERE LOWER(email) = $6
-       RETURNING id, email, nombre, apellido, rol, anio, estado, avatar;`,
+         division = COALESCE($4, division),
+         avatar = COALESCE($5, avatar),
+         password = $6
+       WHERE LOWER(email) = $7
+       RETURNING id, email, nombre, apellido, rol, anio, division, cursos_a_cargo, estado, restringido, avatar;`,
       [
         nombre ? nombre.trim() : user.nombre,
         apellido ? apellido.trim() : user.apellido,
         anio || user.anio,
-        avatar || user.avatar,
+        nextDivision || '',
+        avatar !== undefined ? avatar : user.avatar,
         finalPwd,
-        trimmedEmail
+        targetEmail
       ]
     );
 
-    const updatedUser = result.rows[0];
+    const updatedUser = mapUsuarioRow(result.rows[0]);
     syncService.notifyDataChange('usuarios', { action: 'update-perfil', id: updatedUser.id, email: updatedUser.email });
     res.json({
       message: 'Perfil actualizado exitosamente',
@@ -171,8 +192,12 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'ID de usuario inválido' });
     }
 
-    const { email, pwd, password, nombre, apellido, rol, anio, estado } = req.body;
+    const { email, pwd, password, nombre, apellido, rol, anio, div, division, cursos_a_cargo, estado, restringido } = req.body;
     const finalPwd = pwd || password;
+    const hashedPwd = finalPwd ? hashPassword(finalPwd) : null;
+    const nextDiv = div !== undefined ? div : (division !== undefined ? division : null);
+    const nextCursos = Array.isArray(cursos_a_cargo) ? JSON.stringify(cursos_a_cargo) : null;
+    const nextRestringido = restringido !== undefined ? Boolean(restringido) : (estado ? estado === 'restringido' : null);
 
     const result = await query(
       `UPDATE usuarios SET
@@ -182,17 +207,23 @@ router.put('/:id', async (req, res) => {
          apellido = COALESCE($4, apellido),
          rol = COALESCE($5, rol),
          anio = COALESCE($6, anio),
-         estado = COALESCE($7, estado)
-       WHERE id::text = $8 OR LOWER(email) = LOWER($8)
-       RETURNING id::text AS id, email, nombre, apellido, rol, anio, estado, avatar;`,
+         division = COALESCE($7, division),
+         cursos_a_cargo = COALESCE($8, cursos_a_cargo),
+         estado = COALESCE($9, estado),
+         restringido = COALESCE($10, restringido)
+       WHERE id::text = $11 OR LOWER(email) = LOWER($11)
+       RETURNING id::text AS id, email, nombre, apellido, rol, anio, division, cursos_a_cargo, estado, restringido, avatar;`,
       [
         email ? email.trim().toLowerCase() : null,
-        finalPwd || null,
+        hashedPwd,
         nombre ? nombre.trim() : null,
         apellido ? apellido.trim() : null,
         rol || null,
         anio || null,
-        estado || null,
+        nextDiv,
+        nextCursos,
+        estado || (nextRestringido === true ? 'restringido' : (nextRestringido === false ? 'activo' : null)),
+        nextRestringido,
         rawId
       ]
     );
@@ -201,7 +232,7 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    const updated = result.rows[0];
+    const updated = mapUsuarioRow(result.rows[0]);
     syncService.notifyDataChange('usuarios', { action: 'update', id: updated.id, email: updated.email });
     res.json(updated);
   } catch (err) {
@@ -221,8 +252,8 @@ router.patch('/:id/estado', async (req, res) => {
     }
 
     const result = await query(
-      `UPDATE usuarios SET estado = $1 WHERE id::text = $2 OR LOWER(email) = LOWER($2) RETURNING id::text AS id, email, estado;`,
-      [estado, rawId]
+      `UPDATE usuarios SET estado = $1, restringido = $2 WHERE id::text = $3 OR LOWER(email) = LOWER($3) RETURNING id::text AS id, email, estado, restringido;`,
+      [estado, estado === 'restringido', rawId]
     );
 
     if (result.rows.length === 0) {

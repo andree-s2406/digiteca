@@ -45,6 +45,7 @@ const API = {
 
     const headers = {
       'Content-Type': 'application/json',
+      ...(sesion.token ? { 'Authorization': `Bearer ${sesion.token}` } : {}),
       ...(sesion.email ? {
         'x-user-email': sesion.email,
         'x-user-rol': sesion.rol || 'alumno'
@@ -235,6 +236,9 @@ const API = {
       let sesion = {};
       try { sesion = JSON.parse(localStorage.getItem('digi-sesion') || '{}'); } catch(e) {}
       const headers = {};
+      if (sesion.token) {
+        headers['Authorization'] = `Bearer ${sesion.token}`;
+      }
       if (sesion.email) {
         headers['x-user-email'] = sesion.email;
         headers['x-user-rol'] = sesion.rol || 'admin';
@@ -256,6 +260,9 @@ const API = {
       let sesion = {};
       try { sesion = JSON.parse(localStorage.getItem('digi-sesion') || '{}'); } catch(e) {}
       const headers = {};
+      if (sesion.token) {
+        headers['Authorization'] = `Bearer ${sesion.token}`;
+      }
       if (sesion.email) {
         headers['x-user-email'] = sesion.email;
         headers['x-user-rol'] = sesion.rol || 'admin';

@@ -1,35 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<script>
-(function(){
-  try {
-    var d = localStorage.getItem("digi");
-    var isDark = d === "dark" || (d !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    document.documentElement.classList.add("preload");
-  } catch(e){}
-})();
-</script>
 <style id="auth-guard-css">html { visibility: hidden !important; opacity: 0 !important; }</style>
-<script>
-(function(){
-  try {
-    var raw = localStorage.getItem("digi-sesion");
-    if (!raw) { window.location.replace("login.html"); return; }
-    var s = JSON.parse(raw);
-    if (!s || !s.email) { window.location.replace("login.html"); return; }
-    var el = document.getElementById("auth-guard-css");
-    if (el) el.remove();
-  } catch(e) {
-    window.location.replace("login.html");
-  }
-})();
-</script>
+<script src="js/core/auth-guard.js"></script>
+<script src="js/core/constants.js"></script>
+<script src="js/core/utils.js"></script>
+<script src="js/domain/libros-model.js"></script>
+<script src="js/ui/layout.js"></script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Catálogo – DigiTeca</title>
@@ -817,54 +794,6 @@ document.getElementById("modalOverlay").onclick = function(e){ if(e.target === t
 document.getElementById("modalClose").onclick = cerrarModal;
 function cerrarModal(){ document.getElementById("modalOverlay").classList.remove("open"); document.body.style.overflow = ""; }
 document.addEventListener("keydown", function(e){ if(e.key === "Escape") cerrarModal(); });
-
-/* ── SCROLL OPTIMIZADO CON RAF ── */
-(function(){
-  var navEl = document.getElementById("navbar");
-  var stEl = document.getElementById("scroll-top");
-  var ticking = false;
-
-  function updateScroll(){
-    var sy = window.scrollY || document.documentElement.scrollTop || 0;
-    if(navEl) navEl.classList.toggle("scrolled", sy > 30);
-    if(stEl) stEl.classList.toggle("visible", sy > 200);
-    ticking = false;
-  }
-
-  window.addEventListener("scroll", function(){
-    if(!ticking){
-      requestAnimationFrame(updateScroll);
-      ticking = true;
-    }
-  }, { passive: true });
-})();
-document.getElementById("scroll-top").onclick = function(){ window.scrollTo({ top:0, behavior:"smooth" }); };
-if(typeof initHamburger === "function") { initHamburger(); }
-else {
-  var hb = document.getElementById("hamburger");
-  if(hb) hb.onclick = function(){
-    var isOpen = document.getElementById("navLinks").classList.toggle("open");
-    this.classList.toggle("open", isOpen);
-    this.setAttribute("aria-expanded", isOpen);
-  };
-}
-
-// Panel de control — visible para admin, preceptor y profesor
-(function(){
-  try{
-    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
-    var rol    = (sesion.rol||"").trim().toLowerCase();
-    var tieneAcceso = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
-    if(tieneAcceso){
-      var link = document.createElement("a");
-      link.href = "admin.html";
-      link.innerHTML = DigiIcons.get("settings", {size:14, style:"margin-right:4px"}) + " Panel";
-      link.style.cssText = "font-weight:700;color:var(--rojo,#C0392B)!important;background:rgba(192,57,43,.1);border-radius:8px;padding:8px 14px";
-      var navLinks = document.getElementById("navLinks");
-      if(navLinks) navLinks.appendChild(link);
-    }
-  }catch(e){}
-})();
 
 </script>
 </body>

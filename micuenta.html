@@ -1,35 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<script>
-(function(){
-  try {
-    var d = localStorage.getItem("digi");
-    var isDark = d === "dark" || (d !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    document.documentElement.classList.add("preload");
-  } catch(e){}
-})();
-</script>
 <style id="auth-guard-css">html { visibility: hidden !important; opacity: 0 !important; }</style>
-<script>
-(function(){
-  try {
-    var raw = localStorage.getItem("digi-sesion");
-    if (!raw) { window.location.replace("login.html"); return; }
-    var s = JSON.parse(raw);
-    if (!s || !s.email) { window.location.replace("login.html"); return; }
-    var el = document.getElementById("auth-guard-css");
-    if (el) el.remove();
-  } catch(e) {
-    window.location.replace("login.html");
-  }
-})();
-</script>
+<script src="js/core/auth-guard.js"></script>
+<script src="js/core/constants.js"></script>
+<script src="js/core/utils.js"></script>
+<script src="js/ui/toast.js"></script>
+<script src="js/ui/layout.js"></script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Mi Cuenta - DigiTeca</title>
@@ -491,39 +468,41 @@ function comprimirAvatarParaServidor(src, callback) {
   } catch(e){ callback(src); }
 }
 
-async function guardarLocal() {
+async function guardarLocal(pwdChange) {
   try {
-    localStorage.setItem("digi-cuenta", JSON.stringify(DATOS));
+    var datosSafe = Object.assign({}, DATOS);
+    delete datosSafe.pwd;
+    localStorage.setItem("digi-cuenta", JSON.stringify(datosSafe));
     if (window.API && window.API.usuarios) {
       // Comprimir avatar antes de enviarlo al servidor para asegurar que se guarde bien
       await new Promise(function(resolve){
         comprimirAvatarParaServidor(DATOS.avatar, function(avatarComprimido){
-          API.usuarios.updatePerfil({
+          var payload = {
             email: DATOS.correo,
             nombre: DATOS.nombre,
             apellido: DATOS.apellido,
             anio: DATOS.anio,
             div: DATOS.division,
-            avatar: avatarComprimido,
-            password: DATOS.pwd
-          }).catch(function(err){ console.warn("Error actualizando perfil vía API:", err.message); })
+            avatar: avatarComprimido
+          };
+          if (pwdChange && pwdChange.newPwd) {
+            payload.currentPwd = pwdChange.currentPwd;
+            payload.newPwd = pwdChange.newPwd;
+          }
+          API.usuarios.updatePerfil(payload).catch(function(err){ console.warn("Error actualizando perfil vía API:", err.message); })
             .finally(resolve);
         });
       });
     }
     try{
-      var usuarios = JSON.parse(localStorage.getItem("digi-admin-usuarios")||"[]");
-      for(var i=0;i<usuarios.length;i++){
-        if((usuarios[i].email||"").toLowerCase() === DATOS.correo.toLowerCase()){
-          usuarios[i].nombre   = DATOS.nombre;
-          usuarios[i].apellido = DATOS.apellido;
-          usuarios[i].anio     = DATOS.anio;
-          usuarios[i].div      = DATOS.division;
-          usuarios[i].avatar   = DATOS.avatar;
-          if(DATOS.pwd) usuarios[i].pwd = DATOS.pwd;
-          localStorage.setItem("digi-admin-usuarios", JSON.stringify(usuarios));
-          break;
-        }
+      var sesActual = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
+      if (sesActual.email && sesActual.email.toLowerCase() === DATOS.correo.toLowerCase()) {
+        sesActual.nombre = DATOS.nombre;
+        sesActual.apellido = DATOS.apellido;
+        sesActual.anio = DATOS.anio;
+        sesActual.div = DATOS.division;
+        sesActual.division = DATOS.division;
+        localStorage.setItem("digi-sesion", JSON.stringify(sesActual));
       }
     }catch(e2){}
   } catch(e) {}
@@ -578,17 +557,41 @@ function toggleSec(id) {
 }
 
 // ── GATES DE CONTRASEÑA ──
-function desbloquear(sec) {
+var _verifiedPwd = "";
+async function desbloquear(sec) {
   var input = document.getElementById("pwdGate" + sec);
   var msg   = document.getElementById("msgGate" + sec);
   var pass  = input.value;
 
   if(!pass) { msg.textContent = "Ingresá tu contraseña"; msg.className = "unlock-msg err"; return; }
-  if(pass !== DATOS.pwd && pass !== "1234") {
+
+  var validada = false;
+  if (window.API && window.API.auth && DATOS.correo) {
+    try {
+      var authRes = await API.auth.login(DATOS.correo, pass);
+      if (authRes && authRes.user) {
+        validada = true;
+        if (authRes.token) {
+          try {
+            var ses = JSON.parse(localStorage.getItem("digi-sesion") || "{}");
+            ses.token = authRes.token;
+            localStorage.setItem("digi-sesion", JSON.stringify(ses));
+          } catch(e) {}
+        }
+      }
+    } catch (err) {
+      validada = false;
+    }
+  } else if (DATOS.pwd && pass === DATOS.pwd) {
+    validada = true;
+  }
+
+  if(!validada) {
     msg.textContent = "Contraseña incorrecta";
     msg.className = "unlock-msg err";
     return;
   }
+  _verifiedPwd = pass;
 
   msg.textContent = "";
   document.getElementById("gate" + sec).style.display = "none";
@@ -706,8 +709,9 @@ function guardarPwd() {
   var repetir = document.getElementById("fPwdRepetir").value;
   if(!nueva || nueva.length < 8){ toast("La contraseña debe tener al menos 8 caracteres", true); return; }
   if(nueva !== repetir){ toast("Las contraseñas no coinciden", true); return; }
-  DATOS.pwd = nueva;
-  guardarLocal();
+  var currentPwd = _verifiedPwd || DATOS.pwd || "";
+  guardarLocal({ currentPwd: currentPwd, newPwd: nueva });
+  _verifiedPwd = nueva;
   bloquear("Pwd");
   toast("Contraseña actualizada correctamente");
 }
@@ -836,48 +840,7 @@ function setAvatar(src) {
   document.getElementById("avatarPreviewCardInitials").style.display = "none";
 }
 
-// ── TOAST ──
-function toast(msg, err) {
-  var t = document.getElementById("toast");
-  t.textContent = msg;
-  t.className = "toast" + (err ? " err" : "") + " show";
-  clearTimeout(t._timer);
-  t._timer = setTimeout(function(){ t.classList.remove("show"); }, 3200);
-}
-
-// ── SCROLL ──
-window.onscroll = function(){
-  document.getElementById("navbar").classList.toggle("scrolled", window.scrollY > 30);
-  document.getElementById("scroll-top").classList.toggle("visible", window.scrollY > 200);
-};
-document.getElementById("scroll-top").onclick = function(){ window.scrollTo({top:0, behavior:"smooth"}); };
-if(typeof initHamburger === "function") { initHamburger(); }
-else {
-  var hb = document.getElementById("hamburger");
-  if(hb) hb.onclick = function(){
-    var isOpen = document.getElementById("navLinks").classList.toggle("open");
-    this.classList.toggle("open", isOpen);
-    this.setAttribute("aria-expanded", isOpen);
-  };
-}
 document.addEventListener("keydown", function(e){ if(e.key==="Escape") cerrarAvatarModal(); });
-
-// Panel de control — visible para admin, preceptor y profesor
-(function(){
-  try{
-    var sesion = JSON.parse(localStorage.getItem("digi-sesion")||"{}");
-    var rol    = (sesion.rol||"").trim().toLowerCase();
-    var tieneAcceso = rol === "admin" || rol === "administrador" || rol === "preceptor" || rol === "profesor";
-    if(tieneAcceso){
-      var link = document.createElement("a");
-      link.href = "admin.html";
-      link.innerHTML = DigiIcons.get("settings", {size:14, style:"margin-right:4px"}) + " Panel";
-      link.style.cssText = "font-weight:700;color:var(--rojo,#C0392B)!important;background:rgba(192,57,43,.1);border-radius:8px;padding:8px 14px";
-      var navLinks = document.getElementById("navLinks");
-      if(navLinks) navLinks.appendChild(link);
-    }
-  }catch(e){}
-})();
 
 // Badge de descargas guardadas
 (function(){
