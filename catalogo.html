@@ -635,7 +635,8 @@ function render(lista, pag){
     h += '<div class="libro-card" data-id="' + l.id + '" onclick="abrirModal(\'' + l.id + '\')">';
     
     var cImg = (l.img && !l.img.startsWith("file:")) ? l.img : ((l.img && l.img.includes("test.jpg")) ? "img/test.jpg" : ('https://placehold.co/720x920/A8D8EE/2E7FB3?text='+encodeURIComponent(l.t.split(' ').slice(0,3).join('+'))));
-    h += '<img class="libro-emoji" src="' + cImg + '" alt="' + l.t + '" loading="lazy" decoding="async" onerror="fallbackCover(this, \'' + l.id + '\')"/>';
+    var prioAttr = (i < 4) ? 'fetchpriority="high" ' : '';
+    h += '<img class="libro-emoji" src="' + cImg + '" alt="' + l.t + '" ' + prioAttr + 'decoding="async" onerror="fallbackCover(this, \'' + l.id + '\')"/>';
     h += '<div class="libro-badges">';
     h += '<span class="libro-cat-tag">' + l.mat + '</span>';
     h += '<span class="libro-anio-tag">' + al + '</span>';
@@ -648,6 +649,20 @@ function render(lista, pag){
 
   if(window.DigiMotion && typeof DigiMotion.initTiltCards === "function"){
     DigiMotion.initTiltCards(".libro-card");
+  }
+
+  // Precargar en segundo plano las portadas de la página siguiente
+  if (end < total) {
+    var nextSlice = lista.slice(end, end + POR_PAG);
+    setTimeout(function() {
+      for (var ni = 0; ni < nextSlice.length; ni++) {
+        var nImg = nextSlice[ni].img;
+        if (nImg && !nImg.startsWith("file:")) {
+          var pre = new Image();
+          pre.src = nImg;
+        }
+      }
+    }, 350);
   }
 
   /* paginación inteligente con elipsis */

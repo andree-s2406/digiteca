@@ -1,12 +1,20 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { EMOJIS_MATERIA, CACHE_TTLS } = require('../config/constants');
 const syncService = require('./sync');
 
-// Caché ligera en memoria para URLs de PDF, portadas y listado de libros
+// Caché ligera en memoria + disco para URLs de PDF, portadas y listado de libros
 const pdfUrlCache = new Map();
 const portadaCache = new Map();
-const PORTADA_CACHE_MAX = 300;
+const PORTADA_CACHE_MAX = 1200;
+const PORTADA_DISK_DIR = path.join(os.tmpdir(), 'digiteca-portadas');
 const librosListCache = new Map();
 const LIBROS_LIST_TTL_MS = 60 * 1000;
+
+try {
+  fs.mkdirSync(PORTADA_DISK_DIR, { recursive: true });
+} catch (_) {}
 
 function parseJsonArray(val) {
   if (Array.isArray(val)) return val;
@@ -88,17 +96,36 @@ function setCachedPdfMeta(id, meta) {
   pdfUrlCache.set(String(id), meta);
 }
 
+function getPortadaDiskPaths(id) {
+  const safeId = String(id).replace(/[^a-zA-Z0-9_-]/g, '_');
+  return {
+    bin: path.join(PORTADA_DISK_DIR, `${safeId}.bin`),
+    meta: path.join(PORTADA_DISK_DIR, `${safeId}.json`)
+  };
+}
+
 function getCachedPortada(id) {
   const key = String(id);
   const entry = portadaCache.get(key);
-  if (!entry) return null;
-  // Refrescar orden LRU
-  portadaCache.delete(key);
-  portadaCache.set(key, entry);
-  return entry;
+  if (entry) {
+    portadaCache.delete(key);
+    portadaCache.set(key, entry);
+    return entry;
+  }
+  try {
+    const p = getPortadaDiskPaths(key);
+    if (fs.existsSync(p.bin) && fs.existsSync(p.meta)) {
+      const data = fs.readFileSync(p.bin);
+      const { mimeType } = JSON.parse(fs.readFileSync(p.meta, 'utf8'));
+      const diskEntry = { mimeType: mimeType || 'image/jpeg', data };
+      setCachedPortada(key, diskEntry, false);
+      return diskEntry;
+    }
+  } catch (_) {}
+  return null;
 }
 
-function setCachedPortada(id, meta) {
+function setCachedPortada(id, meta, writeDisk = true) {
   const key = String(id);
   if (portadaCache.has(key)) portadaCache.delete(key);
   if (portadaCache.size >= PORTADA_CACHE_MAX) {
@@ -106,6 +133,13 @@ function setCachedPortada(id, meta) {
     portadaCache.delete(firstKey);
   }
   portadaCache.set(key, meta);
+  if (writeDisk && meta && meta.data) {
+    try {
+      const p = getPortadaDiskPaths(key);
+      fs.writeFileSync(p.bin, meta.data);
+      fs.writeFileSync(p.meta, JSON.stringify({ mimeType: meta.mimeType || 'image/jpeg' }));
+    } catch (_) {}
+  }
 }
 
 function getCachedLibrosList(cacheKey) {
@@ -129,8 +163,14 @@ function setCachedLibrosList(cacheKey, data) {
 function invalidateLibrosCache(action, payload = {}) {
   librosListCache.clear();
   if (payload && payload.id !== undefined) {
-    pdfUrlCache.delete(String(payload.id));
-    portadaCache.delete(String(payload.id));
+    const idStr = String(payload.id);
+    pdfUrlCache.delete(idStr);
+    portadaCache.delete(idStr);
+    try {
+      const p = getPortadaDiskPaths(idStr);
+      if (fs.existsSync(p.bin)) fs.unlinkSync(p.bin);
+      if (fs.existsSync(p.meta)) fs.unlinkSync(p.meta);
+    } catch (_) {}
   } else {
     pdfUrlCache.clear();
     portadaCache.clear();
