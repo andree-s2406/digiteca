@@ -1,8 +1,12 @@
 const { EMOJIS_MATERIA, CACHE_TTLS } = require('../config/constants');
 const syncService = require('./sync');
 
-// Caché ligera en memoria para URLs de PDF (evita repetir SELECT en cada petición Range de PDF.js)
+// Caché ligera en memoria para URLs de PDF, portadas y listado de libros
 const pdfUrlCache = new Map();
+const portadaCache = new Map();
+const PORTADA_CACHE_MAX = 300;
+const librosListCache = new Map();
+const LIBROS_LIST_TTL_MS = 60 * 1000;
 
 function parseJsonArray(val) {
   if (Array.isArray(val)) return val;
@@ -84,11 +88,52 @@ function setCachedPdfMeta(id, meta) {
   pdfUrlCache.set(String(id), meta);
 }
 
+function getCachedPortada(id) {
+  const key = String(id);
+  const entry = portadaCache.get(key);
+  if (!entry) return null;
+  // Refrescar orden LRU
+  portadaCache.delete(key);
+  portadaCache.set(key, entry);
+  return entry;
+}
+
+function setCachedPortada(id, meta) {
+  const key = String(id);
+  if (portadaCache.has(key)) portadaCache.delete(key);
+  if (portadaCache.size >= PORTADA_CACHE_MAX) {
+    const firstKey = portadaCache.keys().next().value;
+    portadaCache.delete(firstKey);
+  }
+  portadaCache.set(key, meta);
+}
+
+function getCachedLibrosList(cacheKey) {
+  const entry = librosListCache.get(cacheKey);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > LIBROS_LIST_TTL_MS) {
+    librosListCache.delete(cacheKey);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedLibrosList(cacheKey, data) {
+  if (librosListCache.size >= 30) {
+    const firstKey = librosListCache.keys().next().value;
+    librosListCache.delete(firstKey);
+  }
+  librosListCache.set(cacheKey, { ts: Date.now(), data });
+}
+
 function invalidateLibrosCache(action, payload = {}) {
+  librosListCache.clear();
   if (payload && payload.id !== undefined) {
     pdfUrlCache.delete(String(payload.id));
+    portadaCache.delete(String(payload.id));
   } else {
     pdfUrlCache.clear();
+    portadaCache.clear();
   }
   syncService.notifyDataChange('libros', { action, ...payload }).catch(() => {});
 }
@@ -99,5 +144,9 @@ module.exports = {
   resolveLibroMetadata,
   getCachedPdfMeta,
   setCachedPdfMeta,
+  getCachedPortada,
+  setCachedPortada,
+  getCachedLibrosList,
+  setCachedLibrosList,
   invalidateLibrosCache
 };

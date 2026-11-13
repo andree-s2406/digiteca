@@ -6,6 +6,10 @@ const {
   resolveLibroMetadata,
   getCachedPdfMeta,
   setCachedPdfMeta,
+  getCachedPortada,
+  setCachedPortada,
+  getCachedLibrosList,
+  setCachedLibrosList,
   invalidateLibrosCache
 } = require('../services/librosService');
 const { streamRemotePdf } = require('../services/pdfStreamService');
@@ -29,9 +33,15 @@ async function persistDataUrlPortada(libroId, img) {
   return portadaApiUrl;
 }
 
-// GET /api/libros - Listar libros directamente desde CockroachDB
+// GET /api/libros - Listar libros directamente desde CockroachDB (con caché en RAM de 60s)
 router.get('/', async (req, res) => {
   try {
+    const cacheKey = req.originalUrl || '/api/libros';
+    const cached = getCachedLibrosList(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const { q, materia, anio, tipo } = req.query;
 
     let sql = `
@@ -77,6 +87,7 @@ router.get('/', async (req, res) => {
       }
     }
 
+    setCachedLibrosList(cacheKey, libros);
     res.json(libros);
   } catch (err) {
     console.error('Error en GET /api/libros (CockroachDB):', err);
@@ -104,12 +115,19 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// GET /api/libros/:id/portada - Servir portada almacenada en CockroachDB
+// GET /api/libros/:id/portada - Servir portada almacenada en CockroachDB con caché LRU en RAM
 router.get('/:id/portada', async (req, res) => {
   try {
     const rawId = req.params.id;
     if (!rawId) {
       return res.status(400).json({ error: 'ID de libro inválido' });
+    }
+
+    const cached = getCachedPortada(rawId);
+    if (cached) {
+      res.setHeader('Content-Type', cached.mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+      return res.send(cached.data);
     }
 
     const result = await query(
@@ -118,9 +136,12 @@ router.get('/:id/portada', async (req, res) => {
     );
 
     if (result.rows.length > 0 && result.rows[0].data) {
-      res.setHeader('Content-Type', result.rows[0].mime_type || 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      return res.send(result.rows[0].data);
+      const mimeType = result.rows[0].mime_type || 'image/jpeg';
+      const data = result.rows[0].data;
+      setCachedPortada(rawId, { mimeType, data });
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+      return res.send(data);
     }
 
     const fallback = await query(
@@ -130,9 +151,12 @@ router.get('/:id/portada', async (req, res) => {
     const portadaUrl = fallback.rows[0]?.portada_url || '';
     const dataMatch = portadaUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
     if (dataMatch) {
-      res.setHeader('Content-Type', dataMatch[1]);
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      return res.send(Buffer.from(dataMatch[2], 'base64'));
+      const mimeType = dataMatch[1];
+      const data = Buffer.from(dataMatch[2], 'base64');
+      setCachedPortada(rawId, { mimeType, data });
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+      return res.send(data);
     }
 
     return res.status(404).json({ error: 'Portada no encontrada' });
