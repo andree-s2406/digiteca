@@ -307,6 +307,7 @@ async function intentarLogin(){
   err.style.display = "none";
 
   var admin = null;
+  var authToken = null;
 
   // 1. Validar a través de la API y CockroachDB
   if (window.API && window.API.auth) {
@@ -315,8 +316,9 @@ async function intentarLogin(){
       if (res && res.user) {
         var u = res.user;
         var r = (u.rol || "").toLowerCase();
-        if (r === "admin" || r === "preceptor" || r === "profesor") {
+        if (r === "admin" || r === "preceptor" || r === "profesor" || r === "administrador") {
           admin = u;
+          authToken = res.token || null;
         }
       }
     } catch(e) {
@@ -344,7 +346,20 @@ async function intentarLogin(){
   }
 
   adminActual = admin;
-  try{ localStorage.setItem("digi-sesion", JSON.stringify({email:admin.email, nombre:admin.nombre, rol:admin.rol||"admin", anio:admin.anio||"", div:admin.div||"", cursosACargo:admin.cursosACargo||[]})); }catch(e){}
+  try{
+    var prevSes = JSON.parse(localStorage.getItem("digi-sesion") || "{}");
+    var finalToken = authToken || (prevSes && prevSes.email === admin.email ? prevSes.token : null);
+    var sesObj = {
+      email: admin.email,
+      nombre: admin.nombre,
+      rol: admin.rol || "admin",
+      anio: admin.anio || "",
+      div: admin.div || "",
+      cursosACargo: admin.cursosACargo || []
+    };
+    if (finalToken) sesObj.token = finalToken;
+    localStorage.setItem("digi-sesion", JSON.stringify(sesObj));
+  }catch(e){}
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("app").style.display = "flex";
   document.getElementById("sidebarNombre").textContent = admin.nombre;

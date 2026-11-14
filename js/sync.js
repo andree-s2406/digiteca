@@ -202,6 +202,7 @@
         const res = await fetch('/api/usuarios/me', {
           headers: {
             'Content-Type': 'application/json',
+            ...(sesion.token ? { 'Authorization': `Bearer ${sesion.token}` } : {}),
             'x-user-email': sesion.email,
             'x-user-rol': sesion.rol || 'alumno'
           }
