@@ -652,8 +652,8 @@ function render(lista, pag){
   }
 
   // Precargar en segundo plano las portadas de la página siguiente
-  if (end < total) {
-    var nextSlice = lista.slice(end, end + POR_PAG);
+  if (fin < total) {
+    var nextSlice = lista.slice(fin, fin + POR_PAG);
     setTimeout(function() {
       for (var ni = 0; ni < nextSlice.length; ni++) {
         var nImg = nextSlice[ni].img;
